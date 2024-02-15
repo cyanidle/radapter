@@ -1,0 +1,18 @@
+[submodule "submodule/hiredis"]
+	path = submodule/hiredis
+	url = https://github.com/redis/hiredis.git
+[submodule "submodule/googletest"]
+	path = submodule/googletest
+	url = https://github.com/google/googletest.git
+[submodule "submodule/backward-cpp"]
+	path = submodule/backward-cpp
+	url = https://github.com/bombela/backward-cpp.git
+[submodule "submodule/fmt"]
+	path = submodule/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "submodule/argparse"]
+	path = submodule/argparse
+	url = https://github.com/p-ranav/argparse.git
+[submodule "submodule/incbin"]
+	path = submodule/incbin
+	url = https://github.com/graphitemaster/incbin.git
