@@ -33,6 +33,8 @@ int main(int argc, char *argv[]) try
     defer cleanup([&]{
         lua_close(L);
     });
+    logDebug(Json{});
+    logDebug("{:p}", Json{});
     cli.add_argument("main")
         .default_value("")
         .help("main file to launch");

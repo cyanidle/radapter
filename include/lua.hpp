@@ -27,4 +27,9 @@ int Protected(lua_State* L) try {
 string_view ToString(lua_State* L, int idx);
 string_view ToStringEx(lua_State* L, int idx);
 
+Json FromTable(lua_State* L, int idx);
+void RegisterJson(lua_State* L);
+void RegisterJsonPtr(lua_State* L);
+
+
 }

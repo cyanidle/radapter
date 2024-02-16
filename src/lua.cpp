@@ -13,3 +13,44 @@ std::string_view lua::ToStringEx(lua_State *L, int idx) {
     auto ptr = luaL_tolstring(L, idx, &len);
     return {ptr, len};
 }
+
+Json lua::FromTable(lua_State *L, int idx)
+{
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+}
+
+static int newJson(lua_State* L) {
+
+}
+
+static int getItem(lua_State* L) {
+
+}
+
+static int getSz(lua_State* L) {
+
+}
+
+static luaL_Reg jsonLib[] = {
+    {"new", newJson},
+    {"Size", getSz},
+    {"__len", getSz},
+    {"Get", getItem},
+    {"__index", getItem},
+    {NULL, NULL}
+};
+
+void lua::RegisterJson(lua_State *L)
+{
+    luaL_newmetatable(L, "Json");
+
+    lua_pushliteral(L, "json");
+    luaL_newlib(L, jsonLib);
+    lua_setglobal(L, "json");
+}
+
+void lua::RegisterJsonPtr(lua_State *L)
+{
+
+}
