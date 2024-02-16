@@ -16,3 +16,6 @@
 [submodule "submodule/incbin"]
 	path = submodule/incbin
 	url = https://github.com/graphitemaster/incbin.git
+[submodule "submodule/json_view"]
+	path = submodule/json_view
+	url = git@github.com:cyanidle/json_view.git
