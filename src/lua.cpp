@@ -14,9 +14,8 @@ std::string_view lua::ToStringEx(lua_State *L, int idx) {
     return {ptr, len};
 }
 
-Json lua::FromTable(lua_State *L, int idx)
+Json lua::IntoJson(lua_State *L, int idx)
 {
-    luaL_checktype(L, 1, LUA_TTABLE);
 
 }
 
