@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 #include <QObject>
+#include "json_view.hpp"
 extern "C" {
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lualib.h>
@@ -16,15 +17,9 @@ extern "C" {
 namespace radapter
 {
 
+using namespace jv;
 #define QSV(x) QStringViewLiteral(x)
 using std::string_view;
 using std::string;
-
-template<typename F> struct defer {
-    F f;
-    defer(F f) : f(std::move(f)) {}
-    ~defer() noexcept(std::is_nothrow_invocable_v<F>) {f();}
-};
-template<typename F> defer(F) -> defer<F>;
 
 }

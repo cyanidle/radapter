@@ -42,6 +42,7 @@ target_link_libraries(radapter PRIVATE
     incbin
     argparse
     lua_iface
+    json_view
     Qt5::Core
     Qt5::Network
     Qt5::WebSockets

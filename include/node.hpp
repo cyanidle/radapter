@@ -1,7 +1,8 @@
 #pragma once
 
-#include "json.hpp"
+#include "json_view.hpp"
 #include <QObject>
+#include "lua.hpp"
 
 namespace radapter
 {

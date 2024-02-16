@@ -6,7 +6,6 @@
 #include <fmt/compile.h>
 #include "common.hpp"
 #include "lua.hpp"
-#include "json.hpp"
 #include <array>
 
 using namespace radapter;
