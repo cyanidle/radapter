@@ -46,6 +46,9 @@ struct LuaHandler {
         lua_pushinteger(L, i);
         return pushed();
     }
+    bool RawNumber(const Ch* s, SizeType sz, bool) {
+        return false;
+    }
     bool Uint(unsigned u) {
         lua_pushinteger(L, u);
         return pushed();
