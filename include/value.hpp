@@ -6,13 +6,14 @@
 namespace radapter::lua
 {
 
+// capture value on top of stack into a reference
 struct Value
 {
     int ref = 0;
-    int isTable = 0;
+    int type = 0;
     lua_State* L;
     Value(lua_State* L) : L(L) {
-        isTable = lua_type(L, -1) == LUA_TTABLE;
+        type = lua_type(L, -1);
         ref = luaL_ref(L, LUA_REGISTRYINDEX);
     }
     void Push() noexcept {
@@ -35,12 +36,14 @@ struct Value
     ~Value() {
         luaL_unref(L, LUA_REGISTRYINDEX, ref);
     }
+    static bool ParseJson(lua_State* L, const string &json);
+    string DumpJson(bool pretty = false);
 private:
     void checkTable() {
-        if (!isTable)
+        if (type != LUA_TTABLE)
             throw Err("value is not a table, was: {}", luaL_typename(L, -1));
     }
 };
 
-    
+
 }
