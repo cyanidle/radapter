@@ -74,4 +74,3 @@ template<> struct fmt::formatter<jv::Json> : fmt::formatter<jv::JsonView> {
         return fmt::formatter<jv::JsonView>::format(j, ctx);
     }
 };
-

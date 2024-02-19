@@ -16,6 +16,12 @@ inline const char* printErr(int err) {
     }
 }
 
+template<typename...Ts>
+[[noreturn]] void Error(lua_State* L, const char* fmt, const Ts&...a) {
+    luaL_error(L, fmt, a...);
+    ::abort();
+}
+
 template<auto func>
 int Protected(lua_State* L) try {
     return func(L);
@@ -24,12 +30,18 @@ int Protected(lua_State* L) try {
     ::abort();
 }
 
-string_view ToString(lua_State* L, int idx);
-string_view ToStringEx(lua_State* L, int idx);
+string_view ToString(lua_State* L, int idx) noexcept;
+string_view ToStringWithConv(lua_State* L, int idx) noexcept;
 
-Json IntoJson(lua_State* L, int idx);
+void PushJson(Json j) noexcept;
+Json TopToJson(lua_State* L) noexcept;
 void RegisterJson(lua_State* L);
-void RegisterJsonPtr(lua_State* L);
 
+template<typename T>
+int cleanup(lua_State* L) noexcept {
+    static_cast<T*>(lua_touserdata(L, 1))->~T();
+}
+template<typename T>
+inline constexpr luaL_Reg gcFor = {"__gc", cleanup<T>};
 
 }
