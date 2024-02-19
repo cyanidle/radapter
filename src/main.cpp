@@ -1,5 +1,6 @@
 #include <argparse/argparse.hpp>
 #include <QCoreApplication>
+#include <QTimer>
 #include "common.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
@@ -25,6 +26,39 @@ static void runBootstrap(lua_State* L) {
     }
 }
 
+static int traceFunc(lua_State* L) {
+    auto str = lua::ToStringWithConv(L, 1);
+    // todo: stack trace
+    lua_pushlstring(L, str.data(), str.size());
+    return 1;
+}
+
+static int tracerRef = 0;
+
+static int setTimeout(lua_State* L) {
+    auto millis = luaL_checkinteger(L, 1);
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+    auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    auto tmr = new QTimer();
+    tmr->callOnTimeout([ref, L]{
+        lua_rawgeti(L, LUA_REGISTRYINDEX, tracerRef);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+        lua_pcall(L, 0, LUA_MULTRET, -2);
+    });
+    QObject::connect(tmr, &QObject::destroyed, [ref, L]{
+        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+    });
+    tmr->start(millis);
+    lua_pushlightuserdata(L, tmr);
+    return 1;
+}
+
+static int clearTimeout(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
+    delete static_cast<QTimer*>(lua_touserdata(L, 1));
+    return 0;
+}
+
 struct CloseLater {
     lua_State* L;
     ~CloseLater() {lua_close(L);}
@@ -38,7 +72,13 @@ int main(int argc, char *argv[]) try
     CloseLater close{L};
     luaL_openlibs(L);
     lua_atpanic(L, panic);
+    lua_pushcfunction(L, traceFunc);
+    tracerRef = luaL_ref(L, LUA_REGISTRYINDEX);
     logs::Register(L);
+    lua_pushcfunction(L, lua::Protected<setTimeout>);
+    lua_setglobal(L, "setTimeout");
+    lua_pushcfunction(L, lua::Protected<clearTimeout>);
+    lua_setglobal(L, "clearTimeout");
     runBootstrap(L);
     cli.add_argument("run")
         .action([&](const string& file){

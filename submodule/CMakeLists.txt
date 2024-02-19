@@ -19,3 +19,6 @@ add_subdirectory(googletest EXCLUDE_FROM_ALL)
 
 add_library(incbin INTERFACE)
 target_include_directories(incbin INTERFACE incbin)
+
+add_library(rapid INTERFACE)
+target_include_directories(rapid INTERFACE rapidjson/include)

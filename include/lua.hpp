@@ -8,7 +8,7 @@ inline const char* printErr(int err) {
     switch (err) {
     case LUA_OK: return "ok";
     case LUA_YIELD:	return "yield";
-    case LUA_ERRRUN: return "run";
+    case LUA_ERRRUN: return "run error";
     case LUA_ERRSYNTAX:	return "syntax error";
     case LUA_ERRMEM: return "memory";
     case LUA_ERRERR: return "err";

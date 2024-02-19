@@ -16,3 +16,6 @@
 [submodule "submodule/incbin"]
 	path = submodule/incbin
 	url = https://github.com/graphitemaster/incbin.git
+[submodule "submodule/rapidjson"]
+	path = submodule/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
