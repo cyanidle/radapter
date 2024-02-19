@@ -15,10 +15,9 @@ static int panic(lua_State* L) {
 }
 
 static void runBootstrap(lua_State* L) {
-    if (auto err = luaL_loadbufferx(
-            L, reinterpret_cast<const char*>(gbootstrapData),
-            gbootstrapSize, "bootstrap", "b"))
-    {
+    auto src = reinterpret_cast<const char*>(gbootstrapData);
+    auto sz = gbootstrapSize;
+    if (auto err = luaL_loadbufferx(L, src, sz, "bootstrap", "b")) {
         throw Err("while loading bootstrap: {}", lua::printErr(err));
     }
     if (auto err = lua_pcall(L, 0, LUA_MULTRET, 0)) {
@@ -26,23 +25,26 @@ static void runBootstrap(lua_State* L) {
     }
 }
 
+struct CloseLater {
+    lua_State* L;
+    ~CloseLater() {lua_close(L);}
+};
+
 int main(int argc, char *argv[]) try
 {
     QCoreApplication app(argc, argv);
     argparse::ArgumentParser cli(argv[0], "0.0.0");
     auto L = luaL_newstate();
-    defer cleanup([&]{
-        lua_close(L);
-    });
+    CloseLater close{L};
     luaL_openlibs(L);
     lua_atpanic(L, panic);
     logs::Register(L);
-    lua::RegisterJson(L);
     runBootstrap(L);
     cli.add_argument("run")
         .action([&](const string& file){
             luaL_dofile(L, file.c_str());
         })
+        .nargs(argparse::nargs_pattern::any)
         .help("main file to launch");
     cli.add_argument("--eval", "-e")
         .action([&](string script){

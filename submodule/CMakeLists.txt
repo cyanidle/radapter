@@ -19,5 +19,3 @@ add_subdirectory(googletest EXCLUDE_FROM_ALL)
 
 add_library(incbin INTERFACE)
 target_include_directories(incbin INTERFACE incbin)
-
-add_subdirectory(json_view)

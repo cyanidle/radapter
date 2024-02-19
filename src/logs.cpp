@@ -68,9 +68,7 @@ static int logImpl(lua_State* L) {
             break;
         }
         case LUA_TTABLE: {
-            lua_pushvalue(L, idx);
-            args.push_back(lua::TopToJson(L));
-            lua_pop(L, 1);
+            //todo
             break;
         }
         default: {

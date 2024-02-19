@@ -33,10 +33,6 @@ int Protected(lua_State* L) try {
 string_view ToString(lua_State* L, int idx) noexcept;
 string_view ToStringWithConv(lua_State* L, int idx) noexcept;
 
-void PushJson(Json j) noexcept;
-Json TopToJson(lua_State* L) noexcept;
-void RegisterJson(lua_State* L);
-
 template<typename T>
 int cleanup(lua_State* L) noexcept {
     static_cast<T*>(lua_touserdata(L, 1))->~T();
