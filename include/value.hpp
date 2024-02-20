@@ -36,8 +36,6 @@ struct Value
     ~Value() {
         luaL_unref(L, LUA_REGISTRYINDEX, ref);
     }
-    static bool ParseJson(lua_State* L, const string &json);
-    string DumpJson(bool pretty = false);
 private:
     void checkTable() {
         if (type != LUA_TTABLE)

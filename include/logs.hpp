@@ -27,6 +27,7 @@ void PrepareLog(Level lvl, const T &arg) {
 
 void Register(lua_State* L);
 
+
 }
 
 namespace radapter {

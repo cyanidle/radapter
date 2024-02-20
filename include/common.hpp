@@ -21,3 +21,12 @@ using std::string_view;
 using std::string;
 
 }
+
+
+#ifdef __GNUC__
+#define _Likely(x)       __builtin_expect(!!(x), 1)
+#define _Unlikely(x)     __builtin_expect(!!(x), 0)
+#else
+#define _Likely(x)       (x)
+#define _Unlikely(x)     (x)
+#endif

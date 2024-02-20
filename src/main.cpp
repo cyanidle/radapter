@@ -15,14 +15,13 @@ static int panic(lua_State* L) {
     std::exit(1);
 }
 
-static void runBootstrap(lua_State* L) {
-    auto src = reinterpret_cast<const char*>(gbootstrapData);
-    auto sz = gbootstrapSize;
+static void runPrecompiled(lua_State* L, const void* data, size_t sz) {
+    auto src = reinterpret_cast<const char*>(data);
     if (auto err = luaL_loadbufferx(L, src, sz, "bootstrap", "b")) {
         throw Err("while loading bootstrap: {}", lua::printErr(err));
     }
     if (auto err = lua_pcall(L, 0, LUA_MULTRET, 0)) {
-        throw Err("while running bootstrap: {}", lua::printErr(err));
+        throw Err("while running bootstrap: {} => {}", lua::printErr(err), lua::ToString(L, -1));
     }
 }
 
@@ -59,6 +58,43 @@ static int clearTimeout(lua_State* L) {
     return 0;
 }
 
+static int parseJson(lua_State* L) {
+    luaL_checkany(L, 1);
+    size_t sz;
+    auto str = luaL_checklstring(L, 1, &sz);
+    try {
+        lua::ParseJson(L, {str, sz});
+    } catch (std::exception& exc) {
+        luaL_error(L, "parse error: %s", exc.what());
+    }
+    return 1;
+}
+
+static int dumpJson(lua_State* L) {
+    luaL_checkany(L, 1);
+    auto n = lua_gettop(L);
+    bool pretty = false;
+    if (n >= 2) {
+        luaL_checktype(L, 2, LUA_TBOOLEAN);
+        pretty = lua_toboolean(L, 2);
+    }
+    try {
+        lua::DumpJson(L, 1, pretty);
+    } catch (std::exception& exc) {
+        luaL_error(L, "dump error: %s", exc.what());
+    }
+    return 1;
+}
+
+static luaL_Reg builtins[] = {
+    {"setTimeout", lua::Protected<setTimeout>},
+    {"clearTimeout", lua::Protected<clearTimeout>},
+    {"parseJson", parseJson},
+    {"dumpJson", dumpJson},
+    {"logStack", lua::DumpStack},
+    {NULL, NULL}
+};
+
 struct CloseLater {
     lua_State* L;
     ~CloseLater() {lua_close(L);}
@@ -75,11 +111,9 @@ int main(int argc, char *argv[]) try
     lua_pushcfunction(L, traceFunc);
     tracerRef = luaL_ref(L, LUA_REGISTRYINDEX);
     logs::Register(L);
-    lua_pushcfunction(L, lua::Protected<setTimeout>);
-    lua_setglobal(L, "setTimeout");
-    lua_pushcfunction(L, lua::Protected<clearTimeout>);
-    lua_setglobal(L, "clearTimeout");
-    runBootstrap(L);
+    lua_pushglobaltable(L);
+    luaL_setfuncs(L, builtins, 0);
+    runPrecompiled(L, gbootstrapData, gbootstrapSize);
     cli.add_argument("run")
         .action([&](const string& file){
             luaL_dofile(L, file.c_str());

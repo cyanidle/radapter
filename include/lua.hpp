@@ -1,5 +1,7 @@
 #pragma once
 #include "common.hpp"
+#include "fmt/base.h"
+#include "fmt/format.h"
 
 namespace radapter::lua
 {
@@ -22,6 +24,20 @@ template<typename...Ts>
     ::abort();
 }
 
+template<bool onlyExc = true>
+struct [[nodiscard]] StackRestore {
+    lua_State* L;
+    int was;
+    StackRestore(lua_State* L) {
+        was = lua_gettop(L);
+    }
+    ~StackRestore() {
+        if (!onlyExc || std::uncaught_exceptions()) {
+            lua_settop(L, was);
+        }
+    }
+};
+
 template<auto func>
 int Protected(lua_State* L) try {
     return func(L);
@@ -29,6 +45,8 @@ int Protected(lua_State* L) try {
     luaL_error(L, "Exception: %s", exc.what());
     ::abort();
 }
+
+lua_Integer IsArray(lua_State* L, int idx);
 
 string_view ToString(lua_State* L, int idx) noexcept;
 string_view ToStringWithConv(lua_State* L, int idx) noexcept;
@@ -40,4 +58,47 @@ int cleanup(lua_State* L) noexcept {
 template<typename T>
 inline constexpr luaL_Reg gcFor = {"__gc", cleanup<T>};
 
+void ParseJson(lua_State* L, string_view json);
+void DumpJson(lua_State* L, int idx, bool pretty = false);
+int DumpStack(lua_State* L) noexcept;
+
+struct LogString {
+    lua_State* L = nullptr;
+    int idx = -1;
+};
+struct LogTable {
+    lua_State* L = nullptr;
+    int idx = -1;
+};
+
 }
+
+template<> struct fmt::formatter<radapter::lua::LogString> : fmt::formatter<fmt::string_view> {
+    template<typename FormatContext>
+    auto format(radapter::lua::LogString s, FormatContext& ctx) {
+        return fmt::formatter<fmt::string_view>::format(radapter::lua::ToString(s.L, s.idx), ctx);
+    }
+};
+
+template<> struct fmt::formatter<radapter::lua::LogTable> {
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx) {
+        auto fmt_end = std::find(ctx.begin(), ctx.end(), '}');
+        if (fmt_end != ctx.begin()) {
+            char representation = *ctx.begin();
+            if (representation == 'c')
+                pretty = false;
+            else if (representation != 'p')
+                pretty = true;
+            else
+                throw fmt::format_error("invalid");
+            ctx.advance_to(std::next(ctx.begin()));
+        }
+    }
+    template<typename FormatContext>
+    auto format(radapter::lua::LogTable s, FormatContext& ctx) {
+        radapter::lua::DumpJson(s.L, s.idx, pretty);
+        fmt::format_to(ctx.out(), "{}", radapter::lua::ToString(s.L, s.idx));
+    }
+    bool pretty = true;
+};
