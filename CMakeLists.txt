@@ -21,7 +21,7 @@ find_program(LUA_COMPILER
 )
 
 set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
-set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/bootstrap.lua)
+set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
 add_custom_command(
     OUTPUT ${BOOTSTRAP_OUT}
     COMMAND ${LUA_COMPILER} -o ${BOOTSTRAP_OUT} ${BOOTSTRAP_IN}
