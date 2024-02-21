@@ -177,7 +177,8 @@ static void visit(lua_State* L, Handler& h) {
             while(lua_next(L, -2) != 0) {
                 obj++;
                 if (lua_type(L, -2) != LUA_TSTRING) {
-                    throw Err("key was not a string: rather: {}", luaL_typename(L, -2));
+                    throw Err("{} => key was not a string: rather: {}",
+                              lua::ToStringWithConv(L, -2), luaL_typename(L, -2));
                 }
                 auto key = ToString(L, -2);
                 h.Key(key.data(), key.size(), true);
@@ -249,26 +250,31 @@ lua_Integer lua::IsArray(lua_State *L, int idx)
         throw Err("table expected");
     }
     lua_pushvalue(L, idx);
-    auto len = lua_rawlen(L, idx);
-    lua_Integer hits = 1;
+    lua_Integer hits = 0;
+    lua_Integer max = 0;
     lua_pushnil(L);
     while(lua_next(L, -2)) {
-        if (++hits > len) {
+        ++hits;
+        if (!lua_isinteger(L, -2)) {
+            DumpStack(L);
             lua_pop(L, 3);
             return 0;
         }
-        auto k = luaL_optinteger(L, -2, 0);
-        if (k < 1 || k > len) {
+        auto k = lua_tointeger(L, -2);
+        if (k < 1) {
             lua_pop(L, 3);
             return 0;
+        }
+        if (k > max) {
+            max = k;
         }
         lua_pop(L, 1);
     }
     lua_pop(L, 1);
-    if (hits != len) {
+    if (hits < max) {
         return 0;
     }
-    return len;
+    return hits;
 }
 
 int lua::DumpStack(lua_State *L) noexcept

@@ -12,8 +12,8 @@ inline const char* printErr(int err) {
     case LUA_YIELD:	return "yield";
     case LUA_ERRRUN: return "run error";
     case LUA_ERRSYNTAX:	return "syntax error";
-    case LUA_ERRMEM: return "memory";
-    case LUA_ERRERR: return "err";
+    case LUA_ERRMEM: return "memory error";
+    case LUA_ERRERR: return "unknown error";
     default: return "<unknown>";
     }
 }
@@ -73,10 +73,10 @@ struct LogTable {
 
 }
 
-template<> struct fmt::formatter<radapter::lua::LogString> : fmt::formatter<fmt::string_view> {
+template<> struct fmt::formatter<radapter::lua::LogString> : fmt::formatter<std::string_view> {
     template<typename FormatContext>
-    auto format(radapter::lua::LogString s, FormatContext& ctx) {
-        return fmt::formatter<fmt::string_view>::format(radapter::lua::ToString(s.L, s.idx), ctx);
+    auto format(const radapter::lua::LogString& s, FormatContext& ctx) const {
+        return fmt::formatter<std::string_view>::format(radapter::lua::ToString(s.L, s.idx), ctx);
     }
 };
 
@@ -92,13 +92,13 @@ template<> struct fmt::formatter<radapter::lua::LogTable> {
                 pretty = true;
             else
                 throw fmt::format_error("invalid");
-            ctx.advance_to(std::next(ctx.begin()));
         }
+        return std::next(ctx.begin());
     }
     template<typename FormatContext>
-    auto format(radapter::lua::LogTable s, FormatContext& ctx) {
+    auto format(const radapter::lua::LogTable& s, FormatContext& ctx) const {
         radapter::lua::DumpJson(s.L, s.idx, pretty);
-        fmt::format_to(ctx.out(), "{}", radapter::lua::ToString(s.L, s.idx));
+        return fmt::format_to(ctx.out(), "{}", radapter::lua::ToString(s.L, s.idx));
     }
     bool pretty = true;
 };

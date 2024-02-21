@@ -116,7 +116,10 @@ int main(int argc, char *argv[]) try
     runPrecompiled(L, gbootstrapData, gbootstrapSize);
     cli.add_argument("run")
         .action([&](const string& file){
-            luaL_dofile(L, file.c_str());
+            if (auto err = luaL_dofile(L, file.c_str())) {
+                logErr("while running {}: \n\t{} => {}", file, lua::printErr(err), lua::ToString(L, -1));
+                std::exit(1);
+            }
         })
         .nargs(argparse::nargs_pattern::any)
         .help("main file to launch");

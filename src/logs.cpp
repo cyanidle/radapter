@@ -41,9 +41,18 @@ void radapter::logs::DoLog(Level lvl, fmt::string_view format, fmt::format_args 
 
 static int logImpl(lua_State* L) {
     auto lvl = logs::Level(lua_tointeger(L, lua_upvalueindex(1)));
-    auto n = lua_gettop(L) - 1;
+    auto n = lua_gettop(L);
+    if (n == 0) {
+        lua::Error(L, "at least 1 argument expected");
+    }
     fmt::dynamic_format_arg_store<fmt::format_context> args;
-    auto fmt = luaL_checkstring(L, 1);
+    string_view fmt;
+    if (lua_type(L, 1) == LUA_TSTRING) {
+        fmt = lua::ToString(L, 1);
+    } else {
+        fmt = "{}";
+        lua_pushvalue(L, 1);
+    }
     args.reserve(n, 0);
     for (auto idx = 2; idx < n + 2; ++idx) {
         switch (lua_type(L, idx)) {
@@ -52,7 +61,7 @@ static int logImpl(lua_State* L) {
             break;
         }
         case LUA_TSTRING: {
-            args.push_back(lua::ToString(L, idx));
+            args.push_back(lua::LogString{L, idx});
             break;
         }
         case LUA_TNIL: {
@@ -68,7 +77,7 @@ static int logImpl(lua_State* L) {
             break;
         }
         case LUA_TTABLE: {
-            //todo
+            args.push_back(lua::LogTable{L, idx});
             break;
         }
         default: {
