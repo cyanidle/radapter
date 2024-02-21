@@ -88,7 +88,7 @@ template<> struct fmt::formatter<radapter::lua::LogTable> {
             char representation = *ctx.begin();
             if (representation == 'c')
                 pretty = false;
-            else if (representation != 'p')
+            else if (representation == 'p')
                 pretty = true;
             else
                 throw fmt::format_error("invalid");
@@ -101,5 +101,5 @@ template<> struct fmt::formatter<radapter::lua::LogTable> {
         auto str = radapter::lua::ToString(s.L, -1);
         return fmt::format_to(ctx.out(), "{}", str);
     }
-    bool pretty = true;
+    bool pretty = false;
 };

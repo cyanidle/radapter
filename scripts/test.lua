@@ -15,3 +15,4 @@ print(assert(j.b))
 print(assert(j.d.lol))
 
 log.debug(j)
+log.debug("{:p}", j)
