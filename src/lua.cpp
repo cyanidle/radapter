@@ -256,7 +256,6 @@ lua_Integer lua::IsArray(lua_State *L, int idx)
     while(lua_next(L, -2)) {
         ++hits;
         if (!lua_isinteger(L, -2)) {
-            DumpStack(L);
             lua_pop(L, 3);
             return 0;
         }

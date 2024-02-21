@@ -98,7 +98,8 @@ template<> struct fmt::formatter<radapter::lua::LogTable> {
     template<typename FormatContext>
     auto format(const radapter::lua::LogTable& s, FormatContext& ctx) const {
         radapter::lua::DumpJson(s.L, s.idx, pretty);
-        return fmt::format_to(ctx.out(), "{}", radapter::lua::ToString(s.L, s.idx));
+        auto str = radapter::lua::ToString(s.L, -1);
+        return fmt::format_to(ctx.out(), "{}", str);
     }
     bool pretty = true;
 };
