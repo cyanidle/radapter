@@ -14,8 +14,6 @@ target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
 
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
 add_subdirectory(argparse EXCLUDE_FROM_ALL)
-set(gtest_build_samples OFF CACHE BOOL "override")
-add_subdirectory(googletest EXCLUDE_FROM_ALL)
 
 add_library(incbin INTERFACE)
 target_include_directories(incbin INTERFACE incbin)
