@@ -43,6 +43,8 @@ target_link_libraries(radapter PRIVATE
     argparse
     lua_iface
     rapid
+    hiredis
+    hiredis_ssl
     Qt5::Core
     Qt5::Network
     Qt5::WebSockets

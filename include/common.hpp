@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <string_view>
 #include <string>
 #include <cstdint>
@@ -19,6 +20,7 @@ namespace radapter
 #define QSV(x) QStringViewLiteral(x)
 using std::string_view;
 using std::string;
+using std::unique_ptr;
 
 }
 

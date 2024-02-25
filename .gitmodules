@@ -16,3 +16,6 @@
 [submodule "submodule/rapidjson"]
 	path = submodule/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
+[submodule "submodule/describe"]
+	path = submodule/describe
+	url = git@github.com:cyanidle/describe.git
