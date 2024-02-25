@@ -43,7 +43,7 @@ static int logImpl(lua_State* L) {
     auto lvl = logs::Level(lua_tointeger(L, lua_upvalueindex(1)));
     auto n = lua_gettop(L);
     if (n == 0) {
-        lua::Error(L, "at least 1 argument expected");
+        throw Err("at least 1 argument expected");
     }
     fmt::dynamic_format_arg_store<fmt::format_context> args;
     string_view fmt;

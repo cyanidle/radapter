@@ -1,44 +1,31 @@
 #pragma once
 
 #include "common.hpp"
+#include "describe.hpp"
 #include <QObject>
 #include <QVariant>
 #include <fmt/core.h>
 
 class QtRedisAdapter;
 struct redisAsyncContext;
+
 namespace radapter::redis
 {
+
+struct Settings {
+    string host = "127.0.0.1";
+    uint16_t port = 6379;
+    uint16_t db = 0;
+};
+
+DESCRIBE(Settings, &_::host, &_::port, &_::db)
 
 class Client : public QObject
 {
     Q_OBJECT
 public:
-
-    struct Exception : public std::exception {
-        Exception(std::string reason = "Unknown") : reason(reason) {}
-        std::string reason;
-        const char* what() const noexcept override {
-            return reason.c_str();
-        }
-    };
-
-    using ResultCallback = std::function<void(QVariant)>;
-
-    struct Settings {
-        string host = "127.0.0.1";
-        uint16_t port = 6379;
-        uint16_t db = 0;
-    };
-
-
-    template<typename Fmt, typename...Args>
-    ThenHelper Execute(Fmt&& fmt, Args&&...args) {
-        return Execute(fmt::format(std::forward<Fmt>(fmt), std::forward<Args>(args)...));
-    }
-    ThenHelper Execute(std::string cmd) {
-        return ThenHelper{cmd, *this};
-    }
+    using ResultCallback = std::function<void(QVariant res, string err)>;
+    void Execute(std::string cmd, ResultCallback cb);
     Client(const Settings& settings);
     ~Client();
 signals:
@@ -54,9 +41,7 @@ private:
 
     struct Impl;
     unique_ptr<Impl> impl;
-    QtRedisAdapter* adapter {};
+    QtRedisAdapter* adapter;
 };
 
 }
-
-Q_DECLARE_METATYPE(radapter::redis::Client::Exception)

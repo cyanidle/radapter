@@ -1,4 +1,3 @@
-
 #include <QSocketNotifier>
 #include "./async.h"
 

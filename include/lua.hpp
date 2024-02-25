@@ -6,6 +6,8 @@
 namespace radapter::lua
 {
 
+void checkType(lua_State* L, int t, int idx = -1);
+
 struct Ref {
     lua_State* L;
     int ref;
@@ -45,26 +47,6 @@ inline const char* printErr(int err) {
     default: return "<unknown>";
     }
 }
-
-template<typename...Ts>
-[[noreturn]] void Error(lua_State* L, const char* fmt, const Ts&...a) {
-    luaL_error(L, fmt, a...);
-    ::abort();
-}
-
-template<bool onlyExc = true>
-struct [[nodiscard]] StackRestore {
-    lua_State* L;
-    int was;
-    StackRestore(lua_State* L) {
-        was = lua_gettop(L);
-    }
-    ~StackRestore() {
-        if (!onlyExc || std::uncaught_exceptions()) {
-            lua_settop(L, was);
-        }
-    }
-};
 
 template<auto func>
 int Protected(lua_State* L) try {
