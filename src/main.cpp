@@ -1,6 +1,7 @@
 #include <argparse/argparse.hpp>
 #include <QCoreApplication>
 #include <QTimer>
+#include <QThread>
 #include "common.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
@@ -15,16 +16,6 @@ static int panic(lua_State* L) {
     std::exit(1);
 }
 
-static void runPrecompiled(lua_State* L, const void* data, size_t sz) {
-    auto src = reinterpret_cast<const char*>(data);
-    if (auto err = luaL_loadbufferx(L, src, sz, "bootstrap", "b")) {
-        throw Err("while loading bootstrap: {}", lua::printErr(err));
-    }
-    if (auto err = lua_pcall(L, 0, LUA_MULTRET, 0)) {
-        throw Err("while running bootstrap: {} => {}", lua::printErr(err), lua::ToString(L, -1));
-    }
-}
-
 static int traceFunc(lua_State* L) {
     auto str = lua::ToStringWithConv(L, 1);
     // todo: stack trace
@@ -37,15 +28,12 @@ static int tracerRef = 0;
 static int setTimeout(lua_State* L) {
     auto millis = luaL_checkinteger(L, 1);
     luaL_checktype(L, 2, LUA_TFUNCTION);
-    auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    auto ref = lua::Ref(L, 2);
     auto tmr = new QTimer();
     tmr->callOnTimeout([ref, L]{
         lua_rawgeti(L, LUA_REGISTRYINDEX, tracerRef);
-        lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+        ref.push();
         lua_pcall(L, 0, LUA_MULTRET, -2);
-    });
-    QObject::connect(tmr, &QObject::destroyed, [ref, L]{
-        luaL_unref(L, LUA_REGISTRYINDEX, ref);
     });
     tmr->start(millis);
     lua_pushlightuserdata(L, tmr);
@@ -87,11 +75,11 @@ static int dumpJson(lua_State* L) {
 }
 
 static luaL_Reg builtins[] = {
-    {"setTimeout", lua::Protected<setTimeout>},
-    {"clearTimeout", lua::Protected<clearTimeout>},
-    {"parseJson", parseJson},
-    {"dumpJson", dumpJson},
-    {"logStack", lua::DumpStack},
+    {"each", lua::Protected<setTimeout>},
+    {"stop", lua::Protected<clearTimeout>},
+    {"parse", parseJson},
+    {"dump", dumpJson},
+    {"printStack", lua::DumpStack},
     {NULL, NULL}
 };
 
@@ -99,6 +87,33 @@ struct CloseLater {
     lua_State* L;
     ~CloseLater() {lua_close(L);}
 };
+
+
+static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
+    lua_rawgeti(L, LUA_REGISTRYINDEX, tracerRef);
+    if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
+        throw Err("while loading {}: {}", name, lua::printErr(err));
+    }
+    if (auto err = lua_pcall(L, 0, LUA_MULTRET, -2)) {
+        throw Err("while running {}: {} => {}", name, lua::printErr(err), lua::ToString(L, -1));
+    }
+}
+
+static void interactive(lua_State* L) {
+    auto thr = QThread::currentThread();
+    while (!thr->isInterruptionRequested()) {
+        std::string line;
+        std::getline(std::cin, line);
+        QMetaObject::invokeMethod(qApp, [L, line=std::move(line)]{
+            try {
+                runBuffer(L, line, "<command line>", "t");
+            } catch (std::exception& e) {
+                logErr("Error: {}", e.what());
+            }
+        },
+        Qt::QueuedConnection);
+    }
+}
 
 int main(int argc, char *argv[]) try
 {
@@ -113,7 +128,10 @@ int main(int argc, char *argv[]) try
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
-    runPrecompiled(L, gbootstrapData, gbootstrapSize);
+    runBuffer(L,
+              {reinterpret_cast<const char*>(gbootstrapData), gbootstrapSize},
+              "<bootstrap>",
+              "b");
     cli.add_argument("run")
         .action([&](const string& file){
             if (auto err = luaL_dofile(L, file.c_str())) {
@@ -128,12 +146,19 @@ int main(int argc, char *argv[]) try
             luaL_loadstring(L, script.c_str());
         })
         .help("execute lua from cli");
+    cli.add_argument("--interactive", "-i")
+        .implicit_value(true)
+        .default_value(false)
+        .help("interactive (cli) mode");
     try {
         cli.parse_known_args(argc, argv);
     } catch (std::exception& exc) {
         logErr(exc.what());
         std::cerr << cli;
         return 1;
+    }
+    if (cli["i"] == true) {
+        QThread::create([L]{interactive(L);})->start();
     }
     return app.exec();
 } catch (std::exception& exc) {

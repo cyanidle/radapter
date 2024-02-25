@@ -1,4 +1,4 @@
-local j = parseJson[[
+local j = parse[[
 {
     "a": [1, 2, 3],
     "b": "c",

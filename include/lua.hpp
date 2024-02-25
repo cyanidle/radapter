@@ -6,6 +6,34 @@
 namespace radapter::lua
 {
 
+struct Ref {
+    lua_State* L;
+    int ref;
+    Ref(lua_State* L, int idx) noexcept : L(L) {
+        lua_pushvalue(L, idx);
+        ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    Ref(const Ref& o) noexcept : L(o.L) {
+        o.push();
+        ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    Ref& operator=(const Ref& o) {
+        if (this != &o) {
+            this->~Ref();
+            L = o.L;
+            o.push();
+            ref = luaL_ref(L, LUA_REGISTRYINDEX);
+        }
+        return *this;
+    }
+    void push() const noexcept {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+    }
+    ~Ref() {
+        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+    }
+};
+
 inline const char* printErr(int err) {
     switch (err) {
     case LUA_OK: return "ok";
