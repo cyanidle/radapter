@@ -20,3 +20,5 @@ target_include_directories(incbin INTERFACE incbin)
 
 add_library(rapid INTERFACE)
 target_include_directories(rapid INTERFACE rapidjson/include)
+
+add_subdirectory(describe)

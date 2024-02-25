@@ -45,6 +45,7 @@ target_link_libraries(radapter PRIVATE
     rapid
     hiredis
     hiredis_ssl
+    describe
     Qt5::Core
     Qt5::Network
     Qt5::WebSockets
