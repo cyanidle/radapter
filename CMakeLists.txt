@@ -46,6 +46,7 @@ target_link_libraries(radapter PRIVATE
     hiredis
     hiredis_ssl
     describe
+    utilcpp
     Qt5::Core
     Qt5::Network
     Qt5::WebSockets

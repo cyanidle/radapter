@@ -6,6 +6,17 @@
 namespace radapter::lua
 {
 
+template<typename Fn>
+void IterateTable(lua_State* L, int idx, Fn&& f) {
+    lua_pushvalue(L, idx);
+    lua_pushnil(L);
+    while(lua_next(L, -2)) {
+        f();
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+}
+
 void checkType(lua_State* L, int t, int idx = -1);
 
 struct Ref {

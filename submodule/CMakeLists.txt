@@ -22,3 +22,4 @@ add_library(rapid INTERFACE)
 target_include_directories(rapid INTERFACE rapidjson/include)
 
 add_subdirectory(describe)
+add_subdirectory(utilcpp)

@@ -2,6 +2,7 @@
 #include "describe/describe.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
+#include "utilcpp/meta.hpp"
 
 namespace radapter {
 
@@ -17,7 +18,7 @@ void deserialize(lua_State* L, T& out)
             try {
                 deserialize(L, out.*f.value);
             } catch (std::exception& exc) {
-                throw Err("{}.{}", exc.what());
+                throw Err("{}.{}", f.name, exc.what());
             }
             lua_pop(L, 1);
         });
@@ -36,8 +37,32 @@ void deserialize(lua_State* L, T& out)
             throw Err("number should be an integer");
         }
         out = lua_tointeger(L, -1);
-    } else if (false) {
-        // containers
+    } else if constexpr (util::is_assoc_container_v<T>) {
+        using kT = typename T::key_type;
+        static_assert(util::is_string_like_v<kT>, "non-string map keys unsupported");
+        using vT = typename T::mapped_type;
+        lua::IterateTable(L, -1, [&]{
+            lua::checkType(L, LUA_TSTRING, -2);
+            auto key = lua::ToString(L, -2);
+            try {
+                deserialize(L, out[key]);
+            } catch (std::exception& exc) {
+                throw Err("{}.{}", key, exc.what());
+            }
+        });
+    } else if constexpr (util::is_container_v<T>) {
+        using vT = typename T::value_type;
+        lua::checkType(L, LUA_TTABLE, -1);
+        if (auto len = lua::IsArray(L, -1)) {
+            out.resize(len);
+            for (auto i = 1; i <= len; ++i) {
+                lua_rawgeti(L, -1, i);
+                deserialize(L, out[i]);
+                lua_pop(L, 1);
+            }
+        } else {
+            throw Err("value is not an array");
+        }
     } else {
         static_assert(std::is_void_v<T>, "Unsupported type");
     }
