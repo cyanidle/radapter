@@ -28,7 +28,7 @@ void deserialize(lua_State* L, T& out)
     }  else if constexpr (std::is_floating_point_v<T>) {
         lua::checkType(L, LUA_TNUMBER, -1);
         out = lua_tonumber(L, -1);
-    } else if constexpr (std::is_same_v<T, std::string>) {
+    } else if constexpr (util::is_string_like_v<T>) {
         lua::checkType(L, LUA_TSTRING, -1);
         out = lua::ToString(L, -1);
     } else if constexpr (std::is_integral_v<T>) {
@@ -57,7 +57,11 @@ void deserialize(lua_State* L, T& out)
             out.resize(len);
             for (auto i = 1; i <= len; ++i) {
                 lua_rawgeti(L, -1, i);
-                deserialize(L, out[i]);
+                try {
+                    deserialize(L, out[i]);
+                } catch (std::exception& exc) {
+                    throw Err("[{}].{}", i, exc.what());
+                }
                 lua_pop(L, 1);
             }
         } else {
