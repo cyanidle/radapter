@@ -19,3 +19,6 @@
 [submodule "submodule/describe"]
 	path = submodule/describe
 	url = git@github.com:cyanidle/describe.git
+[submodule "submodule/utilcpp"]
+	path = submodule/utilcpp
+	url = git@github.com:cyanidle/utilcpp.git
