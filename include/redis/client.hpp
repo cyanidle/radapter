@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common.hpp"
-#include "describe.hpp"
+#include "describe/describe.hpp"
 #include <QObject>
 #include <QVariant>
 #include <fmt/core.h>
