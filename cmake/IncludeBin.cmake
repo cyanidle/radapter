@@ -828,4 +828,6 @@ end:
     return 1;
 }
 ]])
+list(JOIN incbin_h "\;" incbin_h)
+list(JOIN incbin_c "\;" incbin_c)
 endmacro()
