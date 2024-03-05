@@ -1,0 +1,10 @@
+{
+  "dependecies": [
+    "lua",
+    "qt5-base",
+    "qt5-websockets",
+    "qt5-serialbus",
+    "qt5-serialport"
+  ],
+  "builtin-baseline": "72d66da23b4332533c82d797bf2f82b8d6d1bf8a"
+}

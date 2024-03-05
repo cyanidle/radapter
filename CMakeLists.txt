@@ -5,6 +5,8 @@ project(radapter
     DESCRIPTION "protocol zoo router with lua"
 )
 
+include(cmake/IncludeBin.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -16,10 +18,10 @@ find_package(Qt5 REQUIRED COMPONENTS
 set(CMAKE_AUTOMOC ON)
 add_subdirectory(submodule)
 
+
 find_program(LUA_COMPILER
     NAMES luac5.4 REQUIRED
 )
-
 set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
 set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
 add_custom_command(
@@ -29,17 +31,14 @@ add_custom_command(
     VERBATIM
     COMMENT "LUA: Compiling bootstrap"
 )
-add_custom_target(compile_bootstrap DEPENDS ${BOOTSTRAP_OUT})
+include_bin(compiled_bootstrap ${BOOTSTRAP_OUT})
 
 file(GLOB_RECURSE SRC_FILES src/*.cpp include/*.hpp)
 add_executable(radapter ${SRC_FILES})
-set_property(SOURCE src/main.cpp APPEND PROPERTY OBJECT_DEPENDS ${BOOTSTRAP_IN})
-add_dependencies(radapter compile_bootstrap)
 target_include_directories(radapter PRIVATE include)
-target_compile_definitions(radapter PRIVATE BOOTSTRAP_PATH="${BOOTSTRAP_OUT}")
 target_link_libraries(radapter PRIVATE
     fmt
-    incbin
+    compiled_bootstrap
     argparse
     lua_iface
     rapid
