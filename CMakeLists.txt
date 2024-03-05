@@ -18,10 +18,19 @@ find_package(Qt5 REQUIRED COMPONENTS
 set(CMAKE_AUTOMOC ON)
 add_subdirectory(submodule)
 
+add_library(lua_iface INTERFACE)
+if (WIN32)
 
-find_program(LUA_COMPILER
-    NAMES luac5.4 REQUIRED
-)
+else()
+    include(FindPkgConfig)
+    pkg_check_modules(LUA REQUIRED lua-5.4) #liblua<version>-dev
+    target_include_directories(lua_iface INTERFACE ${LUA_INCLUDE_DIRS})
+    target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
+    find_program(LUA_COMPILER
+        NAMES luac5.4 REQUIRED
+    )
+endif()
+
 set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
 set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
 add_custom_command(
