@@ -1,6 +1,9 @@
 {
-  "dependecies": [
-    "lua",
+  "dependencies": [
+    {
+      "name": "lua",
+      "features": ["tools"]
+    },
     "qt5-base",
     "qt5-websockets",
     "qt5-serialbus",

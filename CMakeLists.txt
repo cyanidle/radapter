@@ -20,16 +20,17 @@ add_subdirectory(submodule)
 
 add_library(lua_iface INTERFACE)
 if (WIN32)
-
+    find_package(Lua REQUIRED)
+    target_link_libraries(lua_iface INTERFACE LUA)
 else()
     include(FindPkgConfig)
-    pkg_check_modules(LUA REQUIRED lua-5.4) #liblua<version>-dev
-    target_include_directories(lua_iface INTERFACE ${LUA_INCLUDE_DIRS})
-    target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
-    find_program(LUA_COMPILER
-        NAMES luac5.4 REQUIRED
-    )
+    pkg_check_modules(LUA REQUIRED lua) #liblua<version>-dev
 endif()
+target_include_directories(lua_iface INTERFACE ${LUA_INCLUDE_DIRS})
+target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
+find_program(LUA_COMPILER
+    NAMES luac REQUIRED
+)
 
 set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
 set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
@@ -38,7 +39,7 @@ add_custom_command(
     COMMAND ${LUA_COMPILER} -o ${BOOTSTRAP_OUT} ${BOOTSTRAP_IN}
     MAIN_DEPENDENCY ${BOOTSTRAP_IN}
     VERBATIM
-    COMMENT "LUA: Compiling bootstrap"
+    COMMENT "LUA: Compiling bootstrap => ${BOOTSTRAP_OUT}"
 )
 include_bin(compiled_bootstrap ${BOOTSTRAP_OUT})
 

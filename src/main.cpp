@@ -5,11 +5,9 @@
 #include "common.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
-#include "incbin.h"
+#include "compiled_bootstrap.hpp"
 
 using namespace radapter;
-
-INCBIN(bootstrap, BOOTSTRAP_PATH);
 
 static int panic(lua_State* L) {
     logErr("LUA: Panic: {}", lua::ToStringWithConv(L, 1));
@@ -128,10 +126,7 @@ int main(int argc, char *argv[]) try
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
-    runBuffer(L,
-              {reinterpret_cast<const char*>(gbootstrapData), gbootstrapSize},
-              "<bootstrap>",
-              "b");
+    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "b");
     cli.add_argument("run")
         .action([&](const string& file){
             if (auto err = luaL_dofile(L, file.c_str())) {
