@@ -5,7 +5,7 @@ project(radapter
     DESCRIPTION "protocol zoo router with lua"
 )
 
-include(cmake/IncludeBin.cmake)
+include(cmake_utils/IncludeBin.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(BUILD_SHARED_LIBS OFF)

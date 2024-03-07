@@ -19,3 +19,6 @@
 [submodule "submodule/utilcpp"]
 	path = submodule/utilcpp
 	url = git@github.com:cyanidle/utilcpp.git
+[submodule "cmake_utils"]
+	path = cmake_utils
+	url = git@github.com:cyanidle/cmake_utils.git
