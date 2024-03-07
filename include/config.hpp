@@ -25,7 +25,7 @@ void deserialize(lua_State* L, T& out)
     } else if constexpr (std::is_same_v<T, bool>) {
         lua::checkType(L, LUA_TBOOLEAN, -1);
         out = lua_toboolean(L, -1);
-    }  else if constexpr (std::is_floating_point_v<T>) {
+    } else if constexpr (std::is_floating_point_v<T>) {
         lua::checkType(L, LUA_TNUMBER, -1);
         out = lua_tonumber(L, -1);
     } else if constexpr (util::is_string_like_v<T>) {
