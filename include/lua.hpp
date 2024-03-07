@@ -21,7 +21,8 @@ void checkType(lua_State* L, int t, int idx = -1);
 
 struct Ref {
     lua_State* L;
-    int ref;
+    int ref = LUA_NOREF;
+    Ref() noexcept = default;
     Ref(lua_State* L, int idx) noexcept : L(L) {
         lua_pushvalue(L, idx);
         ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -43,7 +44,9 @@ struct Ref {
         lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
     }
     ~Ref() {
-        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+        if (ref != LUA_NOREF) {
+            luaL_unref(L, LUA_REGISTRYINDEX, ref);
+        }
     }
 };
 

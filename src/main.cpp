@@ -21,7 +21,7 @@ static int traceFunc(lua_State* L) {
     return 1;
 }
 
-static int tracerRef = 0;
+static lua::Ref tracer;
 
 static int setTimeout(lua_State* L) {
     auto millis = luaL_checkinteger(L, 1);
@@ -29,7 +29,7 @@ static int setTimeout(lua_State* L) {
     auto ref = lua::Ref(L, 2);
     auto tmr = new QTimer();
     tmr->callOnTimeout([ref, L]{
-        lua_rawgeti(L, LUA_REGISTRYINDEX, tracerRef);
+        tracer.push();
         ref.push();
         lua_pcall(L, 0, LUA_MULTRET, -2);
     });
@@ -88,7 +88,7 @@ struct CloseLater {
 
 
 static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
-    lua_rawgeti(L, LUA_REGISTRYINDEX, tracerRef);
+    tracer.push();
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
         throw Err("while loading {}: {}", name, lua::printErr(err));
     }
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) try
     luaL_openlibs(L);
     lua_atpanic(L, panic);
     lua_pushcfunction(L, traceFunc);
-    tracerRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    tracer = {L, -1};
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
