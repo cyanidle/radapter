@@ -21,7 +21,6 @@ add_subdirectory(submodule)
 add_library(lua_iface INTERFACE)
 if (WIN32)
     find_package(Lua REQUIRED)
-    target_link_libraries(lua_iface INTERFACE LUA)
 else()
     include(FindPkgConfig)
     pkg_check_modules(LUA REQUIRED lua) #liblua<version>-dev

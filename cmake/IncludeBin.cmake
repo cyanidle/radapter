@@ -2,7 +2,11 @@ function(include_bin name file)
     if(NOT name)
         message(FATAL_ERROR "TARGET argument required")
     endif()
+    set(was ${name})
     string(MAKE_C_IDENTIFIER ${name} name)
+    if (NOT name STREQUAL was)
+        message(FATAL_ERROR "name must be a valid c identifier: was: ${name}")
+    endif()
     set(impl_dir ${CMAKE_BINARY_DIR}/_inc/_${name})
     set(impl_cpp ${impl_dir}/${name}.cpp)
     set(impl_hpp ${impl_dir}/${name}.hpp)
@@ -10,40 +14,41 @@ function(include_bin name file)
     set(dataEnd g${name}DataEnd)
     if (MSVC)
         set(impl_s ${impl_dir}/${name}.c)
-        file(WRITE ${impl_s} "") #kostyl for autogen
         add_custom_command(
             OUTPUT ${impl_s}
             DEPENDS ${file}
-            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/IncludeBin.cmake
-                -D_INC_SELF_RUN_IN=${file}
-                -D_INC_SELF_RUN_OUT=${impl_s}
+            COMMAND ${CMAKE_COMMAND} 
+            ARGS -D_INC_SELF_IN=${file}
+                -D_INC_SELF_OUT=${impl_s}
                 -D_INC_SELF_NAME=${name}
+                -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/IncludeBin.cmake
             COMMENT "Converting to bin: ${file} => ${impl_s}"
             VERBATIM
         )
     else()
         set(impl_s ${impl_dir}/${name}.s)
         file(WRITE ${impl_s} "
+            .section .rodata
+
             .global ${data}
             .type ${data}, @object
             .global ${dataEnd}
             .type ${dataEnd}, @object
             
-            .section .rodata
             .balign 64
             ${data}:
                 .incbin \"${file}\"
-                .balign 1
+            .balign 1
             ${dataEnd}:
                 .byte 0
         ")
     endif()
     file(WRITE ${impl_cpp} "
         #include <string_view>
-        extern \"C\" const char* ${data};
-        extern \"C\" const char* ${dataEnd};
+        extern \"C\" const unsigned char ${data}[];
+        extern \"C\" const unsigned char* ${dataEnd};
         std::string_view ${name}() noexcept {
-            return {${data}, size_t(${dataEnd} - ${data})};
+            return {reinterpret_cast<const char*>(&${data}[0]), size_t(${dataEnd} - ${data})};
         }
         ")
     file(WRITE ${impl_hpp} "
@@ -55,6 +60,7 @@ function(include_bin name file)
     ")
     add_library(${name} STATIC ${impl_cpp} ${impl_s})
     set_property(SOURCE ${impl_s} PROPERTY SKIP_AUTOMOC ON)
+    set_property(SOURCE ${impl_cpp} PROPERTY SKIP_AUTOMOC ON)
     target_include_directories(${name} INTERFACE ${impl_dir})
 endfunction()
 
@@ -70,12 +76,12 @@ function(_self_run in out name)
         set(src 0x${src})
     endif()
     file(WRITE ${out} "
-        const char g${name}Data[${len}] = {${src}};
-        const char* g${name}DataEnd = ${data} + ${len};
+        const unsigned char g${name}Data[${len}] = {${src}, 0x00};
+        const unsigned char* g${name}DataEnd = g${name}Data + ${len};
     ")
     return()
 endfunction()
 
-if (_INC_SELF_RUN_IN AND _INC_SELF_RUN_OUT AND _INC_SELF_NAME)
-    _self_run(${_INC_SELF_RUN_IN} ${_INC_SELF_RUN_OUT} ${_INC_SELF_NAME})
+if (_INC_SELF_IN AND _INC_SELF_OUT AND _INC_SELF_NAME)
+    _self_run(${_INC_SELF_IN} ${_INC_SELF_OUT} ${_INC_SELF_NAME})
 endif()
