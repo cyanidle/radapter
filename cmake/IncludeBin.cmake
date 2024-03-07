@@ -12,43 +12,24 @@ function(include_bin name file)
     set(impl_hpp ${impl_dir}/${name}.hpp)
     set(data g${name}Data)
     set(dataEnd g${name}DataEnd)
-    if (MSVC)
-        set(impl_s ${impl_dir}/${name}.c)
-        add_custom_command(
-            OUTPUT ${impl_s}
-            DEPENDS ${file}
-            COMMAND ${CMAKE_COMMAND} 
-            ARGS -D_INC_SELF_IN=${file}
-                -D_INC_SELF_OUT=${impl_s}
-                -D_INC_SELF_NAME=${name}
-                -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/IncludeBin.cmake
-            COMMENT "Converting to bin: ${file} => ${impl_s}"
-            VERBATIM
-        )
-    else()
-        set(impl_s ${impl_dir}/${name}.s)
-        file(WRITE ${impl_s} "
-            .section .rodata
-
-            .global ${data}
-            .type ${data}, @object
-            .global ${dataEnd}
-            .type ${dataEnd}, @object
-            
-            .balign 64
-            ${data}:
-                .incbin \"${file}\"
-            .balign 1
-            ${dataEnd}:
-                .byte 0
-        ")
-    endif()
+    set(impl_s ${impl_dir}/${name}.c)
+    add_custom_command(
+        OUTPUT ${impl_s}
+        DEPENDS ${file}
+        COMMAND ${CMAKE_COMMAND}
+        ARGS -D_INC_SELF_IN=${file}
+            -D_INC_SELF_OUT=${impl_s}
+            -D_INC_SELF_NAME=${name}
+            -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/IncludeBin.cmake
+        COMMENT "Converting to bin: ${file} => ${impl_s}"
+        VERBATIM
+    )
     file(WRITE ${impl_cpp} "
         #include <string_view>
         extern \"C\" const unsigned char ${data}[];
         extern \"C\" const unsigned char* ${dataEnd};
         std::string_view ${name}() noexcept {
-            return {reinterpret_cast<const char*>(&${data}[0]), size_t(${dataEnd} - ${data})};
+            return {reinterpret_cast<const char*>(${data}), size_t(${dataEnd} - ${data})};
         }
         ")
     file(WRITE ${impl_hpp} "
@@ -76,7 +57,7 @@ function(_self_run in out name)
         set(src 0x${src})
     endif()
     file(WRITE ${out} "
-        const unsigned char g${name}Data[${len}] = {${src}, 0x00};
+        const unsigned char g${name}Data[${len}+1] = {${src}, 0x00};
         const unsigned char* g${name}DataEnd = g${name}Data + ${len};
     ")
     return()
