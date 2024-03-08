@@ -40,7 +40,6 @@ void deserialize(lua_State* L, T& out)
     } else if constexpr (util::is_assoc_container_v<T>) {
         using kT = typename T::key_type;
         static_assert(util::is_string_like_v<kT>, "non-string map keys unsupported");
-        using vT = typename T::mapped_type;
         lua::IterateTable(L, -1, [&]{
             lua::checkType(L, LUA_TSTRING, -2);
             auto key = lua::ToString(L, -2);
@@ -51,7 +50,6 @@ void deserialize(lua_State* L, T& out)
             }
         });
     } else if constexpr (util::is_container_v<T>) {
-        using vT = typename T::value_type;
         lua::checkType(L, LUA_TTABLE, -1);
         if (auto len = lua::IsArray(L, -1)) {
             out.resize(len);

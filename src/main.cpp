@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <QThread>
+#include <set>
 #include "common.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
@@ -22,6 +23,7 @@ static int traceFunc(lua_State* L) {
 }
 
 static lua::Ref tracer;
+static std::set<QTimer*> timers;
 
 static int setTimeout(lua_State* L) {
     auto millis = luaL_checkinteger(L, 1);
@@ -34,13 +36,20 @@ static int setTimeout(lua_State* L) {
         lua_pcall(L, 0, LUA_MULTRET, -2);
     });
     tmr->start(millis);
+    timers.insert(tmr);
     lua_pushlightuserdata(L, tmr);
     return 1;
 }
 
 static int clearTimeout(lua_State* L) {
     luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
-    delete static_cast<QTimer*>(lua_touserdata(L, 1));
+    auto tmr = static_cast<QTimer*>(lua_touserdata(L, 1));
+    if (auto it = timers.find(tmr); it == timers.end()) {
+        throw Err("attempt to delete invalid timer");
+    } else {
+        timers.erase(it);
+        delete tmr;
+    }
     return 0;
 }
 

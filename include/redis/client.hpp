@@ -25,6 +25,7 @@ class Client : public QObject
     Q_OBJECT
 public:
     using ResultCallback = std::function<void(QVariant res, string err)>;
+    static void Register(lua_State* L);
     void Execute(std::string cmd, ResultCallback cb);
     Client(const Settings& settings);
     ~Client();

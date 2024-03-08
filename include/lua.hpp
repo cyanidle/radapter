@@ -20,7 +20,7 @@ void IterateTable(lua_State* L, int idx, Fn&& f) {
 void checkType(lua_State* L, int t, int idx = -1);
 
 struct Ref {
-    lua_State* L;
+    lua_State* L = {};
     int ref = LUA_NOREF;
     Ref() noexcept = default;
     Ref(lua_State* L, int idx) noexcept : L(L) {

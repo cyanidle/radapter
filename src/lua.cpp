@@ -281,7 +281,6 @@ int lua::DumpStack(lua_State *L) noexcept
     std::string stack;
     auto top = lua_gettop(L);
     for(int i = top; i >= 1; i--) {
-        string_view str;
         switch (lua_type(L, i)) {
         case LUA_TSTRING:
         case LUA_TBOOLEAN:
