@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(radapter
     LANGUAGES CXX C ASM
     VERSION 0.0.0
-    DESCRIPTION "protocol zoo router with lua"
+    DESCRIPTION "lua-scriptable protocol zoo router"
 )
 
 include(cmake_utils/IncludeBin.cmake)
