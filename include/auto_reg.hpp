@@ -41,18 +41,23 @@ int AsMethod(lua_State* L) {
     return Call<1>(L, impl, args, args.idxs());
 }
 
+template<typename T, auto func>
+int AsNative(lua_State* L) {
+    constexpr auto args = meta::FuncArgs_t<decltype(func)>{};
+    auto clsName = static_cast<const char*>(lua_touserdata(L, lua_upvalueindex(1)));
+    T* object = static_cast<T*>(luaL_checkudata(L, 1, clsName));
+    lua_rotate(L, 1, -1);
+    lua_pop(L, 1);
+    return (object->*func)(L);
+}
+
 template<typename...Args>
 auto MakeSlotFor(const char* cls, lua::Ref func, meta::TypeList<Args...>) {
     return [func, cls = string{cls}](Args...a){
-        constexpr auto count = sizeof...(Args);
-        auto L = func.L;
-        lua::PushTracer(L);
         func.push();
-        (Serialize(L, a), ...);
-        auto err = lua_pcall(L, count, LUA_MULTRET, -count-2);
+        auto err = lua::PCall(func.L, a...);
         if (err != 0) {
-            logErr("Error invoking slot of '{}': {}",
-                   cls, lua::ToString(L, -1));
+            logErr("Error invoking slot of '{}': {}", cls, lua::ToString(func.L, -1));
         }
     };
 }
@@ -99,12 +104,17 @@ void MakeClass(lua_State* L) {
     methods[totalMethods] = {NULL, NULL};
     size_t idx = metaMethods;
     desc.for_each_method([&](auto m){
-        if constexpr (describe::has_attr_v<Signal, decltype(m)>) {
+        using m_t = decltype(m);
+        auto& method = methods[idx++];
+        if constexpr (describe::has_attr_v<Signal, m_t>) {
             static string nameStorage = "On" + string{m.name};
-            methods[idx++] = {nameStorage.c_str(), lua::Protected<AsSignal<T, m.value>>};
+            method = {nameStorage.c_str(), lua::Protected<AsSignal<T, m.value>>};
+        } else if constexpr (describe::has_attr_v<NativeMethod, m_t>) {
+            static string nameStorage{m.name};
+            method = {nameStorage.c_str(), lua::Protected<AsNative<T, m.value>>};
         } else {
             static string nameStorage{m.name};
-            methods[idx++] = {nameStorage.c_str(), lua::Protected<AsMethod<T, m.value>>};
+            method = {nameStorage.c_str(), lua::Protected<AsMethod<T, m.value>>};
         }
     });
     if (!luaL_newmetatable(L, NameOf<T>().c_str())) {
@@ -112,9 +122,13 @@ void MakeClass(lua_State* L) {
     }
     lua_pushlightuserdata(L, NameOf<T>().data());
     luaL_setfuncs(L, methods, 1);
+    auto meta = lua_absindex(L, -1);
+
     Serialize(L, "__index");
-    lua_pushvalue(L, -2);
-    lua_rawset(L, -3);
+    lua_pushvalue(L, meta);
+    lua_rawset(L, meta);
+
+    // leave metatable on top
 }
     
 }

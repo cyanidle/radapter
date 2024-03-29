@@ -38,7 +38,6 @@ void radapter::logs::DoLog(Level lvl, fmt::string_view format, fmt::format_args 
     );
 }
 
-
 static int logImpl(lua_State* L) {
     auto lvl = logs::Level(lua_tointeger(L, lua_upvalueindex(1)));
     auto n = lua_gettop(L);

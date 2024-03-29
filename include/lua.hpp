@@ -17,7 +17,11 @@ void IterateTable(lua_State* L, int idx, Fn&& f) {
     lua_pop(L, 1);
 }
 
-void checkType(lua_State* L, int t, int idx = -1);
+void CheckType(lua_State* L, int t, int idx = -1);
+
+struct StackRef {
+    int ref = LUA_NOREF;
+};
 
 struct Ref {
     lua_State* L = {};
@@ -56,7 +60,7 @@ struct Ref {
 void PushTracer(lua_State* L);
 void SetTracer(lua_State* L, int idx);
 
-inline const char* printErr(int err) {
+inline const char* PrintErr(int err) {
     switch (err) {
     case LUA_OK: return "ok";
     case LUA_YIELD:	return "yield";

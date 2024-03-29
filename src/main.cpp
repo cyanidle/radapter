@@ -30,10 +30,9 @@ static int setTimeout(lua_State* L) {
     luaL_checktype(L, 2, LUA_TFUNCTION);
     auto ref = lua::Ref(L, 2);
     auto tmr = new QTimer();
-    tmr->callOnTimeout([ref, L]{
-        lua::PushTracer(L);
+    tmr->callOnTimeout([ref]{
         ref.push();
-        lua_pcall(L, 0, LUA_MULTRET, -2);
+        lua::PCall(ref.L);
     });
     tmr->start(millis);
     timers.insert(tmr);
@@ -42,6 +41,9 @@ static int setTimeout(lua_State* L) {
 }
 
 static int clearTimeout(lua_State* L) {
+    if (lua_isnil(L, 1)) {
+        return 0;
+    }
     luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
     auto tmr = static_cast<QTimer*>(lua_touserdata(L, 1));
     if (auto it = timers.find(tmr); it == timers.end()) {
@@ -91,12 +93,11 @@ static luaL_Reg builtins[] = {
 };
 
 static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
-    lua::PushTracer(L);
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
-        throw Err("while loading {}: {}", name, lua::printErr(err));
+        throw Err("while loading {}: {}", name, lua::PrintErr(err));
     }
-    if (auto err = lua_pcall(L, 0, LUA_MULTRET, -2)) {
-        throw Err("while running {}: {} => {}", name, lua::printErr(err), lua::ToString(L, -1));
+    if (auto err = lua::PCall(L)) {
+        throw Err("while running {}: {} => {}", name, lua::PrintErr(err), lua::ToString(L, -1));
     }
     lua_pop(L, 1);
 }
@@ -158,7 +159,7 @@ int main(int argc, char *argv[]) try
     cli.add_argument("run")
         .action([&](const string& file){
             if (auto err = luaL_dofile(L, file.c_str())) {
-                logErr("while running {}: \n\t{} => {}", file, lua::printErr(err), lua::ToString(L, -1));
+                logErr("while running {}: \n\t{} => {}", file, lua::PrintErr(err), lua::ToString(L, -1));
                 std::exit(1);
             }
         })

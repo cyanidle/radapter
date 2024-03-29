@@ -12,23 +12,20 @@ struct redisAsyncContext;
 namespace radapter::redis
 {
 
-struct Settings : ClassSettings {
+struct Settings : ClassSettings, describe::Attrs<MissingAllowed> {
     string host = "127.0.0.1";
     uint16_t port = 6379;
     uint16_t db = 0;
+    uint32_t timeout = 5000;
 };
 
-DESCRIBE(redis::Settings, &_::host, &_::port, &_::db)
-DESCRIBE_FIELD_ATTRS(Settings, host, MissingOk);
-DESCRIBE_FIELD_ATTRS(Settings, port, MissingOk);
-DESCRIBE_FIELD_ATTRS(Settings, db, MissingOk);
+DESCRIBE(redis::Settings, &_::host, &_::port, &_::db, &_::timeout)
 
 class Client : public QObject
 {
     Q_OBJECT
 public:
-    using ResultCallback = std::function<void(QVariant res, string err)>;
-    void Execute(std::string cmd, ResultCallback cb);
+    int Execute(lua_State* L);
     Client(Settings settings);
     ~Client();
 signals:
@@ -37,6 +34,7 @@ signals:
     void Disconnected(int code);
 public slots:
     void Connect();
+    void Disconnect();
 private:
     static void connectCallback(const redisAsyncContext *context, int status);
     static void disconnectCallback(const redisAsyncContext *context, int status);
@@ -46,10 +44,13 @@ private:
     unique_ptr<Impl> d;
 };
 
-DESCRIBE(redis::Client, &_::Connected, &_::Error, &_::Disconnected, &_::Connect)
+DESCRIBE(redis::Client,
+         &_::Connected, &_::Error, &_::Disconnected,
+         &_::Disconnect, &_::Connect, &_::Execute)
 DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Settings)
 DESCRIBE_FIELD_ATTRS(Client, Connected, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Error, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Disconnected, Signal);
+DESCRIBE_FIELD_ATTRS(Client, Execute, NativeMethod);
 
 }

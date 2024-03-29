@@ -6,7 +6,7 @@
 
 namespace radapter {
 
-struct MissingOk {};
+struct MissingAllowed {};
 
 template<typename T>
 void Deserialize(lua_State* L, T& out, int idx = -1)
@@ -14,11 +14,11 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
     lua_pushvalue(L, idx);
     if constexpr (describe::is_described_v<T>) {
         constexpr auto desc = describe::Get<T>();
-        lua::checkType(L, LUA_TTABLE, -1);
+        lua::CheckType(L, LUA_TTABLE, -1);
         desc.for_each_field([&](auto f){
             lua_pushlstring(L, f.name.data(), f.name.size());
             lua_rawget(L, -2);
-            if constexpr (describe::has_attr_v<MissingOk, decltype(f)>) {
+            if constexpr (describe::has_attr_v<MissingAllowed, decltype(f)>) {
                 if (lua_isnil(L, -1)) {
                     lua_pop(L, 1);
                     return;
@@ -32,13 +32,13 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
             lua_pop(L, 1);
         });
     } else if constexpr (std::is_same_v<T, bool>) {
-        lua::checkType(L, LUA_TBOOLEAN, -1);
+        lua::CheckType(L, LUA_TBOOLEAN, -1);
         out = lua_toboolean(L, -1);
     } else if constexpr (std::is_floating_point_v<T>) {
-        lua::checkType(L, LUA_TNUMBER, -1);
+        lua::CheckType(L, LUA_TNUMBER, -1);
         out = lua_tonumber(L, -1);
     } else if constexpr (std::is_constructible_v<string_view, T>) {
-        lua::checkType(L, LUA_TSTRING, -1);
+        lua::CheckType(L, LUA_TSTRING, -1);
         out = lua::ToString(L, -1);
     } else if constexpr (std::is_integral_v<T>) {
         if (!lua_isinteger(L, -1)) {
@@ -49,7 +49,7 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
         using kT = typename T::key_type;
         static_assert(std::is_constructible_v<string_view, T>, "non-string map keys unsupported");
         lua::IterateTable(L, -1, [&]{
-            lua::checkType(L, LUA_TSTRING, -2);
+            lua::CheckType(L, LUA_TSTRING, -2);
             auto key = lua::ToString(L, -2);
             try {
                 deserialize(L, out[key]);
@@ -58,7 +58,7 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
             }
         });
     } else if constexpr (meta::is_index_container_v<T>) {
-        lua::checkType(L, LUA_TTABLE, -1);
+        lua::CheckType(L, LUA_TTABLE, -1);
         if (auto len = lua::IsArray(L, -1)) {
             out.resize(len);
             for (auto i = 1; i <= len; ++i) {
@@ -84,6 +84,14 @@ T Deserialize(lua_State* L, int idx = -1) {
     T out;
     Deserialize(L, out, idx);
     return out;
+}
+
+inline void Serialize(lua_State* L, std::nullptr_t) {
+    lua_pushnil(L);
+}
+
+inline void Serialize(lua_State* L, lua::StackRef s) {
+    lua_pushvalue(L, s.ref);
 }
 
 template<typename T>
@@ -124,4 +132,16 @@ void Serialize(lua_State* L, T const& val) {
     }
 }
 
+namespace lua {
+
+template<typename...Args>
+int PCall(lua_State* L, const Args&...args) {
+    constexpr int count = sizeof...(Args);
+    PushTracer(L);
+    lua_pushvalue(L, -2);
+    (Serialize(L, args), ...);
+    return lua_pcall(L, count, LUA_MULTRET, -count-2);
+}
+
+}
 }
