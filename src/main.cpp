@@ -7,6 +7,7 @@
 #include "logs.hpp"
 #include "lua.hpp"
 #include "compiled_bootstrap.hpp"
+#include "redis/client.hpp"
 
 using namespace radapter;
 
@@ -22,7 +23,6 @@ static int traceFunc(lua_State* L) {
     return 1;
 }
 
-static lua::Ref tracer;
 static std::set<QTimer*> timers;
 
 static int setTimeout(lua_State* L) {
@@ -31,7 +31,7 @@ static int setTimeout(lua_State* L) {
     auto ref = lua::Ref(L, 2);
     auto tmr = new QTimer();
     tmr->callOnTimeout([ref, L]{
-        tracer.push();
+        lua::TracerFunc.push();
         ref.push();
         lua_pcall(L, 0, LUA_MULTRET, -2);
     });
@@ -90,20 +90,15 @@ static luaL_Reg builtins[] = {
     {NULL, NULL}
 };
 
-struct CloseLater {
-    lua_State* L;
-    ~CloseLater() {lua_close(L);}
-};
-
-
 static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
-    tracer.push();
+    lua::TracerFunc.push();
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
         throw Err("while loading {}: {}", name, lua::printErr(err));
     }
     if (auto err = lua_pcall(L, 0, LUA_MULTRET, -2)) {
         throw Err("while running {}: {} => {}", name, lua::printErr(err), lua::ToString(L, -1));
     }
+    lua_pop(L, 1);
 }
 
 static void interactive(lua_State* L) {
@@ -122,20 +117,32 @@ static void interactive(lua_State* L) {
     }
 }
 
+struct Lol {
+    int a;
+    int b;
+};
+DESCRIBE(Lol, &_::a, &_::b)
+
 int main(int argc, char *argv[]) try
 {
     QCoreApplication app(argc, argv);
     argparse::ArgumentParser cli(argv[0], "0.0.0");
     auto L = luaL_newstate();
-    CloseLater close{L};
+    meta::defer close([=]{
+        lua_close(L);
+    });
     luaL_openlibs(L);
     lua_atpanic(L, panic);
     lua_pushcfunction(L, traceFunc);
-    tracer = {L, -1};
+    lua::TracerFunc = {L, -1};
+    lua_pop(L, 1);
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
-    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "b");
+    lua_pop(L, 1);
+    auto boot = compiled_bootstrap();
+    runBuffer(L, boot, "<bootstrap>", "bt");
+    MakeClass<redis::Client>(L);
     cli.add_argument("run")
         .action([&](const string& file){
             if (auto err = luaL_dofile(L, file.c_str())) {

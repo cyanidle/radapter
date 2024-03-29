@@ -118,11 +118,6 @@ void Client::privateCallback(redisAsyncContext*, void *reply, void *data)
     delete cb;
 }
 
-void Client::Register(lua_State *L)
-{
-
-}
-
 void Client::Execute(string cmd, ResultCallback _cb)
 {
     if (!impl->ctx) {
@@ -135,5 +130,10 @@ void Client::Execute(string cmd, ResultCallback _cb)
             delete cb;
         }
     }
+
+}
+
+Client::Client(const Settings &settings)
+{
 
 }

@@ -5,6 +5,10 @@ project(radapter
     DESCRIPTION "lua-scriptable protocol zoo router"
 )
 
+
+option(RADAPTER_BINARY_BOOTSTRAP "Compile bootstrap.lua" ON)
+
+
 include(cmake_utils/IncludeBin.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -30,17 +34,22 @@ target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
 find_program(LUA_COMPILER
     NAMES luac REQUIRED
 )
+# TODO: Fix luac missmatch with lua
 
-set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
 set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
-add_custom_command(
-    OUTPUT ${BOOTSTRAP_OUT}
-    COMMAND ${LUA_COMPILER} -o ${BOOTSTRAP_OUT} ${BOOTSTRAP_IN}
-    MAIN_DEPENDENCY ${BOOTSTRAP_IN}
-    VERBATIM
-    COMMENT "LUA: Compiling bootstrap => ${BOOTSTRAP_OUT}"
-)
-include_bin(compiled_bootstrap ${BOOTSTRAP_OUT})
+if (RADAPTER_BINARY_BOOTSTRAP)
+    set(BOOTSTRAP_OUT ${CMAKE_BINARY_DIR}/bootstrap.lua.out)
+    add_custom_command(
+        OUTPUT ${BOOTSTRAP_OUT}
+        COMMAND ${LUA_COMPILER} -o ${BOOTSTRAP_OUT} ${BOOTSTRAP_IN}
+        MAIN_DEPENDENCY ${BOOTSTRAP_IN}
+        VERBATIM
+        COMMENT "LUA: Compiling bootstrap => ${BOOTSTRAP_OUT}"
+    )
+    include_bin(compiled_bootstrap ${BOOTSTRAP_OUT})
+else()
+    include_bin(compiled_bootstrap ${BOOTSTRAP_IN})
+endif()
 
 file(GLOB_RECURSE SRC_FILES src/*.cpp include/*.hpp)
 add_executable(radapter ${SRC_FILES})

@@ -50,6 +50,8 @@ struct Ref {
     }
 };
 
+inline lua::Ref TracerFunc;
+
 inline const char* printErr(int err) {
     switch (err) {
     case LUA_OK: return "ok";
@@ -78,7 +80,9 @@ string_view ToStringWithConv(lua_State* L, int idx) noexcept;
 template<typename T>
 int cleanup(lua_State* L) noexcept {
     static_cast<T*>(lua_touserdata(L, 1))->~T();
+    return 0;
 }
+
 template<typename T>
 inline constexpr luaL_Reg gcFor = {"__gc", cleanup<T>};
 

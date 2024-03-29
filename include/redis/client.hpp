@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QVariant>
 #include <fmt/core.h>
+#include "auto_reg.hpp"
 
 class QtRedisAdapter;
 struct redisAsyncContext;
@@ -12,7 +13,7 @@ struct redisAsyncContext;
 namespace radapter::redis
 {
 
-struct Settings {
+struct Settings : ClassSettings {
     string host = "127.0.0.1";
     uint16_t port = 6379;
     uint16_t db = 0;
@@ -25,7 +26,6 @@ class Client : public QObject
     Q_OBJECT
 public:
     using ResultCallback = std::function<void(QVariant res, string err)>;
-    static void Register(lua_State* L);
     void Execute(std::string cmd, ResultCallback cb);
     Client(const Settings& settings);
     ~Client();
@@ -44,5 +44,11 @@ private:
     unique_ptr<Impl> impl;
     QtRedisAdapter* adapter;
 };
+
+DESCRIBE(Client, &_::Connected, &_::Error, &_::Disconnected, &_::Connect)
+DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Settings)
+DESCRIBE_FIELD_ATTRS(Client, Connected, Signal);
+DESCRIBE_FIELD_ATTRS(Client, Error, Signal);
+DESCRIBE_FIELD_ATTRS(Client, Disconnected, Signal);
 
 }
