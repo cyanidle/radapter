@@ -40,6 +40,9 @@ struct Ref {
         }
         return *this;
     }
+    void invalidate() {
+        ref = LUA_NOREF;
+    }
     void push() const noexcept {
         lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
     }
@@ -50,7 +53,8 @@ struct Ref {
     }
 };
 
-inline lua::Ref TracerFunc;
+void PushTracer(lua_State* L);
+void SetTracer(lua_State* L, int idx);
 
 inline const char* printErr(int err) {
     switch (err) {
@@ -65,7 +69,7 @@ inline const char* printErr(int err) {
 }
 
 template<auto func>
-int Protected(lua_State* L) try {
+int Protected(lua_State* L) noexcept try {
     return func(L);
 } catch (std::exception& exc) {
     luaL_error(L, "Exception: %s", exc.what());

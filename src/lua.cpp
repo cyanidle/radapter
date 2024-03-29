@@ -302,3 +302,17 @@ void lua::checkType(lua_State *L, int t, int idx) {
         throw Err("Invalid type at {}: expected: {} => got: {}", idx, lua_typename(L, t), lua_typename(L, was));
     }
 }
+
+static int _key;
+static void* key = &_key;
+
+void lua::PushTracer(lua_State *L)
+{
+    lua_rawgetp(L, LUA_REGISTRYINDEX, key);
+}
+
+void lua::SetTracer(lua_State *L, int idx)
+{
+    lua_pushvalue(L, idx);
+    lua_rawsetp(L, LUA_REGISTRYINDEX, key);
+}

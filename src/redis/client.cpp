@@ -8,12 +8,13 @@ struct Client::Impl
 {
     Settings settings{};
     redisAsyncContext* ctx{};
+    QtRedisAdapter* adapter = {};
 };
 
 Client::~Client()
 {
-    if (impl->ctx) {
-        redisAsyncDisconnect(impl->ctx);
+    if (d->ctx) {
+        redisAsyncDisconnect(d->ctx);
     }
 }
 
@@ -65,22 +66,26 @@ static QVariant parseReply(redisReply* reply)
 
 void Client::Connect()
 {
-    if (impl->ctx) {
-        redisAsyncDisconnect(impl->ctx);
+    if (d->ctx) {
+        redisAsyncDisconnect(d->ctx);
     }
-    if (adapter) {
-        delete adapter;
+    if (d->adapter) {
+        delete d->adapter;
     }
-    adapter = new QtRedisAdapter{this};
+    d->adapter = new QtRedisAdapter{this};
     auto options = redisOptions{};
-    REDIS_OPTIONS_SET_TCP(&options, impl->settings.host.c_str(), impl->settings.port);
-    impl->ctx = redisAsyncConnectWithOptions(&options);
-    impl->ctx->data = this;
-    adapter->SetContext(impl->ctx);
-    redisAsyncSetConnectCallback(impl->ctx, connectCallback);
-    redisAsyncSetDisconnectCallback(impl->ctx, disconnectCallback);
-    if (impl->ctx->err) {
-        emit Error(impl->ctx->err);
+    REDIS_OPTIONS_SET_TCP(&options, d->settings.host.c_str(), d->settings.port);
+    d->ctx = redisAsyncConnectWithOptions(&options);
+    d->ctx->data = this;
+    d->adapter->SetContext(d->ctx);
+    timeval timeout;
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    redisAsyncSetTimeout(d->ctx, timeout);
+    redisAsyncSetConnectCallback(d->ctx, connectCallback);
+    redisAsyncSetDisconnectCallback(d->ctx, disconnectCallback);
+    if (d->ctx->err) {
+        emit Error(d->ctx->errstr, d->ctx->err);
     }
 }
 
@@ -88,7 +93,7 @@ void Client::connectCallback(const redisAsyncContext *context, int status)
 {
     auto adapter = static_cast<Client*>(context->data);
     if (status != REDIS_OK) {
-        emit adapter->Error(status);
+        emit adapter->Error("Connect Error", status);
     } else {
         emit adapter->Connected();
     }
@@ -120,11 +125,11 @@ void Client::privateCallback(redisAsyncContext*, void *reply, void *data)
 
 void Client::Execute(string cmd, ResultCallback _cb)
 {
-    if (!impl->ctx) {
+    if (!d->ctx) {
         _cb({}, "Connect not called");
     } else {
         auto cb = new ResultCallback{std::move(_cb)};
-        auto status = redisAsyncCommand(impl->ctx, privateCallback, cb, cmd.c_str());
+        auto status = redisAsyncCommand(d->ctx, privateCallback, cb, cmd.c_str());
         if (status != REDIS_OK) {
             (*cb)({}, "Send Error");
             delete cb;
@@ -133,7 +138,4 @@ void Client::Execute(string cmd, ResultCallback _cb)
 
 }
 
-Client::Client(const Settings &settings)
-{
-
-}
+Client::Client(Settings settings) : d(new Impl{std::move(settings)}) {}

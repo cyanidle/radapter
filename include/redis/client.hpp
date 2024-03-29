@@ -7,7 +7,6 @@
 #include <fmt/core.h>
 #include "auto_reg.hpp"
 
-class QtRedisAdapter;
 struct redisAsyncContext;
 
 namespace radapter::redis
@@ -19,7 +18,10 @@ struct Settings : ClassSettings {
     uint16_t db = 0;
 };
 
-DESCRIBE(Settings, &_::host, &_::port, &_::db)
+DESCRIBE(redis::Settings, &_::host, &_::port, &_::db)
+DESCRIBE_FIELD_ATTRS(Settings, host, MissingOk);
+DESCRIBE_FIELD_ATTRS(Settings, port, MissingOk);
+DESCRIBE_FIELD_ATTRS(Settings, db, MissingOk);
 
 class Client : public QObject
 {
@@ -27,11 +29,11 @@ class Client : public QObject
 public:
     using ResultCallback = std::function<void(QVariant res, string err)>;
     void Execute(std::string cmd, ResultCallback cb);
-    Client(const Settings& settings);
+    Client(Settings settings);
     ~Client();
 signals:
     void Connected();
-    void Error(int code);
+    void Error(string msg, int code);
     void Disconnected(int code);
 public slots:
     void Connect();
@@ -41,11 +43,10 @@ private:
     static void privateCallback(redisAsyncContext *ctx, void *reply, void *data);
 
     struct Impl;
-    unique_ptr<Impl> impl;
-    QtRedisAdapter* adapter;
+    unique_ptr<Impl> d;
 };
 
-DESCRIBE(Client, &_::Connected, &_::Error, &_::Disconnected, &_::Connect)
+DESCRIBE(redis::Client, &_::Connected, &_::Error, &_::Disconnected, &_::Connect)
 DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Settings)
 DESCRIBE_FIELD_ATTRS(Client, Connected, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Error, Signal);

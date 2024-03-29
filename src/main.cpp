@@ -31,7 +31,7 @@ static int setTimeout(lua_State* L) {
     auto ref = lua::Ref(L, 2);
     auto tmr = new QTimer();
     tmr->callOnTimeout([ref, L]{
-        lua::TracerFunc.push();
+        lua::PushTracer(L);
         ref.push();
         lua_pcall(L, 0, LUA_MULTRET, -2);
     });
@@ -91,7 +91,7 @@ static luaL_Reg builtins[] = {
 };
 
 static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
-    lua::TracerFunc.push();
+    lua::PushTracer(L);
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
         throw Err("while loading {}: {}", name, lua::printErr(err));
     }
@@ -117,11 +117,33 @@ static void interactive(lua_State* L) {
     }
 }
 
-struct Lol {
-    int a;
-    int b;
-};
-DESCRIBE(Lol, &_::a, &_::b)
+template<typename T>
+void MakeAndSet(lua_State* L) {
+    constexpr auto desc = describe::Get<T>();
+    lua_createtable(L, 0, 1);
+    Serialize(L, desc.name);
+    MakeClass<T>(L);
+    lua_rawset(L, -3);
+    lua_setglobal(L, string{desc.ns}.c_str());
+}
+
+static void PrepareEnv(lua_State* L) {
+    luaL_openlibs(L);
+    lua_atpanic(L, panic);
+    lua_pushcfunction(L, traceFunc);
+    lua::SetTracer(L, -1);
+    lua_pop(L, 1);
+    logs::Register(L);
+    lua_pushglobaltable(L);
+    luaL_setfuncs(L, builtins, 0);
+    auto boot = compiled_bootstrap();
+    runBuffer(L, boot, "<bootstrap>", "bt");
+    lua_pop(L, 1);
+}
+
+static void RegClasses(lua_State* L) {
+    MakeAndSet<redis::Client>(L);
+}
 
 int main(int argc, char *argv[]) try
 {
@@ -131,18 +153,8 @@ int main(int argc, char *argv[]) try
     meta::defer close([=]{
         lua_close(L);
     });
-    luaL_openlibs(L);
-    lua_atpanic(L, panic);
-    lua_pushcfunction(L, traceFunc);
-    lua::TracerFunc = {L, -1};
-    lua_pop(L, 1);
-    logs::Register(L);
-    lua_pushglobaltable(L);
-    luaL_setfuncs(L, builtins, 0);
-    lua_pop(L, 1);
-    auto boot = compiled_bootstrap();
-    runBuffer(L, boot, "<bootstrap>", "bt");
-    MakeClass<redis::Client>(L);
+    PrepareEnv(L);
+    RegClasses(L);
     cli.add_argument("run")
         .action([&](const string& file){
             if (auto err = luaL_dofile(L, file.c_str())) {

@@ -1,18 +1,17 @@
-local j = parse[[
-{
-    "a": [1, 2, 3],
-    "b": "c",
-    "d": {
-        "lol": "kek"
-    }
+local cli = redis.Client.new {
+    host="localhost"
 }
-]]
-print(assert(#j.a))
-print(assert(j.a[1]))
-print(assert(j.a[2]))
-print(assert(j.a[3]))
-print(assert(j.b))
-print(assert(j.d.lol))
 
-log.debug(j)
-log.debug("{:p}", j)
+cli:OnConnected(function()
+    log.debug("Client connected")
+end)
+
+cli:OnError(function(err, code)
+    log.debug("Error: {}, Code: {}", err, code)
+end)
+
+cli:OnDisconnected(function(code)
+    log.debug("Disconnected with code: {}", code)
+end)
+
+cli:Connect()

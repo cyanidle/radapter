@@ -1,6 +1,7 @@
 #pragma once
 #include "lua.hpp"
 #include "serialize.hpp"
+#include <set>
 
 namespace radapter
 {
@@ -9,8 +10,15 @@ struct ClassSettings{};
 struct Signal{};
 struct NativeMethod{};
 
+template<typename T>
+string& NameOf() {
+    constexpr auto desc = describe::Get<T>();
+    static std::string storage = fmt::format("{}::{}\0", desc.ns, desc.name);
+    return storage;
+}
+
 namespace detail {
-template<size_t offs, typename Fn, typename...Args, size_t...Is>
+template<int offs, typename Fn, typename...Args, size_t...Is>
 int Call(lua_State* L, Fn& func, meta::TypeList<Args...>, std::index_sequence<Is...>) {
     using ret = std::invoke_result_t<Fn, Args...>;
     if constexpr (std::is_void_v<ret>) {
@@ -36,13 +44,15 @@ int AsMethod(lua_State* L) {
 template<typename...Args>
 auto MakeSlotFor(const char* cls, lua::Ref func, meta::TypeList<Args...>) {
     return [func, cls = string{cls}](Args...a){
-        (Serialize(func.L, a), ...);
-        lua::TracerFunc.push();
+        constexpr auto count = sizeof...(Args);
+        auto L = func.L;
+        lua::PushTracer(L);
         func.push();
-        auto err = lua_pcall(func.L, sizeof...(Args), LUA_MULTRET, -2);
+        (Serialize(L, a), ...);
+        auto err = lua_pcall(L, count, LUA_MULTRET, -count-2);
         if (err != 0) {
             logErr("Error invoking slot of '{}': {}",
-                   cls, lua::ToString(func.L, -1));
+                   cls, lua::ToString(L, -1));
         }
     };
 }
@@ -53,21 +63,20 @@ int AsSignal(lua_State* L) {
     auto clsName = static_cast<const char*>(lua_touserdata(L, lua_upvalueindex(1)));
     T* object = static_cast<T*>(luaL_checkudata(L, 1, clsName));
     luaL_checktype(L, 2, LUA_TFUNCTION);
-    auto conn = QObject::connect(object, sig, MakeSlotFor(clsName, lua::Ref(L, 2), args));
-    (void)conn; //todo: allow disconnect
+    QObject::connect(object, sig, MakeSlotFor(clsName, lua::Ref(L, 2), args));
     return 0;
 }
 
-template<typename T, typename...Args, size_t...Is>
+template<int offs, typename T, typename...Args, size_t...Is>
 T* Construct(void* stor, lua_State* L, std::index_sequence<Is...>) {
-    return new (stor) T{Deserialize<Args>(L, -int(Is)-1)...};
+    return new (stor) T{Deserialize<Args>(L, -int(Is)-1-offs)...};
 }
 
 template<typename T, typename...Args>
 int MakeNew(lua_State* L) {
     auto clsName = static_cast<const char*>(lua_touserdata(L, lua_upvalueindex(1)));
     auto ud = lua_newuserdata(L, sizeof(T));
-    Construct<T, Args...>(ud, L, std::index_sequence_for<Args...>());
+    Construct<1, T, Args...>(ud, L, std::index_sequence_for<Args...>());
     luaL_setmetatable(L, clsName);
     return 1;
 }
@@ -77,8 +86,6 @@ template<typename T>
 void MakeClass(lua_State* L) {
     using namespace detail;
     constexpr auto desc = describe::Get<T>();
-    constexpr auto rawName = desc.name;
-    static std::string storage = string{rawName} + '\0';
     constexpr auto metaMethods = 2;
     constexpr auto totalMethods = desc.methods_count + metaMethods;
     luaL_Reg methods[totalMethods + 1];
@@ -100,11 +107,14 @@ void MakeClass(lua_State* L) {
             methods[idx++] = {nameStorage.c_str(), lua::Protected<AsMethod<T, m.value>>};
         }
     });
-    if (!luaL_newmetatable(L, storage.c_str())) {
-        throw Err("Could not create metatable for class: {}", rawName);
+    if (!luaL_newmetatable(L, NameOf<T>().c_str())) {
+        throw Err("Could not create metatable for class: {}", NameOf<T>());
     }
-    lua_pushlightuserdata(L, storage.data());
+    lua_pushlightuserdata(L, NameOf<T>().data());
     luaL_setfuncs(L, methods, 1);
+    Serialize(L, "__index");
+    lua_pushvalue(L, -2);
+    lua_rawset(L, -3);
 }
     
 }

@@ -6,6 +6,8 @@
 
 namespace radapter {
 
+struct MissingOk {};
+
 template<typename T>
 void Deserialize(lua_State* L, T& out, int idx = -1)
 {
@@ -16,6 +18,12 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
         desc.for_each_field([&](auto f){
             lua_pushlstring(L, f.name.data(), f.name.size());
             lua_rawget(L, -2);
+            if constexpr (describe::has_attr_v<MissingOk, decltype(f)>) {
+                if (lua_isnil(L, -1)) {
+                    lua_pop(L, 1);
+                    return;
+                }
+            }
             try {
                 Deserialize(L, f.get(out));
             } catch (std::exception& exc) {
