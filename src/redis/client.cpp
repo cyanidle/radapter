@@ -60,13 +60,13 @@ void Client::Connect()
     Disconnect();
     d->adapter = new QtRedisAdapter{this};
     auto options = redisOptions{};
-    REDIS_OPTIONS_SET_TCP(&options, d->settings.host.c_str(), d->settings.port);
+    REDIS_OPTIONS_SET_TCP(&options, d->settings.Host.c_str(), d->settings.Port);
     d->ctx = redisAsyncConnectWithOptions(&options);
     d->ctx->data = this;
     d->adapter->SetContext(d->ctx);
     timeval timeout;
-    timeout.tv_sec = d->settings.timeout / 1000;
-    timeout.tv_usec = (d->settings.timeout % 1000) * 1000;
+    timeout.tv_sec = d->settings.Timeout / 1000;
+    timeout.tv_usec = (d->settings.Timeout % 1000) * 1000;
     redisAsyncSetTimeout(d->ctx, timeout);
     redisAsyncSetConnectCallback(d->ctx, connectCallback);
     redisAsyncSetDisconnectCallback(d->ctx, disconnectCallback);
@@ -159,6 +159,6 @@ int Client::Execute(lua_State *L)
 Client::Client(Settings settings) : d(new Impl{std::move(settings)}) {
     connect(this, &Client::Error, &Client::Disconnect);
     connect(this, &Client::Connected, this, [this]{
-        redisAsyncCommand(d->ctx, nullptr, nullptr, "SELECT %d", d->settings.db);
+        redisAsyncCommand(d->ctx, nullptr, nullptr, "SELECT %d", d->settings.Db);
     });
 }

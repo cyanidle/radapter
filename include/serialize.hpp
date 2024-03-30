@@ -45,6 +45,10 @@ inline void CheckType(lua_State* L, int t, const TraceFrame& frame) {
     }
 }
 
+inline void Deserialize(lua_State* L, lua::Ref& out, int idx = -1, TraceFrame const& frame = {}) {
+    out = {L, idx};
+}
+
 template<typename T>
 void Deserialize(lua_State* L, T& out, int idx = -1, TraceFrame const& frame = {})
 {

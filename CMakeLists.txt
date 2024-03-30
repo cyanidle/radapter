@@ -34,7 +34,6 @@ target_link_libraries(lua_iface INTERFACE ${LUA_LIBRARIES})
 find_program(LUA_COMPILER
     NAMES luac REQUIRED
 )
-# TODO: Fix luac missmatch with lua
 
 set(BOOTSTRAP_IN ${CMAKE_SOURCE_DIR}/src/bootstrap.lua)
 if (RADAPTER_BINARY_BOOTSTRAP)
@@ -44,7 +43,7 @@ if (RADAPTER_BINARY_BOOTSTRAP)
         COMMAND ${LUA_COMPILER} -o ${BOOTSTRAP_OUT} ${BOOTSTRAP_IN}
         MAIN_DEPENDENCY ${BOOTSTRAP_IN}
         VERBATIM
-        COMMENT "LUA: Compiling bootstrap => ${BOOTSTRAP_OUT}"
+        COMMENT "${LUA_COMPILER}: ${BOOTSTRAP_IN} => ${BOOTSTRAP_OUT}"
     )
     include_bin(compiled_bootstrap ${BOOTSTRAP_OUT})
 else()

@@ -9,7 +9,6 @@
 #include "lua.hpp"
 #include "compiled_bootstrap.hpp"
 #include "redis/client.hpp"
-#include "redis/stream.hpp"
 
 using namespace radapter;
 
