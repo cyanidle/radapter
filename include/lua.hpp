@@ -17,8 +17,6 @@ void IterateTable(lua_State* L, int idx, Fn&& f) {
     lua_pop(L, 1);
 }
 
-void CheckType(lua_State* L, int t, int idx = -1);
-
 struct StackRef {
     int ref = LUA_NOREF;
 };

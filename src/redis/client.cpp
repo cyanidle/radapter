@@ -13,9 +13,7 @@ struct Client::Impl
 
 Client::~Client()
 {
-    if (d->ctx) {
-        redisAsyncDisconnect(d->ctx);
-    }
+    Disconnect();
 }
 
 static void parseReply(lua_State* L, redisReply* reply)
@@ -88,11 +86,11 @@ void Client::Disconnect()
     }
 }
 
-void Client::connectCallback(const redisAsyncContext *context, int status)
+void Client::connectCallback(const redisAsyncContext *ctx, int status)
 {
-    auto adapter = static_cast<Client*>(context->data);
+    auto adapter = static_cast<Client*>(ctx->data);
     if (status != REDIS_OK) {
-        emit adapter->Error(context->errstr, status);
+        emit adapter->Error(ctx->errstr, status);
     } else {
         emit adapter->Connected();
     }
@@ -160,4 +158,7 @@ int Client::Execute(lua_State *L)
 
 Client::Client(Settings settings) : d(new Impl{std::move(settings)}) {
     connect(this, &Client::Error, &Client::Disconnect);
+    connect(this, &Client::Connected, this, [this]{
+        redisAsyncCommand(d->ctx, nullptr, nullptr, "SELECT %d", d->settings.db);
+    });
 }

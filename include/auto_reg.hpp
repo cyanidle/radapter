@@ -72,8 +72,8 @@ int AsSignal(lua_State* L) {
 }
 
 template<int offs, typename T, typename...Args, size_t...Is>
-T* Construct(void* stor, lua_State* L, std::index_sequence<Is...>) {
-    return new (stor) T{Deserialize<Args>(L, -int(Is)-1-offs)...};
+T* Construct(void* stor, lua_State* L, std::index_sequence<Is...>, TraceFrame& frame) {
+    return new (stor) T{Deserialize<Args>(L, -int(Is)-1-offs, frame)...};
 }
 
 template<typename T, typename...Args>
@@ -84,7 +84,9 @@ int MakeNew(lua_State* L) {
         lua_pushnil(L);
     }
     auto ud = lua_newuserdata(L, sizeof(T));
-    Construct<1, T, Args...>(ud, L, std::index_sequence_for<Args...>());
+    TraceFrame root;
+    TraceFrame clsFrame{clsName, root};
+    Construct<1, T, Args...>(ud, L, std::index_sequence_for<Args...>(), clsFrame);
     luaL_setmetatable(L, clsName);
     return 1;
 }

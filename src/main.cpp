@@ -9,6 +9,7 @@
 #include "lua.hpp"
 #include "compiled_bootstrap.hpp"
 #include "redis/client.hpp"
+#include "redis/stream.hpp"
 
 using namespace radapter;
 
@@ -85,8 +86,8 @@ static int dumpJson(lua_State* L) {
 }
 
 static luaL_Reg builtins[] = {
-    {"each", lua::Protected<setTimeout>},
-    {"stop", lua::Protected<clearTimeout>},
+    {"setTimeout", lua::Protected<setTimeout>},
+    {"clearTimeout", lua::Protected<clearTimeout>},
     {"parse", parseJson},
     {"dump", dumpJson},
     {"printStack", lua::DumpStack},

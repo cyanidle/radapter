@@ -43,14 +43,10 @@ private:
 };
 
 DESCRIBE(redis::Client,
-         &_::Connected,
-         &_::Error,
-         &_::Disconnected,
-         &_::Disconnect,
-         &_::Connect,
-         &_::Execute)
+    &_::Connected, &_::Error, &_::Disconnected,
+    &_::Disconnect, &_::Connect, &_::Execute)
 DESCRIBE(Client::Settings, &_::host, &_::port, &_::db, &_::timeout)
-DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Client::Settings)
+DESCRIBE_ATTRS(Client, Client::Settings)
 DESCRIBE_FIELD_ATTRS(Client, Connected, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Error, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Disconnected, Signal);

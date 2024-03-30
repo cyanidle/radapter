@@ -8,83 +8,107 @@ namespace radapter {
 
 struct MissingAllowed {};
 
+struct TraceFrame {
+    constexpr TraceFrame() noexcept = default;
+    constexpr TraceFrame(string_view key, const TraceFrame& parent) :
+        prev(&parent), size(key.size()), str(key.data())
+    {}
+    constexpr TraceFrame(size_t idx, const TraceFrame& parent) :
+        prev(&parent), idx(idx)
+    {}
+    template<typename F>
+    void Walk(F&& f) const {
+        auto nx = prepWalk();
+        while(nx) {
+            if (nx->size) f(string_view{nx->str, nx->size});
+            else f(nx->idx);
+            nx = nx->next;
+        }
+    }
+    string PrintTrace() const;
+private:
+    const TraceFrame* prepWalk() const;
+
+    const TraceFrame* prev = {};
+    mutable const TraceFrame* next = {};
+    size_t size = {};
+    union {
+        const char* str;
+        size_t idx = {};
+    };
+};
+
+inline void CheckType(lua_State* L, int t, const TraceFrame& frame) {
+    if (auto was = lua_type(L, -1); was != t) {
+        throw Err("{}: expected '{}', got '{}'",
+                  frame.PrintTrace(), lua_typename(L, t), lua_typename(L, was));
+    }
+}
+
 template<typename T>
-void Deserialize(lua_State* L, T& out, int idx = -1)
+void Deserialize(lua_State* L, T& out, int idx = -1, TraceFrame const& frame = {})
 {
     lua_pushvalue(L, idx);
     if constexpr (describe::is_described_v<T>) {
         constexpr auto desc = describe::Get<T>();
-        try {
-            auto t = lua_type(L, -1);
-            if (t != LUA_TNIL && t != LUA_TTABLE) {
-                throw Err("Table expected, got: '{}'", lua_typename(L, t));
-            }
-            desc.for_each_field([&](auto f){
-                lua_pushlstring(L, f.name.data(), f.name.size());
-                if (t == LUA_TNIL) {
-                    lua_pop(L, 1);
-                    lua_pushnil(L);
-                } else {
-                    lua_rawget(L, -2);
-                }
-                if constexpr (describe::has_attr_v<MissingAllowed, decltype(f)>) {
-                    if (t == LUA_TNIL || lua_isnil(L, -1)) {
-                        lua_pop(L, 1);
-                        return;
-                    }
-                }
-                try {
-                    Deserialize(L, f.get(out));
-                } catch (std::exception& exc) {
-                    throw Err("{}.{}", f.name, exc.what());
-                }
-                lua_pop(L, 1);
-            });
-        } catch (std::exception& e) {
-            throw Err("'{}': {}", desc.name, e.what());
+        auto t = lua_type(L, -1);
+        if (t != LUA_TNIL && t != LUA_TTABLE) {
+            throw Err("{}: Table expected, got: '{}'",
+                      frame.PrintTrace(), lua_typename(L, t));
         }
-
+        desc.for_each_field([&](auto f){
+            if (t == LUA_TNIL) {
+                lua_pushnil(L);
+            } else {
+                lua_pushlstring(L, f.name.data(), f.name.size());
+                lua_rawget(L, -2);
+            }
+            constexpr bool canSkip = describe::has_attr_v<MissingAllowed, decltype(f)>;
+            if (canSkip && lua_isnil(L, -1)) {
+                lua_pop(L, 1);
+                return;
+            }
+            TraceFrame next{f.name, frame};
+            Deserialize(L, f.get(out), -1, next);
+            lua_pop(L, 1);
+        });
     } else if constexpr (std::is_same_v<T, bool>) {
-        lua::CheckType(L, LUA_TBOOLEAN, -1);
+        CheckType(L, LUA_TBOOLEAN, frame);
         out = lua_toboolean(L, -1);
     } else if constexpr (std::is_floating_point_v<T>) {
-        lua::CheckType(L, LUA_TNUMBER, -1);
+        CheckType(L, LUA_TNUMBER, frame);
         out = lua_tonumber(L, -1);
     } else if constexpr (std::is_constructible_v<string_view, T>) {
-        lua::CheckType(L, LUA_TSTRING, -1);
+        CheckType(L, LUA_TSTRING, frame);
         out = lua::ToString(L, -1);
     } else if constexpr (std::is_integral_v<T>) {
         if (!lua_isinteger(L, -1)) {
-            throw Err("number should be an integer");
+            throw Err("{}: number should be an integer",
+                      frame.PrintTrace());
         }
         out = lua_tointeger(L, -1);
     } else if constexpr (meta::is_assoc_container_v<T>) {
         using kT = typename T::key_type;
         static_assert(std::is_constructible_v<string_view, T>, "non-string map keys unsupported");
         lua::IterateTable(L, -1, [&]{
-            lua::CheckType(L, LUA_TSTRING, -2);
+            CheckType(L, LUA_TSTRING, frame);
             auto key = lua::ToString(L, -2);
-            try {
-                deserialize(L, out[key]);
-            } catch (std::exception& exc) {
-                throw Err("{}.{}", key, exc.what());
-            }
+            TraceFrame next{key, frame};
+            Deserialize(L, out[key], -1, next);
         });
     } else if constexpr (meta::is_index_container_v<T>) {
-        lua::CheckType(L, LUA_TTABLE, -1);
+        CheckType(L, LUA_TTABLE, frame);
         if (auto len = lua::IsArray(L, -1)) {
             out.resize(len);
             for (auto i = 1; i <= len; ++i) {
                 lua_rawgeti(L, -1, i);
-                try {
-                    deserialize(L, out[i]);
-                } catch (std::exception& exc) {
-                    throw Err("[{}].{}", i, exc.what());
-                }
+                TraceFrame next{size_t(i), frame};
+                Deserialize(L, out[i], -1, next);
                 lua_pop(L, 1);
             }
         } else {
-            throw Err("value is not an array");
+            throw Err("{}: value is not an array",
+                      frame.PrintTrace());
         }
     } else {
         static_assert(std::is_void_v<T>, "Unsupported type");
@@ -93,9 +117,9 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
 }
 
 template<typename T>
-T Deserialize(lua_State* L, int idx = -1) {
+T Deserialize(lua_State* L, int idx = -1, TraceFrame const& frame = {}) {
     T out;
-    Deserialize(L, out, idx);
+    Deserialize(L, out, idx, frame);
     return out;
 }
 

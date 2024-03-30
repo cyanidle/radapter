@@ -297,13 +297,6 @@ int lua::DumpStack(lua_State *L) noexcept
     return 0;
 }
 
-void lua::CheckType(lua_State *L, int t, int idx) {
-    if (auto was = lua_type(L, idx); was != t) {
-        throw Err("Invalid type at {}: expected: '{}' => got: '{}'",
-                  idx, lua_typename(L, t), lua_typename(L, was));
-    }
-}
-
 static int _key;
 static void* key = &_key;
 
