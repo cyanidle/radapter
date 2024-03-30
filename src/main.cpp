@@ -100,6 +100,7 @@ static luaL_Reg builtins[] = {
 };
 
 static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
+    auto was = lua_gettop(L);
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
         throw Err("while loading {}: {}", name, lua::PrintErr(err));
     }
@@ -201,14 +202,13 @@ int main(int argc, char *argv[]) try
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
+    lua_pop(L, 1);
     if (isDebug) {
+        // set 'socket' and 'mobdebug' packages here
         runBuffer(L, compiled_socket(), "<socket>", "bt");
-        lua_setglobal(L, "socket");
         runBuffer(L, compiled_mobdebug(), "<mobdebug>", "bt");
-        lua_setglobal(L, "mobdebug");
     }
     runBuffer(L, compiled_bootstrap(), "<bootstrap>", "bt");
-    lua_pop(L, 1);
     MakeAndSet<redis::Client>(L, "redis", "Client");
     for (auto& e: evals) {
         luaL_dostring(L, e.c_str());

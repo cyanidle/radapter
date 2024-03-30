@@ -54,7 +54,7 @@ cmake_policy(SET CMP0079 NEW)
 add_library(luasocket SHARED)
 set_target_properties(luasocket PROPERTIES 
     PREFIX ""
-    OUTPUT_NAME "socket"
+    OUTPUT_NAME "socket/core"
     )
 target_sources(luasocket PRIVATE
     submodule/luasocket/src/luasocket.c
