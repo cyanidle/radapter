@@ -10,6 +10,7 @@
 #include "redis/client.hpp"
 #include "compiled_bootstrap.hpp"
 #include "compiled_mobdebug.hpp"
+#include "compiled_socket.hpp"
 
 using namespace radapter;
 
@@ -105,7 +106,6 @@ static void runBuffer(lua_State* L, string_view code, const char* name, const ch
     if (auto err = lua::PCall(L)) {
         throw Err("while running {}: {} => {}", name, lua::PrintErr(err), lua::ToString(L, -1));
     }
-    lua_pop(L, 1);
 }
 
 static void interactive(lua_State* L) {
@@ -138,24 +138,6 @@ void MakeAndSet(lua_State* L, string_view ns, string_view name) {
     lua_setglobal(L, string{ns}.c_str());
 }
 
-static void PrepareEnv(lua_State* L) {
-    luaL_openlibs(L);
-    lua_atpanic(L, panic);
-    lua_pushcfunction(L, traceFunc);
-    lua::SetTracer(L, -1);
-    lua_pop(L, 1);
-    logs::Register(L);
-    lua_pushglobaltable(L);
-    luaL_setfuncs(L, builtins, 0);
-    runBuffer(L, compiled_mobdebug(), "<mobdebug>", "bt");
-    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "bt");
-    lua_pop(L, 1);
-}
-
-static void RegClasses(lua_State* L) {
-    MakeAndSet<redis::Client>(L, "redis", "Client");
-}
-
 int main(int argc, char *argv[]) try
 {
     QCoreApplication app(argc, argv);
@@ -164,26 +146,32 @@ int main(int argc, char *argv[]) try
     meta::defer close([=]{
         lua_close(L);
     });
-    PrepareEnv(L);
-    RegClasses(L);
+    std::vector<string> files;
+    std::vector<string> evals;
     cli.add_argument("run")
-        .action([&](const string& file){
-            if (auto err = luaL_dofile(L, file.c_str())) {
-                logErr("while running {}: \n\t{} => {}", file, lua::PrintErr(err), lua::ToString(L, -1));
-                std::exit(1);
-            }
+        .action([&](auto f){
+            files.push_back(f);
         })
         .nargs(argparse::nargs_pattern::any)
-        .help("main file to launch");
+        .help("files to launch");
     cli.add_argument("--eval", "-e")
         .action([&](string script){
-            luaL_loadstring(L, script.c_str());
+            evals.push_back(script);
         })
         .help("execute lua from cli");
     cli.add_argument("--interactive", "-i")
-        .implicit_value(true)
-        .default_value(false)
+        .flag()
         .help("interactive (cli) mode");
+    cli.add_argument("--debug", "-d")
+        .flag()
+        .help("enable (debug) mode");
+    cli.add_argument("--debug-host")
+        .default_value("localhost")
+        .help("debug listener host");
+    cli.add_argument("--debug-port")
+        .scan<'u', uint16_t>()
+        .default_value(uint16_t(8172))
+        .help("debug listener port");
     try {
         cli.parse_known_args(argc, argv);
     } catch (std::exception& exc) {
@@ -191,6 +179,45 @@ int main(int argc, char *argv[]) try
         std::cerr << cli;
         return 1;
     }
+    lua_createtable(L, 0, 0);
+    auto isDebug = cli["d"] == true;
+    if (isDebug) {
+        Serialize(L, "debug_enabled");
+        Serialize(L, true);
+        lua_rawset(L, -3);
+    }
+    Serialize(L, "debug_port");
+    Serialize(L, cli.get<uint16_t>("debug-port"));
+    lua_rawset(L, -3);
+    Serialize(L, "debug_host");
+    Serialize(L, cli.get("debug-host"));
+    lua_rawset(L, -3);
+    lua_setglobal(L, "radapter");
+    luaL_openlibs(L);
+    lua_atpanic(L, panic);
+    lua_pushcfunction(L, traceFunc);
+    lua::SetTracer(L, -1);
+    lua_pop(L, 1);
+    logs::Register(L);
+    lua_pushglobaltable(L);
+    luaL_setfuncs(L, builtins, 0);
+    if (isDebug) {
+        runBuffer(L, compiled_socket(), "<socket>", "bt");
+        lua_setglobal(L, "socket");
+        runBuffer(L, compiled_mobdebug(), "<mobdebug>", "bt");
+        lua_setglobal(L, "mobdebug");
+    }
+    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "bt");
+    lua_pop(L, 1);
+    MakeAndSet<redis::Client>(L, "redis", "Client");
+    for (auto& e: evals) {
+        luaL_dostring(L, e.c_str());
+    }
+    evals = {};
+    for (auto& f: files) {
+        luaL_dofile(L, f.c_str());
+    }
+    files = {};
     if (cli["i"] == true) {
         QThread::create([L]{interactive(L);})->start();
     }
