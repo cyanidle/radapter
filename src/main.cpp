@@ -7,8 +7,9 @@
 #include "common.hpp"
 #include "logs.hpp"
 #include "lua.hpp"
-#include "compiled_bootstrap.hpp"
 #include "redis/client.hpp"
+#include "compiled_bootstrap.hpp"
+#include "compiled_mobdebug.hpp"
 
 using namespace radapter;
 
@@ -26,7 +27,8 @@ static int traceFunc(lua_State* L) {
 
 static std::set<QTimer*> timers;
 
-static int setTimeout(lua_State* L) {
+template<bool singleShot>
+static int setInterval(lua_State* L) {
     auto millis = luaL_checkinteger(L, 1);
     luaL_checktype(L, 2, LUA_TFUNCTION);
     auto ref = lua::Ref(L, 2);
@@ -35,13 +37,14 @@ static int setTimeout(lua_State* L) {
         ref.push();
         lua::PCall(ref.L);
     });
+    tmr->setSingleShot(singleShot);
     tmr->start(millis);
     timers.insert(tmr);
     lua_pushlightuserdata(L, tmr);
     return 1;
 }
 
-static int clearTimeout(lua_State* L) {
+static int clearInterval(lua_State* L) {
     if (lua_isnil(L, 1)) {
         return 0;
     }
@@ -85,8 +88,10 @@ static int dumpJson(lua_State* L) {
 }
 
 static luaL_Reg builtins[] = {
-    {"setTimeout", lua::Protected<setTimeout>},
-    {"clearTimeout", lua::Protected<clearTimeout>},
+    {"setTimeout", lua::Protected<setInterval<true>>},
+    {"clearTimeout", lua::Protected<clearInterval>},
+    {"setInterval", lua::Protected<setInterval<false>>},
+    {"clearInterval", lua::Protected<clearInterval>},
     {"parse", parseJson},
     {"dump", dumpJson},
     {"printStack", lua::DumpStack},
@@ -142,8 +147,8 @@ static void PrepareEnv(lua_State* L) {
     logs::Register(L);
     lua_pushglobaltable(L);
     luaL_setfuncs(L, builtins, 0);
-    auto boot = compiled_bootstrap();
-    runBuffer(L, boot, "<bootstrap>", "bt");
+    runBuffer(L, compiled_mobdebug(), "<mobdebug>", "bt");
+    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "bt");
     lua_pop(L, 1);
 }
 

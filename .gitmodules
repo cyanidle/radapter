@@ -22,3 +22,9 @@
 [submodule "cmake_utils"]
 	path = cmake_utils
 	url = git@github.com:cyanidle/cmake_utils.git
+[submodule "submodule/luasocket"]
+	path = submodule/luasocket
+	url = https://github.com/lunarmodules/luasocket.git
+[submodule "submodule/MobDebug"]
+	path = submodule/MobDebug
+	url = https://github.com/pkulchenko/MobDebug.git
