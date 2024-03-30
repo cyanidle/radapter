@@ -14,23 +14,36 @@ void Deserialize(lua_State* L, T& out, int idx = -1)
     lua_pushvalue(L, idx);
     if constexpr (describe::is_described_v<T>) {
         constexpr auto desc = describe::Get<T>();
-        lua::CheckType(L, LUA_TTABLE, -1);
-        desc.for_each_field([&](auto f){
-            lua_pushlstring(L, f.name.data(), f.name.size());
-            lua_rawget(L, -2);
-            if constexpr (describe::has_attr_v<MissingAllowed, decltype(f)>) {
-                if (lua_isnil(L, -1)) {
+        try {
+            auto t = lua_type(L, -1);
+            if (t != LUA_TNIL && t != LUA_TTABLE) {
+                throw Err("Table expected, got: '{}'", lua_typename(L, t));
+            }
+            desc.for_each_field([&](auto f){
+                lua_pushlstring(L, f.name.data(), f.name.size());
+                if (t == LUA_TNIL) {
                     lua_pop(L, 1);
-                    return;
+                    lua_pushnil(L);
+                } else {
+                    lua_rawget(L, -2);
                 }
-            }
-            try {
-                Deserialize(L, f.get(out));
-            } catch (std::exception& exc) {
-                throw Err("{}.{}", f.name, exc.what());
-            }
-            lua_pop(L, 1);
-        });
+                if constexpr (describe::has_attr_v<MissingAllowed, decltype(f)>) {
+                    if (t == LUA_TNIL || lua_isnil(L, -1)) {
+                        lua_pop(L, 1);
+                        return;
+                    }
+                }
+                try {
+                    Deserialize(L, f.get(out));
+                } catch (std::exception& exc) {
+                    throw Err("{}.{}", f.name, exc.what());
+                }
+                lua_pop(L, 1);
+            });
+        } catch (std::exception& e) {
+            throw Err("'{}': {}", desc.name, e.what());
+        }
+
     } else if constexpr (std::is_same_v<T, bool>) {
         lua::CheckType(L, LUA_TBOOLEAN, -1);
         out = lua_toboolean(L, -1);

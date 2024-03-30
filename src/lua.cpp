@@ -299,7 +299,8 @@ int lua::DumpStack(lua_State *L) noexcept
 
 void lua::CheckType(lua_State *L, int t, int idx) {
     if (auto was = lua_type(L, idx); was != t) {
-        throw Err("Invalid type at {}: expected: {} => got: {}", idx, lua_typename(L, t), lua_typename(L, was));
+        throw Err("Invalid type at {}: expected: '{}' => got: '{}'",
+                  idx, lua_typename(L, t), lua_typename(L, was));
     }
 }
 

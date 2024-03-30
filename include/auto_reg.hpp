@@ -78,7 +78,11 @@ T* Construct(void* stor, lua_State* L, std::index_sequence<Is...>) {
 
 template<typename T, typename...Args>
 int MakeNew(lua_State* L) {
+    constexpr auto count = sizeof...(Args);
     auto clsName = static_cast<const char*>(lua_touserdata(L, lua_upvalueindex(1)));
+    while (lua_gettop(L) < count) {
+        lua_pushnil(L);
+    }
     auto ud = lua_newuserdata(L, sizeof(T));
     Construct<1, T, Args...>(ud, L, std::index_sequence_for<Args...>());
     luaL_setmetatable(L, clsName);

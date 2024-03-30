@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <QThread>
+#include <QSemaphore>
 #include <set>
 #include "common.hpp"
 #include "logs.hpp"
@@ -104,15 +105,19 @@ static void runBuffer(lua_State* L, string_view code, const char* name, const ch
 
 static void interactive(lua_State* L) {
     auto thr = QThread::currentThread();
+    auto sem = std::make_shared<QSemaphore>(1);
     while (!thr->isInterruptionRequested()) {
+        sem->acquire();
+        std::cout << "> ";
         std::string line;
         std::getline(std::cin, line);
-        QMetaObject::invokeMethod(qApp, [L, line=std::move(line)]{
+        QMetaObject::invokeMethod(qApp, [sem, L, line=std::move(line)]{
             try {
                 runBuffer(L, line, "<command line>", "t");
             } catch (std::exception& e) {
-                logErr("Error: {}", e.what());
+                logErr("{}", e.what());
             }
+            sem->release();
         },
         Qt::QueuedConnection);
     }
