@@ -23,7 +23,6 @@ static void parseReply(lua_State* L, redisReply* reply)
     if (!reply) {
         return;
     }
-    auto array = QVariantList{};
     switch (reply->type) {
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_STRING:
@@ -31,8 +30,11 @@ static void parseReply(lua_State* L, redisReply* reply)
     case REDIS_REPLY_VERB:
         lua_pushlstring(L, reply->str, reply->len);
         break;
+    case REDIS_REPLY_ATTR:
     case REDIS_REPLY_SET:
     case REDIS_REPLY_ARRAY:
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_PUSH:
         lua_createtable(L, reply->elements, 0);
         for (size_t i = 0; i < reply->elements; ++i) {
             parseReply(L, reply->element[i]);
@@ -48,12 +50,6 @@ static void parseReply(lua_State* L, redisReply* reply)
     case REDIS_REPLY_BOOL:
         lua_pushboolean(L, bool(reply->integer));
         break;
-    case REDIS_REPLY_MAP:
-        throw std::runtime_error("REDIS_REPLY_MAP Unsupported");
-    case REDIS_REPLY_ATTR:
-        throw std::runtime_error("REDIS_REPLY_ATTR Unsupported");
-    case REDIS_REPLY_PUSH:
-        throw std::runtime_error("REDIS_REPLY_PUSH Unsupported");
     case REDIS_REPLY_ERROR:
     case REDIS_REPLY_NIL:
     default:
@@ -150,6 +146,7 @@ int Client::Execute(lua_State *L)
     if (!d->ctx) {
         lua_pushvalue(L, 2);
         lua::PCall(L, nullptr, "Connect not called");
+        return 0;
     }
     auto cb = new lua::Ref{L, 2};
     auto status = redisAsyncCommand(d->ctx, privateCallback, cb, cmd);

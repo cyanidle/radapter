@@ -94,6 +94,10 @@ inline void Serialize(lua_State* L, lua::StackRef s) {
     lua_pushvalue(L, s.ref);
 }
 
+inline void Serialize(lua_State* L, lua::Ref s) {
+    s.push();
+}
+
 template<typename T>
 void Serialize(lua_State* L, T const& val) {
     if constexpr (describe::is_described_v<T>) {

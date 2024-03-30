@@ -11,11 +11,11 @@ public:
         }
         m_ctx = ac;
         m_ctx->ev.data = this;
-        m_ctx->ev.addRead = [](void* a){static_cast<QtRedisAdapter*>(a)->addRead();};
-        m_ctx->ev.delRead = [](void* a){static_cast<QtRedisAdapter*>(a)->delRead();};
-        m_ctx->ev.addWrite = [](void* a){static_cast<QtRedisAdapter*>(a)->addWrite();};
-        m_ctx->ev.delWrite = [](void* a){static_cast<QtRedisAdapter*>(a)->delWrite();};
-        m_ctx->ev.cleanup = [](void* a){static_cast<QtRedisAdapter*>(a)->cleanup();};
+        m_ctx->ev.addRead = [](void* a){if(a)static_cast<QtRedisAdapter*>(a)->addRead();};
+        m_ctx->ev.delRead = [](void* a){if(a)static_cast<QtRedisAdapter*>(a)->delRead();};
+        m_ctx->ev.addWrite = [](void* a){if(a)static_cast<QtRedisAdapter*>(a)->addWrite();};
+        m_ctx->ev.delWrite = [](void* a){if(a)static_cast<QtRedisAdapter*>(a)->delWrite();};
+        m_ctx->ev.cleanup = [](void* a){if(a)static_cast<QtRedisAdapter*>(a)->cleanup();};
         return REDIS_OK;
     }
 
