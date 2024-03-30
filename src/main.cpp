@@ -119,13 +119,13 @@ static void interactive(lua_State* L) {
 }
 
 template<typename T>
-void MakeAndSet(lua_State* L) {
+void MakeAndSet(lua_State* L, string_view ns, string_view name) {
     constexpr auto desc = describe::Get<T>();
     lua_createtable(L, 0, 1);
-    Serialize(L, desc.name);
+    Serialize(L, name);
     MakeClass<T>(L);
     lua_rawset(L, -3);
-    lua_setglobal(L, string{desc.ns}.c_str());
+    lua_setglobal(L, string{ns}.c_str());
 }
 
 static void PrepareEnv(lua_State* L) {
@@ -143,7 +143,7 @@ static void PrepareEnv(lua_State* L) {
 }
 
 static void RegClasses(lua_State* L) {
-    MakeAndSet<redis::Client>(L);
+    MakeAndSet<redis::Client>(L, "redis", "Client");
 }
 
 int main(int argc, char *argv[]) try

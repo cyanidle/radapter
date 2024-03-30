@@ -12,19 +12,17 @@ struct redisAsyncContext;
 namespace radapter::redis
 {
 
-struct Settings : ClassSettings, describe::Attrs<MissingAllowed> {
-    string host = "127.0.0.1";
-    uint16_t port = 6379;
-    uint16_t db = 0;
-    uint32_t timeout = 5000;
-};
-
-DESCRIBE(redis::Settings, &_::host, &_::port, &_::db, &_::timeout)
-
 class Client : public QObject
 {
     Q_OBJECT
 public:
+    struct Settings : ClassSettings, describe::Attrs<MissingAllowed> {
+        string host = "127.0.0.1";
+        uint16_t port = 6379;
+        uint16_t db = 0;
+        uint32_t timeout = 5000;
+    };
+
     int Execute(lua_State* L);
     Client(Settings settings);
     ~Client();
@@ -45,9 +43,14 @@ private:
 };
 
 DESCRIBE(redis::Client,
-         &_::Connected, &_::Error, &_::Disconnected,
-         &_::Disconnect, &_::Connect, &_::Execute)
-DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Settings)
+         &_::Connected,
+         &_::Error,
+         &_::Disconnected,
+         &_::Disconnect,
+         &_::Connect,
+         &_::Execute)
+DESCRIBE(Client::Settings, &_::host, &_::port, &_::db, &_::timeout)
+DESCRIBE_ATTRS(Client, describe::FieldsDoNotInherit, Client::Settings)
 DESCRIBE_FIELD_ATTRS(Client, Connected, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Error, Signal);
 DESCRIBE_FIELD_ATTRS(Client, Disconnected, Signal);

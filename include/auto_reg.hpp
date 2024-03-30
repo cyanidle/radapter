@@ -12,8 +12,7 @@ struct NativeMethod{};
 
 template<typename T>
 string& NameOf() {
-    constexpr auto desc = describe::Get<T>();
-    static std::string storage = fmt::format("{}::{}\0", desc.ns, desc.name);
+    static std::string storage = fmt::format("{}\0", describe::Get<T>().name);
     return storage;
 }
 
