@@ -99,14 +99,28 @@ static luaL_Reg builtins[] = {
     {NULL, NULL}
 };
 
-static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode) {
-    auto was = lua_gettop(L);
+static void runBuffer(lua_State* L, string_view code, const char* name, const char* mode = "bt") {
     if (auto err = luaL_loadbufferx(L, code.data(), code.size(), name, mode)) {
-        throw Err("while loading {}: {}", name, lua::PrintErr(err));
+        throw Err("while loading {}: \n\t{}",
+                  name, lua::PrintErr(err));
     }
     if (auto err = lua::PCall(L)) {
-        throw Err("while running {}: {} => {}", name, lua::PrintErr(err), lua::ToString(L, -1));
+        throw Err("while running {}: \n\t{} => {}",
+                  name, lua::PrintErr(err), lua::ToString(L, -1));
     }
+}
+
+static void saveModule(lua_State* L, string_view name) {
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "preload");
+    lua_pushvalue(L, -3);
+    constexpr auto impl = [](lua_State* L) -> int {
+        lua_pushvalue(L, lua_upvalueindex(1));
+        return 1;
+    };
+    lua_pushcclosure(L, impl, 1);
+    lua_setfield(L, -2, "preload");
+    lua_pop(L, 3);
 }
 
 static void interactive(lua_State* L) {
@@ -137,6 +151,10 @@ void MakeAndSet(lua_State* L, string_view ns, string_view name) {
     MakeClass<T>(L);
     lua_rawset(L, -3);
     lua_setglobal(L, string{ns}.c_str());
+}
+
+extern "C" {
+int luaopen_socket_core(lua_State* L);
 }
 
 int main(int argc, char *argv[]) try
@@ -183,16 +201,13 @@ int main(int argc, char *argv[]) try
     lua_createtable(L, 0, 0);
     auto isDebug = cli["d"] == true;
     if (isDebug) {
-        Serialize(L, "debug_enabled");
-        Serialize(L, true);
-        lua_rawset(L, -3);
+        lua_pushboolean(L, true);
+        lua_setfield(L, -2, "debug_port");
     }
-    Serialize(L, "debug_port");
     Serialize(L, cli.get<uint16_t>("debug-port"));
-    lua_rawset(L, -3);
-    Serialize(L, "debug_host");
+    lua_setfield(L, -2, "debug_port");
     Serialize(L, cli.get("debug-host"));
-    lua_rawset(L, -3);
+    lua_setfield(L, -2, "debug_host");
     lua_setglobal(L, "radapter");
     luaL_openlibs(L);
     lua_atpanic(L, panic);
@@ -204,11 +219,14 @@ int main(int argc, char *argv[]) try
     luaL_setfuncs(L, builtins, 0);
     lua_pop(L, 1);
     if (isDebug) {
-        // set 'socket' and 'mobdebug' packages here
-        runBuffer(L, compiled_socket(), "<socket>", "bt");
-        runBuffer(L, compiled_mobdebug(), "<mobdebug>", "bt");
+        luaopen_socket_core(L);
+        saveModule(L, "socket.core");
+        runBuffer(L, compiled_socket(), "<socket>", "b");
+        saveModule(L, "socket");
+        runBuffer(L, compiled_mobdebug(), "<mobdebug>", "b");
+        saveModule(L, "mobdebug");
     }
-    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "bt");
+    runBuffer(L, compiled_bootstrap(), "<bootstrap>", "b");
     MakeAndSet<redis::Client>(L, "redis", "Client");
     for (auto& e: evals) {
         luaL_dostring(L, e.c_str());

@@ -285,11 +285,15 @@ int lua::DumpStack(lua_State *L) noexcept
         case LUA_TSTRING:
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
-            stack += fmt::format("\t{:>3}({:>3}): {}\n", i, i - top - 1, ToStringWithConv(L, i));
+            stack += fmt::format(
+                "\t{:>3}({:>3}): {}\n",
+                i, i - top - 1, ToStringWithConv(L, i));
             lua_pop(L, 1);
             break;
         default:
-            stack += fmt::format("\t{:>3}({:>3}): <{}>\n", i, i - top - 1, luaL_typename(L, i));
+            stack += fmt::format(
+                "\t{:>3}({:>3}): <{}>\n",
+                i, i - top - 1, luaL_typename(L, i));
             break;
         }
     }
@@ -297,16 +301,16 @@ int lua::DumpStack(lua_State *L) noexcept
     return 0;
 }
 
-static int _key;
-static void* key = &_key;
+static int _trKey;
+static void* trKey = &_trKey;
 
 void lua::PushTracer(lua_State *L)
 {
-    lua_rawgetp(L, LUA_REGISTRYINDEX, key);
+    lua_rawgetp(L, LUA_REGISTRYINDEX, trKey);
 }
 
 void lua::SetTracer(lua_State *L, int idx)
 {
     lua_pushvalue(L, idx);
-    lua_rawsetp(L, LUA_REGISTRYINDEX, key);
+    lua_rawsetp(L, LUA_REGISTRYINDEX, trKey);
 }

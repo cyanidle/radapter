@@ -182,11 +182,10 @@ namespace lua {
 template<typename...Args>
 int PCall(lua_State* L, const Args&...args) {
     constexpr int count = sizeof...(Args);
-    PushTracer(L);
-    lua_pushvalue(L, -2);
-    // TODO! Consume function on top of stack
+    // todo: tracer
     (Serialize(L, args), ...);
-    return lua_pcall(L, count, LUA_MULTRET, -count-2);
+    auto status = lua_pcall(L, count, LUA_MULTRET, 0);
+    return status;
 }
 
 }

@@ -64,7 +64,7 @@ static int logImpl(lua_State* L) {
             break;
         }
         case LUA_TNIL: {
-            args.push_back("null");
+            args.push_back("<nil>");
             break;
         }
         case LUA_TNUMBER: {

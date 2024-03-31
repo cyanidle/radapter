@@ -51,12 +51,7 @@ add_lua_file(compiled_mobdebug ${CMAKE_SOURCE_DIR}/submodule/MobDebug/src/mobdeb
 add_lua_file(compiled_socket ${CMAKE_SOURCE_DIR}/submodule/luasocket/src/socket.lua)
 
 cmake_policy(SET CMP0079 NEW)
-add_library(luasocket SHARED)
-set_target_properties(luasocket PROPERTIES 
-    PREFIX ""
-    OUTPUT_NAME "socket/core"
-    )
-target_sources(luasocket PRIVATE
+add_library(luasocket
     submodule/luasocket/src/luasocket.c
     submodule/luasocket/src/timeout.c
     submodule/luasocket/src/buffer.c
@@ -78,6 +73,9 @@ if (WIN32)
 else()
     target_sources(luasocket PRIVATE
         submodule/luasocket/src/usocket.c
+        submodule/luasocket/src/unix.c
+        submodule/luasocket/src/unixdgram.c
+        submodule/luasocket/src/unixstream.h
     )
 endif()
 target_link_libraries(luasocket PRIVATE lua_iface)
@@ -88,6 +86,7 @@ target_include_directories(radapter PRIVATE include)
 target_link_libraries(radapter PRIVATE
     fmt
     argparse
+    luasocket
     lua_iface
     rapid
     hiredis

@@ -110,9 +110,8 @@ void Client::privateCallback(redisAsyncContext* ctx, void *reply, void *data)
         if (cast) {
             try {
                 parseReply(cb->L, cast);
-                auto pos = lua_absindex(cb->L, -1);
                 cb->push();
-                lua::PCall(cb->L, lua::StackRef{pos}, nullptr);
+                lua::PCall(cb->L, lua::StackRef{-2}, nullptr);
             } catch (std::exception& exc) {
                 cb->push();
                 lua::PCall(cb->L, nullptr, exc.what());
