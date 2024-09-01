@@ -512,25 +512,23 @@ void radapter::Instance::EvalFile(fs::path path)
 {
     auto L = d->L;
 
+    lua_pushcfunction(L, traceback);
+    auto msgh = lua_gettop(L);
+    auto load = luaL_loadfile(L, path.string().c_str());
+    if (load != LUA_OK) {
+        throw Err("Error loading file {}: {}", path.string(), toSV(L));
+    }
+
     auto dir = path.parent_path();
     auto wasCwd = QDir::currentPath();
     if (!dir.empty()) {
         QDir::setCurrent(QString::fromLocal8Bit(dir.string().c_str()));
     }
-    auto revertPath = [&]{
-        if (!dir.empty()) {
-            QDir::setCurrent(wasCwd);
-        }
-    };
-    lua_pushcfunction(L, traceback);
-    auto msgh = lua_gettop(L);
-    auto load = luaL_loadfile(L, path.string().c_str());
-    if (load != LUA_OK) {
-        revertPath();
-        throw Err("Error loading file {}: {}", path.string(), toSV(L));
-    }
+
     auto res = lua_pcall(L, 0, 0, msgh);
-    revertPath();
+    if (!dir.empty()) {
+        QDir::setCurrent(wasCwd);
+    }
     if (res != LUA_OK) {
         auto e = toSV(L);
         throw Err("EvalFile error: {}", e);
