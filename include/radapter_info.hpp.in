@@ -1,0 +1,21 @@
+#ifndef RADAPTER_INFO_HPP
+#define RADAPTER_INFO_HPP
+
+
+namespace radapter 
+{
+
+constexpr int VerMajor = @RADAPTER_VERSION_MAJOR@;
+constexpr int VerMinor = @RADAPTER_VERSION_MINOR@;
+constexpr bool JIT = 
+#ifdef RADAPTER_JIT
+    true;
+#else
+    false;
+#endif
+constexpr auto BuildId = "@RADAPTER_SHORT_HASH_COMMIT@";
+constexpr auto BuildDate = "@RADAPTER_DAY_OF_CONFIGURE@";
+
+}
+
+#endif //RADAPTER_INFO_HPP

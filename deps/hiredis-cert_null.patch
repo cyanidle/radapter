@@ -1,0 +1,13 @@
+diff --git a/ssl.c b/ssl.c
+index c2f6178..66adb85 100644
+--- a/ssl.c
++++ b/ssl.c
+@@ -288,7 +288,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
+     if (capath || cacert_filename) {
+ #ifdef _WIN32
+         if (0 == strcmp(cacert_filename, "wincert")) {
+-            win_store = CertOpenSystemStore(NULL, "Root");
++            win_store = CertOpenSystemStore(0, "Root");
+             if (!win_store) {
+                 if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+                 goto error;
