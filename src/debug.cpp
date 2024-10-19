@@ -71,6 +71,7 @@ SocketClient SocketServer::accept()
     auto shut = QObject::connect(inst, &Instance::ShutdownRequest, [&]{
         shutdown = true;
     });
+    // todo: use wait...() APIS in server and client
     while (!sock && !shutdown) {
         server->thread()->eventDispatcher()->processEvents(QEventLoop::AllEvents);
     }
