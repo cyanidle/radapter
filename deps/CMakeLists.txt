@@ -37,9 +37,9 @@ if (RADAPTER_JIT) #libluajit2-5.1-dev
   target_compile_definitions(radapter_lua INTERFACE RADAPTER_JIT)
 else()
   CPMAddPackage(NAME lua
-    URL https://www.lua.org/ftp/lua-5.4.6.tar.gz
-    URL_HASH SHA256=7d5ea1b9cb6aa0b59ca3dde1c6adcb57ef83a1ba8e5432c0ecd06bf439b3ad88 
-    VERSION 5.4.6
+    URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
+    URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+    VERSION 5.4.7
     DOWNLOAD_ONLY YES
   )
   set(lua_src_dir ${lua_SOURCE_DIR})
