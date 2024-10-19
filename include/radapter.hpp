@@ -74,6 +74,7 @@ public:
     void Error(const char* cat, fmt::format_string<Args...> fmt, Args&&...a) {
         Log(error, cat, fmt, fmt::make_format_args(a...));
     }
+    void DebuggerListen(string host, uint16_t port);
     void RegisterSchema(const char* name, ExtraSchema schemaGen);
     void RegisterFunc(const char* name, ExtraFunction func);
     void RegisterGlobal(const char* name, QVariant const& value);
@@ -85,6 +86,7 @@ public:
     lua_State* LuaState();
     static Instance* FromLua(lua_State* L);
 signals:
+    void ShutdownRequest();
     void WorkerCreated(Worker* worker);
     void HasShutdown();
 private:

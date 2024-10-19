@@ -52,6 +52,7 @@ target_link_libraries(radapter-sdk PUBLIC
     Qt::WebSockets
     Qt::Network
     radapter_lua
+    glua
     describe
     fmt)
 

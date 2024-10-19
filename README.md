@@ -2,6 +2,11 @@
 
 Как радаптер, но на LUA. Система для соединения зоопарка устройств/протоколов/баз данных
 
+## Special thanks
+
+* smokie-l for inspiration
+* https://github.com/pkulchenko/MobDebug for remote debugger
+
 ## Build
 ```bash
 sudo apt update

@@ -558,6 +558,7 @@ void Instance::Shutdown(unsigned int timeout)
     }
     d->shutdown = true;
     Warn("radapter", "Shutting down...");
+    emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
         auto ws = d->workers;
         for (auto w: ws) {

@@ -48,6 +48,16 @@ int main (int argc, char **argv) try {
     cli.add_argument("--schema")
         .flag()
         .help("Print config schema");
+    cli.add_argument("--debug")
+        .flag()
+        .help("Enable debugger");
+    cli.add_argument("--debug-host")
+        .default_value("*")
+        .help("Debugger listen host");
+    cli.add_argument("--debug-port")
+        .scan<'u', uint16_t>()
+        .default_value(uint16_t{8172})
+        .help("Debugger listen port");
     try {
         cli.parse_args(args);
     } catch (std::exception& e) {
@@ -76,8 +86,12 @@ int main (int argc, char **argv) try {
         inst.EvalFile(f);
     }
 
+    if (cli["debug"] == true) {
+        inst.DebuggerListen(cli.get("debug-host"), cli.get<uint16_t>("debug-port"));
+    }
+
     return app.exec();
 } catch (std::exception& exc) {
-    qFatal("%s", exc.what());
+    std::cerr << "Critical: " << exc.what() << std::endl;
     return 1;
 }
