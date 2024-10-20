@@ -12,6 +12,7 @@ extern "C" {
 
 using namespace radapter;
 
+[[maybe_unused]]
 static string_view toSV(lua_State* L, int idx = -1) noexcept {
     size_t len;
     auto s = lua_tolstring(L, idx, &len);
@@ -20,8 +21,8 @@ static string_view toSV(lua_State* L, int idx = -1) noexcept {
 
 [[maybe_unused]]
 static int traceback(lua_State* L) noexcept {
-    auto sv = string{toSV(L, 1)};
-    luaL_traceback(L, L, sv.c_str(), 1);
+    auto msg = lua_tostring(L, 1);
+    luaL_traceback(L, L, msg, 1);
     return 1;
 }
 

@@ -14,9 +14,8 @@ int main (int argc, char **argv) try {
         args.push_back(a.toStdString());
     }
 
-    QVariantMap luaArgs;
     std::vector<std::string> exprs;
-    std::vector<std::string> files;
+    QStringList lua_args;
     auto ver = fmt::format(
         "{}.{}{} ({}+{})",
         radapter::VerMajor,
@@ -26,21 +25,14 @@ int main (int argc, char **argv) try {
         radapter::BuildDate);
     argparse::ArgumentParser cli(argv[0], ver);
     cli.add_argument("file")
-        .nargs(argparse::nargs_pattern::any)
-        .store_into(files)
+        .nargs(argparse::nargs_pattern::optional)
         .help("Execute files");
-    cli.add_argument("-a", "--arg")
-        .append()
-        .action([&](std::string_view kv){
-            auto pos = kv.find_first_of('=');
-            if (pos == std::string_view::npos || pos == kv.size() - 1) {
-                throw radapter::Err("Invalid --arg format ({}) => should be key=val", kv);
-            }
-            auto k = kv.substr(0, pos);
-            auto v = kv.substr(pos + 1);
-            luaArgs[QString::fromUtf8(k.data(), int(k.size()))] = QString::fromUtf8(v.data(), int(v.size()));
+    cli.add_argument("args")
+        .nargs(argparse::nargs_pattern::any)
+        .action([&](std::string_view str){
+            lua_args.push_back(QString::fromUtf8(str.data(), int(str.size())));
         })
-        .help("Add keys to global 'args' with syntax -a key=value");
+        .help("Args array to be passed to script");
     cli.add_argument("-e", "--eval")
         .append()
         .store_into(exprs)
@@ -77,17 +69,18 @@ int main (int argc, char **argv) try {
     app.connect(sigs, &QCtrlSignalHandler::ctrlSignal, &inst, &radapter::Instance::Shutdown);
     app.connect(&inst, &radapter::Instance::HasShutdown, &app, &QCoreApplication::quit);
 
-    inst.RegisterGlobal("args", luaArgs);
+    inst.RegisterGlobal("args", lua_args);
 
     for (auto& e: exprs) {
         inst.Eval(e);
     }
-    for (auto& f: files) {
-        inst.EvalFile(f);
-    }
 
     if (cli["debug"] == true) {
-        inst.DebuggerListen(cli.get("debug-host"), cli.get<uint16_t>("debug-port"));
+        inst.DebuggerConnect(cli.get("debug-host"), cli.get<uint16_t>("debug-port"));
+    }
+
+    if (auto f = cli.present("file")) {
+        inst.EvalFile(radapter::fs::u8path(*f));
     }
 
     return app.exec();

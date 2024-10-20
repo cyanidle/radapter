@@ -1,6 +1,7 @@
 CPMAddPackage("gh:cyanidle/describe@1.3")
-CPMAddPackage("gh:cyanidle/glua@1.1")
 CPMAddPackage("gh:p-ranav/argparse@3.1")
+
+CPMAddPackage("gh:cyanidle/glua@1.1")
 
 CPMAddPackage(NAME fmt
     GITHUB_REPOSITORY fmtlib/fmt
@@ -52,3 +53,40 @@ else()
   endif()
 endif()
 
+
+CPMAddPackage(NAME luasocket
+  GITHUB_REPOSITORY lunarmodules/luasocket
+  VERSION 3.1.0
+  GIT_TAG v3.1.0
+  GIT_SHALLOW YES
+  DOWNLOAD_ONLY YES
+)
+
+set(LUASOCK_SRC
+  src/luasocket.c
+  src/timeout.c
+  src/buffer.c
+  src/io.c
+  src/auxiliar.c
+  src/options.c
+  src/inet.c
+  src/except.c
+  src/select.c
+  src/tcp.c
+  src/udp.c
+  src/compat.c
+)
+if (UNIX)
+  list(APPEND LUASOCK_SRC src/usocket.c)
+endif()
+if (WIN32)
+  list(APPEND LUASOCK_SRC src/wsocket.c)
+endif()
+list(TRANSFORM LUASOCK_SRC PREPEND ${luasocket_SOURCE_DIR}/)
+add_library(radapter_luasock STATIC ${LUASOCK_SRC})
+target_include_directories(radapter_luasock PRIVATE ${luasocket_SOURCE_DIR}/src)
+target_link_libraries(radapter_luasock PRIVATE radapter_lua)
+target_compile_definitions(radapter_luasock PRIVATE LUASOCKET_DEBUG)
+if (WIN32)
+    target_link_libraries(radapter_luasock ws2_32)
+endif()

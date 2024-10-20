@@ -522,7 +522,7 @@ void radapter::Instance::EvalFile(fs::path path)
     auto dir = path.parent_path();
     auto wasCwd = QDir::currentPath();
     if (!dir.empty()) {
-        QDir::setCurrent(QString::fromLocal8Bit(dir.string().c_str()));
+        QDir::setCurrent(QString::fromUtf8(dir.u8string().c_str()));
     }
 
     auto res = lua_pcall(L, 0, 0, msgh);
