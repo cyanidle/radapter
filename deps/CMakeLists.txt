@@ -49,7 +49,7 @@ else()
   add_library(radapter_lua STATIC ${LUA_SRC_FILES})
   target_include_system_directories(radapter_lua PUBLIC ${lua_src_dir}/src)
   if (UNIX)
-      target_compile_definitions(radapter_lua PRIVATE LUA_USE_POSIX)
+      target_compile_definitions(radapter_lua PRIVATE LUA_USE_POSIX LUA_USE_DLOPEN)
   endif()
 endif()
 
