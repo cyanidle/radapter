@@ -30,18 +30,25 @@ local test = TestWorker {
     delay = 1000
 }
 
+pipe(
+    test,
+    function(msg)
+        log(msg)
+        return msg + 1
+    end,
+    function(msg)
+        log(msg)
+        --return msg + 1
+    end,
+    function(msg)
+        log(msg)
+        error("Should not be reachable")
+    end
+)
+
 test
 :pipe(function(msg)
-    log(msg)
-    return msg + 1
-end)
-:pipe(function(msg)
-    log(msg)
-    --return msg + 1
-end)
-:pipe(function(msg)
-    log(msg)
-    error("Should not be reachable")
+    return msg + 13
 end)
 
 _ = test 
