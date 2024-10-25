@@ -37,7 +37,9 @@ configure_file(include/radapter_info.hpp.in ${CMAKE_BINARY_DIR}/_info/radapter_i
 
 file(GLOB_RECURSE RADAPTER_SRC CONFIGURE_DEPENDS src/*.cpp)
 file(GLOB_RECURSE RADAPTER_HPP CONFIGURE_DEPENDS src/*.h src/*.hpp include/*.hpp)
-add_library(radapter-sdk STATIC ${RADAPTER_SRC} ${RADAPTER_HPP})
+qt5_add_resources(RADAPTER_QRC src/radapter.qrc)
+
+add_library(radapter-sdk STATIC ${RADAPTER_SRC} ${RADAPTER_HPP} ${RADAPTER_QRC})
 set_target_warnings(radapter-sdk PRIVATE OFF)
 target_compile_definitions(radapter-sdk PUBLIC RADAPTER_API=)
 target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info)
@@ -56,6 +58,7 @@ target_link_libraries(radapter-sdk PUBLIC
     glua
     describe
     fmt)
+    
 
 add_executable(radapter ./app/main.cpp)
 target_link_libraries(radapter PRIVATE

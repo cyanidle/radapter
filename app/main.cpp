@@ -43,8 +43,11 @@ int main (int argc, char **argv) try {
     cli.add_argument("--debug")
         .flag()
         .help("Enable debugger");
+    cli.add_argument("--debug-vscode")
+        .flag()
+        .help("Debugger vscode implementation (json-based)");
     cli.add_argument("--debug-host")
-        .default_value("*")
+        .default_value("127.0.0.1")
         .help("Debugger listen host");
     cli.add_argument("--debug-port")
         .scan<'u', uint16_t>()
@@ -76,7 +79,11 @@ int main (int argc, char **argv) try {
     }
 
     if (cli["debug"] == true) {
-        inst.DebuggerConnect(cli.get("debug-host"), cli.get<uint16_t>("debug-port"));
+        radapter::Instance::DebuggerOpts opts;
+        opts.host = cli.get("debug-host");
+        opts.port = cli.get<uint16_t>("debug-port");
+        opts.vscode = cli["debug-vscode"] == true;
+        inst.DebuggerConnect(opts);
     }
 
     if (auto f = cli.present("file")) {

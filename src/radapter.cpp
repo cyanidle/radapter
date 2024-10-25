@@ -97,8 +97,13 @@ static int wrapInfo(lua_State* L) noexcept {
     return 0;
 }
 
+static void init_qrc() {
+    Q_INIT_RESOURCE(radapter);
+}
+
 radapter::Instance::Instance() : d(new Impl)
 {
+    init_qrc();
     auto L = d->L;
     lua_gc(L, LUA_GCSTOP, 0);
     luaL_openlibs(L);

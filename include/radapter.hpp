@@ -55,8 +55,15 @@ public:
         static_assert(std::is_base_of_v<Worker, T>);
         RegisterWorker(name, FactoryFor<T>, extra);
     }
+
+    void RegisterSchema(const char* name, ExtraSchema schemaGen);
+    void RegisterFunc(const char* name, ExtraFunction func);
+    void RegisterGlobal(const char* name, QVariant const& value);
+    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+
     QVariantMap GetSchemas();
     QSet<Worker*> GetWorkers();
+
     void Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args);
     template<typename...Args>
     void Debug(const char* cat, fmt::format_string<Args...> fmt, Args&&...a) {
@@ -74,13 +81,17 @@ public:
     void Error(const char* cat, fmt::format_string<Args...> fmt, Args&&...a) {
         Log(error, cat, fmt, fmt::make_format_args(a...));
     }
-    void DebuggerConnect(string host, uint16_t port);
-    void RegisterSchema(const char* name, ExtraSchema schemaGen);
-    void RegisterFunc(const char* name, ExtraFunction func);
-    void RegisterGlobal(const char* name, QVariant const& value);
-    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+
+    struct DebuggerOpts {
+        string host = "127.0.0.1";
+        uint16_t port = 8172;
+        bool vscode = {false};
+    };
+    void DebuggerConnect(DebuggerOpts opts);
+
     void EvalFile(fs::path path);
     void Eval(std::string_view code);
+
     void Shutdown(unsigned timeout = 5000);
 
     lua_State* LuaState();
