@@ -47,8 +47,11 @@ pipe(
 )
 
 test
+:pipe(function()
+    return deep
+end)
 :pipe(function(msg)
-    return msg + 13
+    return msg
 end)
 
 _ = test 

@@ -57,6 +57,11 @@ int main (int argc, char **argv) try {
         cli.parse_args(args);
     } catch (std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Invalid args: ";
+        for (auto& a: args) {
+            std::cerr << a << " | ";
+        }
+        std::cerr << std::endl;
         std::cerr << cli << std::endl;
         return 1;
     }
@@ -78,11 +83,14 @@ int main (int argc, char **argv) try {
         inst.Eval(e);
     }
 
-    if (cli["debug"] == true) {
+    bool debug = cli["debug"] == true;
+    bool debugVscode = cli["debug-vscode"] == true;
+
+    if (debug || debugVscode) {
         radapter::Instance::DebuggerOpts opts;
         opts.host = cli.get("debug-host");
         opts.port = cli.get<uint16_t>("debug-port");
-        opts.vscode = cli["debug-vscode"] == true;
+        opts.vscode = debugVscode;
         inst.DebuggerConnect(opts);
     }
 
