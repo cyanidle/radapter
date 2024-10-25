@@ -20,7 +20,7 @@ static string_view toSV(lua_State* L, int idx = -1) noexcept {
 }
 
 [[maybe_unused]]
-static int traceback(lua_State* L) noexcept {
+inline int traceback(lua_State* L) noexcept {
     auto msg = lua_tostring(L, 1);
     luaL_traceback(L, L, msg, 1);
     return 1;
@@ -92,7 +92,7 @@ static QVariantList toArgs(lua_State* L, int start = 1) {
 #endif
 
 template<typename T, typename...Args>
-static T* pushGced(lua_State* L, Args&&...a) {
+inline T* pushGced(lua_State* L, Args&&...a) {
 
     auto mem = lua_udata(L, sizeof(T));
     auto res = new (mem) T{std::forward<Args>(a)...};
@@ -115,7 +115,7 @@ using qptr = QPointer<QObject>;
 constexpr auto qtptr_name = "QObject*";
 
 [[maybe_unused]]
-static void push(lua_State* L, QVariant const& val) {
+inline void push(lua_State* L, QVariant const& val) {
     auto t = val.type();
     switch (int(t)) {
     case QVariant::Type::Map: {

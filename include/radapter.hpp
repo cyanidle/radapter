@@ -9,9 +9,16 @@
 #include "worker.hpp"
 
 struct lua_State;
+typedef int(*lua_CFunction)(lua_State*);
 
 namespace radapter
 {
+
+namespace compat {
+int lua_absindex (lua_State *L, int i);
+int luaL_getsubtable (lua_State *L, int i, const char *name);
+void luaL_requiref (lua_State *L, const char *modname, lua_CFunction openf, int glb);
+}
 
 namespace detail {
 template<typename Cls, typename T> Cls* getcls(QVariant(Cls::*)(T));

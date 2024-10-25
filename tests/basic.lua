@@ -54,11 +54,13 @@ end)
     return msg
 end)
 
-_ = test 
->> function (msg)
-    return msg + 10
-end 
->> test
+-- >> syntax for pipes in lua 5.3+
+
+-- _ = test 
+-- >> function (msg)
+--     return msg + 10
+-- end 
+-- >> test
 
 test:Call(function(a, b, c)
     log("{} - {} - {}", a, b, c)

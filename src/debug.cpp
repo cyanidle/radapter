@@ -49,7 +49,7 @@ static void load_mod(lua_State* L, const char* name, string_view src) {
 }
 
 static int load_socket(lua_State* L) {
-    luaL_requiref(L, "socket.core", luaopen_socket_core, 0);
+    radapter::compat::luaL_requiref(L, "socket.core", luaopen_socket_core, 0);
     lua_pop(L, 1);
     load_mod(L, "socket", load_builtin(":/scripts/socket.lua"));
     return 1;
@@ -76,14 +76,14 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     lua_pushcfunction(L, traceback);
     auto msgh = lua_gettop(L);
     stop_gc gc{L};
-    luaL_requiref(L, "socket", glua::protect<load_socket>, 0);
+    radapter::compat::luaL_requiref(L, "socket", glua::protect<load_socket>, 0);
     lua_pop(L, 1);
     if (opts.vscode) {
         Warn("debugger", "Using vscode-compatible mobdebug");
-        luaL_requiref(L, "dkjson", glua::protect<load_dkjson>, 0);
-        luaL_requiref(L, "mobdebug", glua::protect<load_vscode_mobdebug>, 0);
+        radapter::compat::luaL_requiref(L, "dkjson", glua::protect<load_dkjson>, 0);
+        radapter::compat::luaL_requiref(L, "mobdebug", glua::protect<load_vscode_mobdebug>, 0);
     } else {
-        luaL_requiref(L, "mobdebug", glua::protect<load_mobdebug>, 0);
+        radapter::compat::luaL_requiref(L, "mobdebug", glua::protect<load_mobdebug>, 0);
     }
     Info("debugger", "Connecting to debug server on {}:{}", opts.host, opts.port);
     lua_getfield(L, -1, "start");
