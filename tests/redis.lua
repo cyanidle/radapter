@@ -8,6 +8,16 @@ local stream = RedisStream {
 
 cache:pipe(wrap("wrapped!")):pipe(stream)
 
+pipe {
+    cache,
+    wrap("wrapped 3!"),
+    stream,
+}
+
+pipe(
+    cache, wrap("wrapped 2!"), stream
+)
+
 cache:pipe(function(msg)
     log("Msg from cache: {}", msg)
 end)

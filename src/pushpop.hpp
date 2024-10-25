@@ -20,14 +20,14 @@ static string_view toSV(lua_State* L, int idx = -1) noexcept {
 }
 
 [[maybe_unused]]
-inline int traceback(lua_State* L) noexcept {
+static int traceback(lua_State* L) noexcept {
     auto msg = lua_tostring(L, 1);
     luaL_traceback(L, L, msg, 1);
     return 1;
 }
 
 template<typename Fn>
-static void iterateTable(lua_State* L, Fn&& f) {
+inline void iterateTable(lua_State* L, Fn&& f) {
     if (lua_type(L, -1) != LUA_TTABLE) {
         throw Err("iterateTable(): Table expected");
     }
@@ -74,7 +74,7 @@ static int __gc(lua_State* L) {
 static QVariant toQVar(lua_State* L);
 
 [[maybe_unused]]
-static QVariantList toArgs(lua_State* L, int start = 1) {
+inline QVariantList toArgs(lua_State* L, int start = 1) {
     QVariantList args;
     auto top = lua_gettop(L);
     for (auto i = start; i <= top; ++i) {
@@ -114,7 +114,6 @@ static void pushQStr(lua_State* L, QString const& str) {
 using qptr = QPointer<QObject>;
 constexpr auto qtptr_name = "QObject*";
 
-[[maybe_unused]]
 inline void push(lua_State* L, QVariant const& val) {
     auto t = val.type();
     switch (int(t)) {
@@ -213,7 +212,7 @@ inline void push(lua_State* L, QVariant const& val) {
     }
 }
 
-static unsigned isArray(lua_State* L) noexcept {
+inline unsigned isArray(lua_State* L) noexcept {
     lua_Integer hits = 0;
     lua_Integer max = 0;
     lua_pushnil(L);
@@ -239,13 +238,13 @@ static unsigned isArray(lua_State* L) noexcept {
     return unsigned(hits);
 }
 
-static QString toQStr(lua_State* L, int idx = -1) {
+inline QString toQStr(lua_State* L, int idx = -1) {
     size_t len;
     auto s = lua_tolstring(L, idx, &len);
     return QString::fromUtf8(s, int(len));
 }
 
-static QVariant toQVar(lua_State* L) {
+inline QVariant toQVar(lua_State* L) {
     switch (lua_type(L, -1)) {
     case LUA_TTABLE: {
         if (!lua_checkstack(L, 3)) return {}; // nil + key + val

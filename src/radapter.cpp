@@ -12,7 +12,7 @@
 struct radapter::Instance::Impl {
     lua_State* L;
     QSet<Worker*> workers;
-    LogLevel globalLevel;
+    LogLevel globalLevel = LogLevel::debug;
     std::map<string, LogLevel, std::less<>> perCat;
     std::map<string, ExtraSchema> schemas;
     bool shutdown = false;
@@ -357,13 +357,15 @@ static void pushPiperSubs(lua_State* L) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, piper->subsRef);
 }
 
-static void makePiper(lua_State* L) {
+void radapter::MakePipable(lua_State *L)
+{
+    assert(lua_type(L, -1) == LUA_TFUNCTION && "MakePipable(): function expected");
     auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
     lua_newtable(L);
     auto subsRef = luaL_ref(L, LUA_REGISTRYINDEX);
     auto ud = lua_udata(L, sizeof(RadPiper));
     new (ud) RadPiper{ref, subsRef};
-    if (luaL_newmetatable(L, "__rad_piper")) {
+    if (luaL_newmetatable(L, "<pipeable-func>")) {
         luaL_Reg pipeMethods[] = {
             {"pipe", protect<pipe>},
             {"__shr", protect<pipe>},
@@ -387,7 +389,7 @@ static int pipe(lua_State* L) {
     lua_pushvalue(L, 2);
     auto t = lua_type(L, -1);
     if (t == LUA_TFUNCTION) {
-        makePiper(L); //replace function with RadPiper
+        MakePipable(L); //replace function with RadPiper
     } else if (t == LUA_TUSERDATA) {
         //pass
     } else {

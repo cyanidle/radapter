@@ -30,7 +30,28 @@ local test = TestWorker {
     delay = 1000
 }
 
-pipe(
+assert(not pcall(pipe), "Empty pipe() should fail")
+assert(not pcall(pipe, {}), "Empty pipe{} should fail")
+
+assert(pipe {test} == test, "pipe{x} == x")
+assert(pipe (test) == test, "pipe(x) == x")
+
+assert(pcall(pipe(function () end)), "convert function to callable")
+
+local first = pipe {
+    test,
+    function () end,
+}
+
+assert(first == test, "pipe{x, y} should return x")
+
+pipe {
+    test,
+    function () return 1 end,
+    function (msg) return msg end,
+}
+
+first = pipe (
     test,
     function(msg)
         log(msg)
@@ -45,6 +66,15 @@ pipe(
         error("Should not be reachable")
     end
 )
+
+assert(first == test, "pipe(x, y, z) should return x")
+
+local test_func = function () end
+
+assert(pipe { test_func } ~= test_func, "pipe{func} -> wrapper for func)")
+assert(pipe { test_func, test_func } ~= test_func, "pipe{func} -> wrapper for func)")
+assert(pipe(test_func) ~= test_func, "pipe(func) -> wrapper for func")
+assert(pipe(test_func, test_func) ~= test_func, "pipe(func) -> wrapper for func")
 
 test
 :pipe(function()

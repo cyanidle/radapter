@@ -1,7 +1,7 @@
 CPMAddPackage("gh:cyanidle/describe@1.3")
 CPMAddPackage("gh:p-ranav/argparse@3.1")
 
-CPMAddPackage("gh:cyanidle/glua@1.1")
+CPMAddPackage("gh:cyanidle/glua@1.0")
 
 CPMAddPackage(NAME fmt
     GITHUB_REPOSITORY fmtlib/fmt

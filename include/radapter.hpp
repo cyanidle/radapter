@@ -112,6 +112,8 @@ private:
     QScopedPointer<Impl> d;
 };
 
+//! Convert function on top into :pipe()-able userdata
+void MakePipable(lua_State* L);
 
 template<typename T>
 struct KeyVal {

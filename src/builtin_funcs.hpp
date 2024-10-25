@@ -1,4 +1,5 @@
 #pragma once
+#include "radapter.hpp"
 #include "pushpop.hpp"
 #include "utils.hpp"
 #include <fmt/args.h>
@@ -273,7 +274,7 @@ static int timer(lua_State* L, bool oneshot) {
         }
         if (t->isSingleShot()) {
             luaL_unref(f._L, LUA_REGISTRYINDEX, t->objectName().toInt());
-            t->setObjectName("-2");
+            t->setObjectName(QString::number(LUA_NOREF));
             f = LuaFunction{};
         }
     });
@@ -291,21 +292,95 @@ static int after(lua_State* L) {
     return timer(L, true);
 }
 
-[[maybe_unused]] // pipe(a, b, c) == a:pipe(b):pipe(c)
+static void pipeTable(lua_State* L) noexcept {
+    lua_pushliteral(L, "pipe");
+    constexpr auto Table = 1;
+    constexpr auto PipeKey = 2;
+    lua_rawgeti(L, Table, 1);
+    if (lua_isnil(L, -1)) {
+        luaL_error(L, "table expected to have at least 1 element");
+    }
+    int idx = 2;
+    if (lua_type(L, -1) == LUA_TFUNCTION) {
+        MakePipable(L);
+    }
+    auto first = lua_gettop(L);
+    lua_pushvalue(L, -1);
+    // x
+    while (true) {
+        lua_rawgeti(L, Table, idx++);
+        if (lua_isnil(L, -1)) {
+            lua_pop(L, 1);
+            break;
+        }
+        // x
+        // y
+        lua_pushvalue(L, PipeKey);
+        lua_gettable(L, -3);
+        // x
+        // y
+        // :pipe
+        lua_insert(L, -3);
+        // :pipe
+        // x
+        // y
+        lua_call(L, 2, 1);
+        // new x
+    }
+    lua_pushvalue(L, first);
+}
+
+static void pipeVargs(lua_State* L) noexcept {
+    // a
+    // b
+    // .. <- #top
+    auto top = lua_gettop(L);
+    lua_pushvalue(L, 1);
+    if (lua_type(L, -1) == LUA_TFUNCTION) {
+        MakePipable(L);
+    }
+    // top + 1: wrapped a
+    lua_pushvalue(L, -1);
+    // ..
+    // x (a)
+    for (int i = 2; i <= top; ++i) {
+        lua_getfield(L, -1, "pipe");
+        // x (a)
+        // :pipe
+        lua_insert(L, -2);
+        // :pipe
+        // x (a)
+        lua_pushvalue(L, i);
+        // :pipe
+        // x (a)
+        // y (b)
+        lua_call(L, 2, 1);
+        // new x
+    }
+    lua_pushvalue(L, top + 1); // return first arg (maybe wrapped)
+}
+
+// list-identity:   pipe{x} -> x
+// vargs-identity:  pipe(x) -> x
+// list:            pipe{a, b, c} -> a:pipe(b):pipe(c), -> a
+// vargs:           pipe(a, b, c) -> a:pipe(b):pipe(c), -> a
+[[maybe_unused]]
 static int pipeAll(lua_State* L) noexcept {
     auto top = lua_gettop(L);
-    if (top < 2) {
-        luaL_error(L, "pipe(): expected at least 2 params");
-    }
-    lua_getfield(L, 1, "pipe");
-    lua_pushvalue(L, 1);
-    for (auto i = 2; i <= top; ++i) {
-        lua_pushvalue(L, i);
-        lua_call(L, 2, 1);
-        if (i != top) {
-            lua_getfield(L, -1, "pipe");
-            lua_insert(L, -2); //swap top and pre-top
+    if (top == 0) {
+        luaL_error(L, "expected at least 1 arg");
+    } else if (top == 1) {
+        auto t = lua_type(L, 1);
+        if (t != LUA_TTABLE) {
+            if (lua_type(L, -1) == LUA_TFUNCTION) {
+                MakePipable(L);
+            }
+            return 1; //vargs-identity
+        } else {
+            pipeTable(L);
         }
+    } else {
+        pipeVargs(L);
     }
     return 1;
 }

@@ -41,7 +41,6 @@ struct LuaFunction {
     int _ref;
 };
 
-
 }
 
 Q_DECLARE_METATYPE(radapter::LuaFunction)
