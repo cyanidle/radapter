@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(radapter C CXX)
+project(radapter
+    LANGUAGES C CXX
+    VERSION 3.0
+)
 
 include(cmake/CPM.cmake)
 include(cmake/warnings.cmake)
@@ -10,9 +13,9 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
-set(RADAPTER_VERSION_MAJOR 3 CACHE STRING "Radapter major version" FORCE)
-set(RADAPTER_VERSION_MINOR 0 CACHE STRING "Radapter minor version" FORCE)
 
+set(RADAPTER_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
+set(RADAPTER_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -37,7 +40,42 @@ configure_file(include/radapter_info.hpp.in ${CMAKE_BINARY_DIR}/_info/radapter_i
 
 file(GLOB_RECURSE RADAPTER_SRC CONFIGURE_DEPENDS src/*.cpp)
 file(GLOB_RECURSE RADAPTER_HPP CONFIGURE_DEPENDS src/*.h src/*.hpp include/*.hpp)
-qt5_add_resources(RADAPTER_QRC src/radapter.qrc)
+
+file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua)
+
+function(radapter_scripts)
+    set(scripts_dir ${CMAKE_CURRENT_BINARY_DIR}/_scripts)
+    set(scripts_qrc ${scripts_dir}/radapter.qrc)
+
+    file(WRITE ${scripts_qrc} "<RCC>\n")
+    file(APPEND ${scripts_qrc} "<qresource prefix=\"/scripts\">\n")
+
+    foreach(file ${RADAPTER_SCRIPTS})
+        get_filename_component(name ${file} NAME)
+        if (RADAPTER_JIT) #no precompile for JIT
+            file(COPY ${file} DESTINATION ${scripts_dir})
+            message(STATUS "Embedding file => scripts/${name}")
+        else()
+            set(out ${scripts_dir}/${name})
+            add_custom_command(
+                OUTPUT ${out}
+                DEPENDS radapter-luac
+                COMMAND $<TARGET_FILE:radapter-luac>
+                ARGS -o ${out} ${file}
+                COMMENT "Precompiling => ${out}"
+            )
+        endif()
+        file(APPEND ${scripts_qrc} "<file>${name}</file>\n")
+    endforeach()
+
+    file(APPEND ${scripts_qrc} "</qresource>\n")
+    file(APPEND ${scripts_qrc} "</RCC>\n")
+
+    qt5_add_resources(RADAPTER_QRC ${scripts_qrc})
+    set(RADAPTER_QRC ${RADAPTER_QRC} PARENT_SCOPE)
+endfunction()
+
+radapter_scripts()
 
 add_library(radapter-sdk STATIC ${RADAPTER_SRC} ${RADAPTER_HPP} ${RADAPTER_QRC})
 set_target_warnings(radapter-sdk PRIVATE OFF)
@@ -46,6 +84,9 @@ target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info
 target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 
+target_link_libraries(radapter-sdk PRIVATE
+    radapter-luasock)
+
 target_link_libraries(radapter-sdk PUBLIC 
     Qt::Core
     Qt::SerialPort
@@ -53,12 +94,10 @@ target_link_libraries(radapter-sdk PUBLIC
     Qt::Sql
     Qt::WebSockets
     Qt::Network
-    radapter_lua
-    radapter_luasock
+    radapter-lua
     glua
     describe
     fmt)
-    
 
 add_executable(radapter ./app/main.cpp)
 target_link_libraries(radapter PRIVATE

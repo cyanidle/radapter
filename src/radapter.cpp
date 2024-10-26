@@ -626,3 +626,25 @@ void radapter::compat::luaL_requiref (lua_State *L, const char *modname, lua_CFu
     }
     lua_replace(L, -2);
 }
+
+static int do_prequiref(lua_State* L) noexcept {
+    luaL_requiref(L, lua_tostring(L, 1), lua_tocfunction(L, 2), int(lua_tointeger(L, 3)));
+    return 1;
+}
+
+void compat::prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb)
+{
+    luaL_checkstack(L, 5, "prequire: no stack left");
+    lua_pushcfunction(L, traceback);
+    auto trace = lua_gettop(L);
+    lua_pushcfunction(L, do_prequiref);
+    lua_pushstring(L, modname);
+    lua_pushcfunction(L, openf);
+    lua_pushinteger(L, glb);
+    auto res = lua_pcall(L, 3, 1, trace);
+    lua_insert(L, -2); //remove traceback
+    lua_pop(L, 1);
+    if (res != LUA_OK) {
+        throw Err("prequire: {}", lua_tostring(L, -1));
+    }
+}

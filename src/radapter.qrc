@@ -1,8 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>scripts/mobdebug.lua</file>
-        <file>scripts/mobdebug.vscode.lua</file>
-        <file>scripts/dkjson.lua</file>
-        <file>scripts/socket.lua</file>
-    </qresource>
-</RCC>
