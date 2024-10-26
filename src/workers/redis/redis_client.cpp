@@ -1,4 +1,5 @@
 #include "redis_client.hpp"
+#include "fmt/compile.h"
 #include "qtadapter.hpp"
 #include <QTimer>
 #ifndef _WIN32
@@ -134,38 +135,35 @@ void radapter::redis::Client::Start() {
     doConnect();
 }
 
-static void escape(string& buff, char sym) {
-    auto count = size_t(std::count(buff.begin(), buff.end(), sym));
-    if (!count) return;
-    buff.resize(buff.size() + count);
-    auto from = buff.size() - 1 - count;
-    auto to = buff.size() - 1;
-    while (from) {
-        auto ch = buff[from--];
-        if (ch == sym) {
-            buff[to--] = sym;
-            buff[to--] = sym;
-        } else {
-            buff[to--] = ch;
-        }
+static string redisFormat(const string_view *argv, size_t argc) {
+    string res = fmt::format(FMT_COMPILE("*{}\r\n"), argc);
+    for (size_t i = 0; i < argc; ++i) {
+        res += fmt::format(FMT_COMPILE("${}\r\n{}\r\n"), argv[i].size(), argv[i]);
     }
+    return res;
 }
 
-void Client::Execute(string cmd, Callback cb)
+void Client::Execute(const string_view *argv, size_t argc, Callback cb)
 {
     if (!ctx) {
         cb({}, std::make_exception_ptr(Err("Not connected")));
         return;
     }
-    if (cmd.empty()) {
+    if (!argc) {
         cb({}, std::make_exception_ptr(Err("Empty command")));
         return;
     }
-    escape(cmd, '%');
+    string prep;
+    try {
+        prep = redisFormat(argv, argc);
+    } catch (std::exception& e) {
+        cb({}, std::current_exception());
+        return;
+    }
     auto c = new Callback{std::move(cb)};
-    auto status = redisAsyncCommand(ctx, Impl::privateCallback, c, cmd.c_str());
+    auto status = redisAsyncFormattedCommand(ctx, Impl::privateCallback, c, prep.c_str(), prep.size());
     if (status != REDIS_OK) {
-        (*c)({}, std::make_exception_ptr(Err("Could not run command")));
+        (*c)({}, std::make_exception_ptr(Err("Could not run command: {}", argv[0])));
         delete c;
     }
 }

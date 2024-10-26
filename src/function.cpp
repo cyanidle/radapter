@@ -44,7 +44,7 @@ LuaFunction::operator bool() const noexcept
     return _L && _ref != LUA_NOREF;
 }
 
-QVariant LuaFunction::Call(QVariantList args) const
+QVariant LuaFunction::Call(QVariantList const& args) const
 {
     if (!(*this)) {
         throw Err("Attempt to call invalid lua function");

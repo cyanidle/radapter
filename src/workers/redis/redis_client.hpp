@@ -1,6 +1,7 @@
 #pragma once
 
 #include "radapter.hpp"
+#include <forward_list>
 
 class QtRedisAdapter;
 struct redisAsyncContext;
@@ -15,6 +16,28 @@ struct Config {
 };
 DESCRIBE(redis::Config, &_::host, &_::port, &_::db, &_::reconnect_timeout)
 
+
+struct RedisCmd {
+    RedisCmd() = default;
+    RedisCmd(string_view cmd) {
+        Arg(cmd);
+    }
+    size_t Size() {
+        return args.size();
+    }
+    void Arg(string_view arg) {
+        args.push_back(arg);
+    }
+    // needed if string does not outlive this RedisCmd
+    void Temp(string&& arg) {
+        args.push_back(string_view{temp_args.emplace_front(std::move(arg))});
+    }
+private:
+    std::forward_list<std::string> temp_args;
+    std::vector<std::string_view> args;
+    friend class Client;
+};
+
 class Client : public QObject {
     Q_OBJECT
 
@@ -25,7 +48,13 @@ public:
     using Callback = std::function<void(QVariant, std::exception_ptr)>;
     Client(Config conf, Worker* parent);
     void Start();
-    void Execute(string cmd, Callback cb);
+    void Execute(const string_view* argv, size_t argc, Callback cb);
+    void Execute(std::initializer_list<string_view> args, Callback cb) {
+        Execute(&*args.begin(), args.size(), std::move(cb));
+    }
+    void Execute(RedisCmd const& args, Callback cb) {
+        Execute(args.args.data(), args.args.size(), std::move(cb));
+    }
 signals:
     void Error(QString err);
     void ConnectedChanged(bool state);
@@ -34,6 +63,5 @@ private:
     void doConnect();
     void reconnectLater();
 };
-
 
 }

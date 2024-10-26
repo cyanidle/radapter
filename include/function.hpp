@@ -31,8 +31,8 @@ struct LuaFunction {
     bool IsValid() const noexcept {
         return bool(*this);
     }
-    QVariant Call(QVariantList args) const;
-    QVariant operator()(QVariantList args) const {
+    QVariant Call(const QVariantList &args) const;
+    QVariant operator()(QVariantList const& args) const {
         return Call(args);
     }
     ~LuaFunction();

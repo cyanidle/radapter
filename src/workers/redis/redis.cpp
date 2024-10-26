@@ -15,26 +15,27 @@ struct CacheConfig : Config {
 DESCRIBE_INHERIT(redis::CacheConfig, Config, &_::hash_key, &_::update_rate)
 
 enum StreamStart {
-    from_persistent_id,
-    from_top,
-    from_start,
+    persistent_id,
+    top,
+    start,
 };
-DESCRIBE(StreamStart, from_persistent_id, from_top, from_start)
+DESCRIBE(StreamStart, persistent_id, top, start)
 
 struct StreamConfig : Config {
     string stream_key;
-    WithDefault<StreamStart> start_from = from_persistent_id;
+    WithDefault<StreamStart> start_from = persistent_id;
     WithDefault<unsigned> stream_size = 1'000'000u;
     WithDefault<unsigned> block_timeout = 30'000u;
     WithDefault<unsigned> entries_per_read = 1'000u;
     WithDefault<bool> read_enabled = true;
     WithDefault<bool> write_enabled = true;
+    WithDefault<string> instance_id = "_";
     WithDefault<string> persistent_prefix = "__radapter";
 };
 DESCRIBE_INHERIT(redis::StreamConfig, Config,
                  &_::stream_key, &_::start_from, &_::stream_size,
                  &_::block_timeout, &_::entries_per_read,
-                 &_::read_enabled, &_::write_enabled)
+                 &_::read_enabled, &_::write_enabled, &_::instance_id)
 
 class Cache : public Worker
 {
@@ -65,8 +66,7 @@ public:
     }
     void poll() {
         assert(config.hash_key);
-        auto cmd = fmt::format("HGETALL {}", *config.hash_key);
-        client->Execute(cmd, [this](QVariant resp, std::exception_ptr exc){
+        client->Execute({"HGETALL", *config.hash_key}, [this](QVariant resp, std::exception_ptr exc){
             if (exc) {
                 try {
                     std::rethrow_exception(exc);
@@ -102,11 +102,13 @@ public:
         }
         FlatMap flat;
         Flatten(flat, msg);
-        string cmd = "HMSET " + *config.hash_key;
+        RedisCmd cmd("HMSET");
+        cmd.Arg(*config.hash_key);
         for (auto& [k, v]: flat) {
-            cmd += fmt::format(FMT_COMPILE(" {} {}"), k, v.toString().toStdString());
+            cmd.Arg(k);
+            cmd.Temp(v.toString().toStdString());
         }
-        client->Execute(std::move(cmd), [this](QVariant resp, std::exception_ptr except){
+        client->Execute(cmd, [this](QVariant resp, std::exception_ptr except){
             if (except) {
                 try {
                     std::rethrow_exception(except);
@@ -118,26 +120,49 @@ public:
             }
         });
     }
+
+    // 1: Execute(cmd, function (ok, err) ... end)
+    // 2: Execute(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
     QVariant Execute(QVariantList args) {
-        auto cmd = args.value(0).toString();
-        auto cb = args.value(1).value<LuaFunction>();
-        if (cmd.isEmpty()) throw Err("cmd string as argument #1 expected");
-        client->Execute(cmd.toStdString(), [this, cb = std::move(cb)](QVariant res, std::exception_ptr exc){
-            if (exc) {
-                try {
-                    std::rethrow_exception(exc);
-                } catch (std::exception& e) {
-                    if (cb) {
-                        cb({{}, e.what()});
-                    } else {
-                        Warn("{}: unhandled exception: {}", objectName(), e.what());
-                    }
-                }
-            } else if (cb) {
-                cb({res, {}});
+        QStringList rawcmd = args.value(0).toString().split(' ');
+        RedisCmd cmd;
+        for (auto& part: qAsConst(rawcmd)) {
+            cmd.Temp(part.toStdString());
+        }
+        int funcIdx = 1;
+        if (args.size() > 2) {
+            funcIdx = 2;
+            for (auto& arg: args.value(1).toList()) {
+                cmd.Temp(arg.toString().toStdString());
+            }
+        }
+        LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
+        client->Execute(cmd, [this, cb = std::move(cb)](QVariant res, std::exception_ptr exc) mutable {
+            try {
+                if (exc) std::rethrow_exception(exc);
+                runCb(cb, true, std::move(res));
+            } catch (std::exception& e) {
+                runCb(cb, false, e.what());
             }
         });
         return {};
+    }
+
+    void runCb(LuaFunction& func, bool ok, QVariant result) {
+        if (!func) {
+            if (!ok) {
+                Error("Unhandled error: {}", result.toString());
+            }
+            return;
+        }
+        auto args = ok
+                        ? QVariantList{std::move(result), {}}
+                        : QVariantList{{}, std::move(result)};
+        try {
+            func(args);
+        } catch (std::exception& e) {
+            Error("Error in callback: {}", e.what());
+        }
     }
 };
 
@@ -149,10 +174,11 @@ class Stream : public Worker
     Client* client = nullptr;
     Client* read_client = nullptr;
     string lastId;
+
+    string lastIdKey;
 public:
     void saveLastId() {
-        auto cmd = fmt::format("SET {}:{}:last_id {}", config.persistent_prefix.value, config.stream_key, lastId);
-        client->Execute(std::move(cmd), [this](QVariant, std::exception_ptr exc){
+        client->Execute({"SET", lastIdKey, lastId}, [this](QVariant, std::exception_ptr exc){
             if (exc) {
                 try {
                     std::rethrow_exception(exc);
@@ -163,8 +189,7 @@ public:
         });
     }
     void loadIdAndRead() {
-        auto cmd = fmt::format("GET {}:{}:last_id", config.persistent_prefix.value, config.stream_key);
-        client->Execute(std::move(cmd), [this](QVariant resp, std::exception_ptr exc){
+        client->Execute({"GET", lastIdKey}, [this](QVariant resp, std::exception_ptr exc){
             if (exc) {
                 try {
                     std::rethrow_exception(exc);
@@ -185,6 +210,11 @@ public:
     Stream(QVariantList args, Instance* inst) : Worker(inst, "redis")
     {
         Parse(config, args.value(0));
+        lastIdKey = fmt::format(
+            "{}:{}:{}:last_id",
+            config.persistent_prefix.value,
+            config.instance_id.value,
+            config.stream_key);
         client = new Client(config, this);
         client->setObjectName(client->objectName() + QString("_stream(%1)").arg(config.stream_key.c_str()));
         setObjectName(client->objectName());
@@ -195,10 +225,10 @@ public:
             read_client->Start();
             connect(read_client, &Client::ConnectedChanged, this, [this](bool state){
                 if (state) {
-                    if (config.start_from == from_persistent_id) {
+                    if (config.start_from == persistent_id) {
                         loadIdAndRead();
                     } else {
-                        if (config.start_from == from_start) {
+                        if (config.start_from == start) {
                             lastId = "0-0";
                         } else {
                             lastId = "$";
@@ -210,23 +240,22 @@ public:
         }
     }
     void nextRead() {
-        read_client->Execute(
-            fmt::format("XREAD COUNT {} BLOCK {} STREAMS {} {}",
-                        config.entries_per_read.value, config.block_timeout.value,
-                        config.stream_key, lastId),
-            [this](QVariant resp, std::exception_ptr exc){
-                if (exc) {
+        read_client
+            ->Execute(
+                {"XREAD",
+                 "COUNT", std::to_string(config.entries_per_read.value),
+                 "BLOCK", std::to_string(config.block_timeout.value),
+                 "STREAMS", config.stream_key, lastId,
+                 },
+                [this](QVariant resp, std::exception_ptr exc){
                     try {
-                        std::rethrow_exception(exc);
+                        if (exc) std::rethrow_exception(exc);
+                        parseReply(resp);
                     } catch (std::exception& e) {
                         Error("{}: error reading stream: {}", objectName(), e.what());
-                        nextRead();
-                        return;
                     }
-                }
-                parseReply(resp);
-                nextRead();
-            });
+                    nextRead();
+                });
     }
     void parseReply(QVariant& resp) {
         if (resp.type() != QVariant::List) {
@@ -260,11 +289,17 @@ public:
         }
         FlatMap flat;
         Flatten(flat, msg);
-        string cmd = fmt::format("XADD {} MAXLEN ~ {} *", config.stream_key, config.stream_size.value);
+        RedisCmd cmd("XADD");
+        cmd.Arg(config.stream_key);
+        cmd.Arg("MAXLEN");
+        cmd.Arg("~");
+        cmd.Temp(std::to_string(config.stream_size.value));
+        cmd.Arg("*");
         for (auto& [k, v]: flat) {
-            cmd += fmt::format(" {} {}", k, v.toString());
+            cmd.Arg(k);
+            cmd.Temp(v.toString().toStdString());
         }
-        client->Execute(std::move(cmd), [this](QVariant, std::exception_ptr exc){
+        client->Execute(cmd, [this](QVariant, std::exception_ptr exc){
             if (exc) {
                 try {
                     std::rethrow_exception(exc);
@@ -280,9 +315,10 @@ public:
 }
 
 void radapter::builtin::redis(Instance* inst) {
-    inst->RegisterWorker<redis::Cache>("RedisCache", {
-        {"Execute", AsExtraMethod<&redis::Cache::Execute>},
-    });
+    inst->RegisterWorker<redis::Cache>(
+        "RedisCache", {
+         {"Execute", AsExtraMethod<&redis::Cache::Execute>},
+         });
     inst->RegisterSchema("RedisCache", SchemaFor<redis::CacheConfig>);
 
     inst->RegisterWorker<redis::Stream>("RedisStream");
