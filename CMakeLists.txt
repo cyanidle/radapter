@@ -52,7 +52,7 @@ function(radapter_scripts)
 
     foreach(file ${RADAPTER_SCRIPTS})
         get_filename_component(name ${file} NAME)
-        if (RADAPTER_JIT) #no precompile for JIT
+        if (RADAPTER_JIT OR CMAKE_CROSSCOMPILING) #no precompile for JIT or Cross
             file(COPY ${file} DESTINATION ${scripts_dir})
             message(STATUS "Embedding file => scripts/${name}")
         else()

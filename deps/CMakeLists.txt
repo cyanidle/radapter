@@ -48,14 +48,12 @@ else()
   list(REMOVE_ITEM LUA_SRC_FILES "${lua_src_dir}/src/lua.c" "${lua_src_dir}/src/luac.c")
   add_library(radapter-lua STATIC ${LUA_SRC_FILES})
   target_include_system_directories(radapter-lua PUBLIC ${lua_src_dir}/src)
-
-  add_executable(radapter-luac EXCLUDE_FROM_ALL ${lua_SOURCE_DIR}/src/luac.c)
-
+  target_link_libraries(radapter-lua PUBLIC dl)
   if (UNIX)
       target_compile_definitions(radapter-lua PRIVATE LUA_USE_POSIX LUA_USE_DLOPEN)
-      target_compile_definitions(radapter-luac PRIVATE LUA_USE_POSIX)
   endif()
 
+  add_executable(radapter-luac EXCLUDE_FROM_ALL ${lua_SOURCE_DIR}/src/luac.c)
   target_link_libraries(radapter-luac PRIVATE radapter-lua m)
 endif()
 

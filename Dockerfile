@@ -8,8 +8,7 @@ RUN apt update && apt install -y \
     && rm -rf /var/lib/apt/lists/*
 COPY . /src
 WORKDIR /src
-RUN cmake -B /build -G Ninja
-RUN cmake --build /build -j$(nproc)
+RUN cmake -B /build -G Ninja && cmake --build /build -j$(nproc)
 
 FROM debian:bullseye-slim AS runner
 COPY --from=builder /lib /lib

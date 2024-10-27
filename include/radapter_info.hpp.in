@@ -5,6 +5,7 @@
 namespace radapter 
 {
 
+#cmakedefine CMAKE_CROSSCOMPILING
 constexpr int VerMajor = @RADAPTER_VERSION_MAJOR@;
 constexpr int VerMinor = @RADAPTER_VERSION_MINOR@;
 constexpr bool JIT = 

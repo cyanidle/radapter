@@ -34,7 +34,7 @@ struct stop_gc {
 };
 }
 
-#ifdef RADAPTER_JIT
+#if defined(RADAPTER_JIT) || defined(CMAKE_CROSSCOMPILING) 
 const auto loadmode = "t";
 #else
 const auto loadmode = "b";
