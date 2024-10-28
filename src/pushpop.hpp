@@ -3,13 +3,9 @@
 #include <QList>
 #include <QPointer>
 #include "radapter.hpp"
+#include "glua/glua.hpp"
 
-extern "C" {
-#include "lua.h"
-#include "lualib.h"
-#include "lauxlib.h"
-}
-
+using namespace glua;
 using namespace radapter;
 
 [[maybe_unused]]
@@ -52,17 +48,6 @@ inline void iterateTable(lua_State* L, Fn&& f) {
         }
         lua_pop(L, 1);
     }
-}
-
-template<auto f>
-static int protect(lua_State* L) noexcept {
-    try {
-        return f(L);
-    } catch (std::exception& e) {
-        lua_pushstring(L, e.what());
-    }
-    lua_error(L);
-    std::abort();
 }
 
 template<typename T>

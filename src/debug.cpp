@@ -22,18 +22,6 @@ static string load_builtin(QString name) {
     return s;
 }
 
-namespace {
-struct stop_gc {
-    lua_State* L;
-    stop_gc(lua_State* L): L(L) {
-        lua_gc(L, LUA_GCSTOP, 0);
-    }
-    ~stop_gc() {
-        lua_gc(L, LUA_GCRESTART, 0);
-    }
-};
-}
-
 #if defined(RADAPTER_JIT) || defined(CMAKE_CROSSCOMPILING) 
 const auto loadmode = "t";
 #else
@@ -81,7 +69,10 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     auto L = LuaState();
     lua_pushcfunction(L, traceback);
     auto msgh = lua_gettop(L);
-    stop_gc gc{L};
+    lua_gc(L, LUA_GCSTOP, 0);
+    defer restart([L]{
+        lua_gc(L, LUA_GCRESTART, 0);
+    });
     radapter::compat::prequiref(L, "socket", glua::protect<load_socket>, 0);
     lua_pop(L, 1);
     if (opts.vscode) {

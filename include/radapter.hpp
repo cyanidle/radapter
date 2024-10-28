@@ -14,6 +14,14 @@ typedef int(*lua_CFunction)(lua_State*);
 namespace radapter
 {
 
+template<typename Fn> struct defer {
+    Fn f;
+    defer(Fn f) : f(std::move(f)) {}
+    defer(defer &&) = delete;
+    ~defer() noexcept(false) {f();}
+};
+template<typename T> defer(T) -> defer<T>;
+
 namespace compat {
 int lua_absindex(lua_State *L, int i);
 int luaL_getsubtable(lua_State *L, int i, const char *name);

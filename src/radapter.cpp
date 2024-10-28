@@ -17,23 +17,18 @@ struct radapter::Instance::Impl {
     std::map<string, ExtraSchema> schemas;
     bool shutdown = false;
     bool shutdownDone = false;
-    bool insideLog = false;
+    int insideLogHandler = false;
     int luaHandler = LUA_NOREF;
 
     static int luaLog(lua_State* L) {
+        auto inst = Instance::FromLua(L);
+        if (inst->d->insideLogHandler) return 0;
         format(L);
         auto lvl = LogLevel(lua_tointeger(L, lua_upvalueindex(1)));
         size_t len;
         auto s = lua_tolstring(L, -1, &len);
         auto sv = string_view{s, len};
-        auto inst = Instance::FromLua(L);
-        if (inst->d->insideLog) {
-            QMetaObject::invokeMethod(inst, [lvl, inst, m = string{sv}]{
-                inst->Log(lvl, "lua", "{}", fmt::make_format_args(m));
-            }, Qt::QueuedConnection);
-        } else {
-            Instance::FromLua(L)->Log(lvl, "lua", "{}", fmt::make_format_args(sv));
-        }
+        Instance::FromLua(L)->Log(lvl, "lua", "{}", fmt::make_format_args(sv));
         return 0;
     }
 
@@ -58,13 +53,17 @@ struct radapter::Instance::Impl {
     }
 
     static int log_handler(lua_State* L) {
-        luaL_checktype(L, 1, LUA_TFUNCTION);
-        auto inst = static_cast<Instance*>(lua_touserdata(L, lua_upvalueindex(1)));
-        lua_rawgeti(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
-        luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
-        lua_pushvalue(L, 1);
-        inst->d->luaHandler = luaL_ref(L, LUA_REGISTRYINDEX);
-        return 1; //push previous handler
+        auto inst = Instance::FromLua(L);
+        if (lua_isnil(L, 1)) {
+            luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
+            inst->d->luaHandler = LUA_NOREF;
+        } else {
+            luaL_checktype(L, 1, LUA_TFUNCTION);
+            luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
+            lua_pushvalue(L, 1);
+            inst->d->luaHandler = luaL_ref(L, LUA_REGISTRYINDEX);
+        }
+        return 0;
     }
 
     Impl() {
@@ -89,6 +88,7 @@ struct radapter::Instance::Impl {
 static int _dummy;
 static void* instKey = &_dummy;
 
+// convert __call(t, ...) -> upvalue(1)(...)
 static int wrapInfo(lua_State* L) noexcept {
     auto args = lua_gettop(L);
     lua_pushvalue(L, lua_upvalueindex(1));
@@ -124,11 +124,15 @@ radapter::Instance::Instance() : d(new Impl)
     lua_pushinteger(L, error);
     lua_pushcclosure(L, protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "error");
+    lua_pushcfunction(L, protect<Impl::log_handler>);
+    lua_setfield(L, -2, "set_handler");
+    lua_pushcfunction(L, protect<Impl::log_level>);
+    lua_setfield(L, -2, "set_level");
 
-    lua_newtable(L); //metatable
+    lua_newtable(L); //log. metatable
     lua_getfield(L, -2, "info");
     lua_pushcclosure(L, wrapInfo, 1);
-    lua_setfield(L, -2, "__call");  //make log() call log.info()
+    lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 
     lua_setglobal(L, "log");
@@ -141,8 +145,6 @@ radapter::Instance::Instance() : d(new Impl)
     lua_register(L, "set", protect<set>);
     lua_register(L, "wrap", protect<wrap>);
     lua_register(L, "unwrap", protect<unwrap>);
-    lua_register(L, "set_log_handler", protect<Impl::log_handler>);
-    lua_register(L, "set_log_level", protect<Impl::log_level>);
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
         connect(w, &QObject::destroyed, this, [this, w]{
@@ -197,7 +199,7 @@ std::runtime_error radapter::detail::doErr(fmt::string_view fmt, fmt::format_arg
     return std::runtime_error(fmt::vformat(fmt, args));
 }
 
-void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args)
+void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args) try
 {
     if (d->globalLevel > lvl) return;
     auto it = d->perCat.find(string_view{cat});
@@ -209,11 +211,23 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         name = "<inval>";
     }
     auto dt = QDateTime::currentDateTime();
-    if (d->luaHandler != LUA_NOREF && !d->insideLog) {
-        d->insideLog = true;
+    fmt::print(
+        FMT_COMPILE("{}.{:0>3}|{:>5}|{:>12}| {}\n"),
+        dt.toString(Qt::DateFormat::ISODate), dt.time().msec(),
+        name, cat, fmt::vformat(fmt, args));
+
+    if (d->luaHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
         lua_pushcfunction(L, traceback);
         auto msgh = lua_gettop(L);
+        d->insideLogHandler = true;
+        defer reset([&]{
+            d->insideLogHandler = false;
+            lua_settop(L, msgh - 1);
+        });
+        if (!lua_checkstack(L, 3)) {
+            throw Err("Could not reserve stack for log handler");
+        }
         lua_rawgeti(L, LUA_REGISTRYINDEX, d->luaHandler);
         lua_createtable(L, 0, 4);
         lua_pushliteral(L, "level");
@@ -229,22 +243,11 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         lua_pushstring(L, cat);
         lua_rawset(L, -3);
         if (lua_pcall(L, 1, 0, msgh) != LUA_OK) {
-            fmt::print(FMT_COMPILE("{}.{:0>3}|{:>5}|{:>12}| {}\n"),
-                       dt.toString(Qt::DateFormat::ISODate),
-                       dt.time().msec(),
-                       "error",
-                       "radapter",
-                       "Error in lua log handler: " + string{lua_tostring(L, -1)});
+            throw Err("Error in lua log handler: {}", lua_tostring(L, -1));
         }
-        lua_settop(L, msgh - 1);
-        d->insideLog = false;
     }
-    fmt::print(FMT_COMPILE("{}.{:0>3}|{:>5}|{:>12}| {}\n"),
-               dt.toString(Qt::DateFormat::ISODate),
-               dt.time().msec(),
-               name,
-               cat,
-               fmt::vformat(fmt, args));
+} catch (std::exception& e) {
+    fprintf(stderr, "Error in Log(): %s\n", e.what());
 }
 
 void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
@@ -367,12 +370,12 @@ void radapter::MakePipable(lua_State *L)
     new (ud) RadPiper{ref, subsRef};
     if (luaL_newmetatable(L, "<pipeable-func>")) {
         luaL_Reg pipeMethods[] = {
-            {"pipe", protect<pipe>},
-            {"__shr", protect<pipe>},
-            {"__call", protect<pipeCall>},
-            {"__gc", pipeGc},
-            {nullptr, nullptr},
-        };
+                                  {"pipe", protect<pipe>},
+                                  {"__shr", protect<pipe>},
+                                  {"__call", protect<pipeCall>},
+                                  {"__gc", pipeGc},
+                                  {nullptr, nullptr},
+                                  };
         luaL_setfuncs(L, pipeMethods, 0);
 
         lua_pushvalue(L, -1); // metatable to closure
@@ -458,12 +461,12 @@ static void pushMeta(lua_State* L, const char* name, ExtraMethods const& extra)
         throw Err("{} already registered", name);
     }
     luaL_Reg funcs[] = {
-        {"pipe", protect<pipe>},
-        {"__shr", protect<pipe>},
-        {"__call", protect<__worker_call>},
-        {"__gc", __worker_gc},
-        {nullptr, nullptr},
-    };
+                        {"pipe", protect<pipe>},
+                        {"__shr", protect<pipe>},
+                        {"__call", protect<__worker_call>},
+                        {"__gc", __worker_gc},
+                        {nullptr, nullptr},
+                        };
     luaL_setfuncs(L, funcs, 0);
 
     lua_pushvalue(L, -1); //metatable to closure

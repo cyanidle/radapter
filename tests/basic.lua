@@ -1,3 +1,9 @@
+log.set_handler(function (msg)
+    print("LUA handler:", msg.msg)
+end)
+
+log "Start test"
+
 local deep = {
     a = { b = { c = 1 }  }
 }

@@ -1,5 +1,5 @@
-set_log_level("info")
-set_log_level("modbus", "debug")
+log.set_level("info")
+log.set_level("modbus", "debug")
 log "lol"
 log.error("Big achtung")
 
