@@ -10,7 +10,7 @@ static void flatten(
 {
     switch (input.type()) {
     case QVariant::Map: {
-        auto m = input.toMap();
+        auto& m = *static_cast<const QVariantMap*>(input.constData());
         for (auto it = m.keyValueBegin(); it != m.keyValueEnd(); ++it) {
             auto part = it->first.toStdString() + ':';
             path += part;
@@ -20,7 +20,7 @@ static void flatten(
         break;
     }
     case QVariant::List: {
-        auto l = input.toList();
+        auto& l = *static_cast<const QVariantList*>(input.constData());
         unsigned idx = 0;
         for (auto& v: l) {
             auto part = '[' + std::to_string(idx++) + "]:";
