@@ -62,8 +62,8 @@ local ws = WebsocketServer {
 }
 
 -- pipelines
-_= modbus >> ws
-_= ws >> modbus
+pipe(modbus, ws)
+pipe(ws, modbus)
 
 -- send a msg to websocket (all clients)
 ws {
@@ -84,17 +84,30 @@ each(4000, function()
    }
 end)
 
--- create an interceptor
-
-_= modbus
->> function(msg)
-   if msg.data then
-      return msg.data + 1
-   end
-   -- if nothing or nil is returned - msg is not passed forward
-end
->> ws --send to websocket
-
 
 ```
 
+## Pipeable protocol
+
+* Every connection is done using `pipe()` function.
+* `Table` or `Userdata`: `set_signal(self)` and `call(self, msg)` methods,
+* `Function`: always pipeable. Subscribers will receive return value
+
+```lua
+pipe(func1, func2) --> returns 'func1'
+pipe(worker1, worker2, func3) --> returns 'worker1'
+
+function MyWorker()
+   return {
+      get_listeners = function(self) 
+         return listeners 
+      end,
+      call = function(self, msg)
+         -- handle msg
+      end,
+   }
+end
+
+local worker1
+
+```

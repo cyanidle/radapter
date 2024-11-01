@@ -44,6 +44,11 @@ LuaFunction::operator bool() const noexcept
     return _L && _ref != LUA_NOREF;
 }
 
+bool LuaFunction::operator==(const LuaFunction &o) const noexcept
+{
+    return _ref == o._ref;
+}
+
 QVariant LuaFunction::Call(QVariantList const& args) const
 {
     if (!(*this)) {

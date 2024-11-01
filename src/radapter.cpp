@@ -75,14 +75,6 @@ struct radapter::Instance::Impl {
         lua_close(L);
     }
 
-    struct FactoryContext {
-        Factory factory;
-        int metaRef = LUA_NOREF;
-        Instance* inst;
-        ~FactoryContext() {
-            luaL_unref(inst->d->L, LUA_REGISTRYINDEX, metaRef);
-        }
-    };
 };
 
 static int _dummy;
@@ -106,7 +98,12 @@ radapter::Instance::Instance() : d(new Impl)
     init_qrc();
     auto L = d->L;
     lua_gc(L, LUA_GCSTOP, 0);
+    defer _restart([&]{
+        lua_gc(L, LUA_GCRESTART, 0);
+    });
+
     luaL_openlibs(L);
+
     lua_pushlightuserdata(L, instKey);
     lua_pushlightuserdata(L, this);
     lua_rawset(L, LUA_REGISTRYINDEX);
@@ -163,7 +160,6 @@ radapter::Instance::Instance() : d(new Impl)
     for (auto system: builtin::all) {
         system(this);
     }
-    lua_gc(L, LUA_GCRESTART, 0);
 }
 
 Instance *Instance::FromLua(lua_State *L)
@@ -173,11 +169,6 @@ Instance *Instance::FromLua(lua_State *L)
     auto res = lua_touserdata(L, -1);
     lua_pop(L, 1);
     return static_cast<Instance*>(res);
-}
-
-radapter::Instance::~Instance()
-{
-
 }
 
 QVariantMap Instance::GetSchemas()
@@ -255,267 +246,15 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
     d->schemas[name] = schemaGen;
 }
 
-static int wrapFunc(lua_State* L) {
-    auto& f = *static_cast<ExtraFunction*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto top = lua_gettop(L);
-    auto args = QVariantList();
-    args.reserve(top);
-    for (auto i = 1; i <= top; ++i) {
-        lua_pushvalue(L, i);
-        args.push_back(toQVar(L));
-        lua_pop(L, 1);
-    }
-    push(L, f(Instance::FromLua(L), args));
-    return 1;
-}
+struct radapter::WorkerImpl {
 
-void Instance::RegisterFunc(const char* name, ExtraFunction func)
-{
-    pushGced<ExtraFunction>(d->L, std::move(func));
-    lua_pushcclosure(d->L, protect<wrapFunc>, 1);
-    lua_setglobal(d->L, name);
-}
-
-void Instance::RegisterGlobal(const char* name, const QVariant &value)
-{
-    auto L = d->L;
-    push(L, value);
-    lua_setglobal(L, name);
-}
-
-static Worker* getWorker(lua_State* L, int idx) {
-    return (*static_cast<Worker**>(lua_touserdata(L, idx)));
-}
-
-static int __worker_call(lua_State* L) {
-    if (auto w = getWorker(L, 1)) {
-        w->OnMsg(toQVar(L));
-    }
-    return 0;
-}
-
-constexpr auto subs = "__subscribers";
-
-static int pipeCall(lua_State* L) {
-    lua_pushcfunction(L, traceback);
-    auto msgh = lua_gettop(L);
-    //call func
-    auto* ref = static_cast<int*>(lua_touserdata(L, 1));
-    lua_rawgeti(L, LUA_REGISTRYINDEX, *ref);
-    lua_pushvalue(L, 2);
-    auto ok = lua_pcall(L, 1, 1, msgh);
-    if (ok != LUA_OK) {
-        Instance::FromLua(L)->Error("radapter", "Error calling function in pipe: {}", lua_tostring(L, -1));
-        return 0;
-    }
-    auto t = lua_type(L, -1);
-    if (t == LUA_TNIL) {
-        return 0;
-    }
-    lua_getfield(L, 1, subs);
-    iterateTable(L, [&]{
-        lua_pushvalue(L, -1);
-        lua_pushvalue(L, -5);
-        auto ok = lua_pcall(L, 1, 0, msgh);
-        if (ok != LUA_OK) {
-            Instance::FromLua(L)->Error("radapter", "Error calling listener: {}", lua_tostring(L, -1));
-            lua_pop(L, 1);
-        }
-    });
-    return 0;
-}
-
-namespace {
-struct RadPiper {
-    int funcRef = LUA_NOREF;
-    int subsRef = LUA_NOREF;
 };
-}
-
-static int pipe(lua_State* L);
-static int pipeGc(lua_State* L) {
-    auto* piper = static_cast<RadPiper*>(lua_touserdata(L, 1));
-    luaL_unref(L, LUA_REGISTRYINDEX, piper->funcRef);
-    luaL_unref(L, LUA_REGISTRYINDEX, piper->subsRef);
-    return 0;
-}
-
-template<auto pushSubs>
-static int subsOrFallback(lua_State* L) noexcept {
-    auto metaTable = lua_upvalueindex(1);
-    if (lua_type(L, 2) == LUA_TSTRING) {
-        size_t len;
-        auto s = lua_tolstring(L, 2, &len);
-        if (string_view{s, len} == subs) {
-            pushSubs(L);
-            return 1;
-        }
-    }
-    lua_rawget(L, metaTable);
-    return 1;
-}
-
-static void pushPiperSubs(lua_State* L) {
-    auto* piper = static_cast<RadPiper*>(lua_touserdata(L, 1));
-    lua_rawgeti(L, LUA_REGISTRYINDEX, piper->subsRef);
-}
-
-void radapter::MakePipable(lua_State *L)
-{
-    assert(lua_type(L, -1) == LUA_TFUNCTION && "MakePipable(): function expected");
-    auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
-    lua_newtable(L);
-    auto subsRef = luaL_ref(L, LUA_REGISTRYINDEX);
-    auto ud = lua_udata(L, sizeof(RadPiper));
-    new (ud) RadPiper{ref, subsRef};
-    if (luaL_newmetatable(L, "<pipeable-func>")) {
-        luaL_Reg pipeMethods[] = {
-                                  {"pipe", protect<pipe>},
-                                  {"__shr", protect<pipe>},
-                                  {"__call", protect<pipeCall>},
-                                  {"__gc", pipeGc},
-                                  {nullptr, nullptr},
-                                  };
-        luaL_setfuncs(L, pipeMethods, 0);
-
-        lua_pushvalue(L, -1); // metatable to closure
-        lua_pushcclosure(L, subsOrFallback<pushPiperSubs>, 1);
-        lua_setfield(L, -2, "__index");
-    }
-    lua_setmetatable(L, -2);
-}
-
-static int pipe(lua_State* L) {
-    luaL_checktype(L, 1, LUA_TUSERDATA); //self
-    luaL_checkany(L, 2); //target
-
-    lua_pushvalue(L, 2);
-    auto t = lua_type(L, -1);
-    if (t == LUA_TFUNCTION) {
-        MakePipable(L); //replace function with RadPiper
-    } else if (t == LUA_TUSERDATA) {
-        //pass
-    } else {
-        throw Err("Cannot pipe to value of type: {}", lua_typename(L, t));
-    }
-    // on top is target
-    lua_getfield(L, 1, subs); //-3
-    auto subsLen = lua_Integer(isArray(L) + 1);
-    lua_pushinteger(L, subsLen); //-2
-    lua_pushvalue(L, -3); //-1 copy target
-    lua_rawset(L, -3);
-    lua_pop(L, 1); //pop subs table
-    // target on top
-    return 1;
-}
-
-// self on top, call() all listeners
-static void notifyListeners(lua_State* L, QVariant const& msg) noexcept try {
-    lua_pushcfunction(L, traceback);
-    auto msgh = lua_gettop(L);
-    if (!msg.isValid()) {
-        return;
-    }
-    push(L, msg);
-    lua_getfield(L, -3, subs);
-    iterateTable(L, [&]{
-        lua_pushvalue(L, -1);
-        lua_pushvalue(L, -5);
-        auto ok = lua_pcall(L, 1, 0, msgh);
-        if (ok != LUA_OK) {
-            Instance::FromLua(L)->Error("radapter", "Error calling listener: {}", lua_tostring(L, -1));
-            lua_pop(L, 1);
-        }
-    });
-    lua_settop(L, msgh - 1);
-} catch (std::exception& e) {
-    Instance::FromLua(L)->Error("radapter", "Error in notify listeners: {}", e.what());
-}
-
-static int __worker_gc(lua_State* L) {
-    if (auto w = getWorker(L, 1)) {
-        w->~Worker();
-    }
-    return 0;
-}
-
-static int callExtra(lua_State* L) {
-    const char* cls = lua_tostring(L, lua_upvalueindex(1));
-    ExtraMethod& extra = *static_cast<ExtraMethod*>(lua_touserdata(L, lua_upvalueindex(2)));
-    assert(extra && "Invalid ExtraMethod");
-    void* raw = luaL_checkudata(L, 1, cls);
-    Worker* w = *static_cast<Worker**>(raw);
-    auto res = extra(w, toArgs(L, 2));
-    push(L, res);
-    return 1;
-}
-
-static void pushWorkerSubs(lua_State* L) {
-    auto* w = getWorker(L, 1);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, w->_subs);
-}
-
-static void pushMeta(lua_State* L, const char* name, ExtraMethods const& extra)
-{
-    if (!luaL_newmetatable(L, name)) {
-        throw Err("{} already registered", name);
-    }
-    luaL_Reg funcs[] = {
-                        {"pipe", protect<pipe>},
-                        {"__shr", protect<pipe>},
-                        {"__call", protect<__worker_call>},
-                        {"__gc", __worker_gc},
-                        {nullptr, nullptr},
-                        };
-    luaL_setfuncs(L, funcs, 0);
-
-    lua_pushvalue(L, -1); //metatable to closure
-    lua_pushcclosure(L, subsOrFallback<pushWorkerSubs>, 1);
-    lua_setfield(L, -2, "__index");
-
-    for (auto it = extra.keyValueBegin(); it != extra.keyValueEnd(); ++it) {
-        auto&& [k, func] = *it;
-        lua_pushstring(L, name);
-        pushGced<ExtraMethod>(L, func);
-        lua_pushcclosure(L, protect<callExtra>, 2);
-        lua_setfield(L, -2, k.toStdString().c_str());
-    }
-}
-
-
-using FactoryContext = Instance::Impl::FactoryContext;
-
-static int factoryFunc(lua_State* L)
-{
-    FactoryContext* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto w = ctx->factory(toArgs(L), ctx->inst);
-    auto mem = lua_udata(L, sizeof(w));
-    memcpy(mem, &w, sizeof(w));
-    lua_newtable(L);
-    w->_subs = luaL_ref(L, LUA_REGISTRYINDEX);
-    lua_pushvalue(L, -1);
-    w->_self = luaL_ref(L, LUA_REGISTRYINDEX);
-    w->connect(w, &Worker::SendMsg, ctx->inst, [w, self = ctx->inst](QVariant const& msg){
-        auto L = self->LuaState();
-        lua_rawgeti(L, LUA_REGISTRYINDEX, w->_self);
-        notifyListeners(L, msg);
-        lua_pop(L, 1);
-    });
-    lua_rawgeti(L, LUA_REGISTRYINDEX, ctx->metaRef);
-    lua_setmetatable(L, -2);
-    emit ctx->inst->WorkerCreated(w);
-    return 1;
-}
 
 void radapter::Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra)
 {
     auto L = d->L;
-    pushMeta(L, name, extra);
-    auto metaRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    // TODO
 
-    pushGced<FactoryContext>(L, factory, metaRef, this);
-    lua_pushcclosure(L, protect<factoryFunc>, 1);
-    lua_setglobal(L, name);
 }
 
 void radapter::Instance::EvalFile(fs::path path)
@@ -587,4 +326,9 @@ void Instance::Shutdown(unsigned int timeout)
 lua_State *Instance::LuaState()
 {
     return d->L;
+}
+
+radapter::Instance::~Instance()
+{
+
 }

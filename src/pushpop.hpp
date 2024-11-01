@@ -76,21 +76,6 @@ inline QVariantList toArgs(lua_State* L, int start = 1) {
 #define lua_udata(L, ...) lua_newuserdatauv(L, (__VA_ARGS__), 0)
 #endif
 
-template<typename T, typename...Args>
-inline T* pushGced(lua_State* L, Args&&...a) {
-
-    auto mem = lua_udata(L, sizeof(T));
-    auto res = new (mem) T{std::forward<Args>(a)...};
-    lua_createtable(L, 0, 1);
-    luaL_Reg metameta[]{
-        {"__gc", __gc<T>},
-        {nullptr, nullptr}
-    };
-    luaL_setfuncs(L, metameta, 0);
-    lua_setmetatable(L, -2);
-    return res;
-}
-
 static void pushQStr(lua_State* L, QString const& str) {
     auto std = str.toStdString();
     lua_pushlstring(L, std.data(), std.size());
