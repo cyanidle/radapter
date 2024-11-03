@@ -9,15 +9,11 @@ struct lua_State;
 namespace radapter
 {
 
-struct WorkerImpl;
-void _destroy_worker_impl(WorkerImpl*);
-
 class Instance;
 class Worker : public QObject {
     Q_OBJECT
 public:
     Instance* _Inst;
-    WorkerImpl* _impl = nullptr;
 
     Worker(Instance* parent, const char* category = "worker");
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);

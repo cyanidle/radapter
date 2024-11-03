@@ -20,7 +20,6 @@ void Worker::Shutdown() {
 
 Worker::~Worker()
 {
-    _destroy_worker_impl(_impl);
 }
 
 }

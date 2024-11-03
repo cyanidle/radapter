@@ -137,11 +137,11 @@ radapter::Instance::Instance() : d(new Impl)
     lua_register(L, "fmt", protect<format>);
     lua_register(L, "each", protect<each>);
     lua_register(L, "after", protect<after>);
-    lua_register(L, "pipe", pipeAll);
     lua_register(L, "get", protect<get>);
     lua_register(L, "set", protect<set>);
-    lua_register(L, "wrap", protect<wrap>);
-    lua_register(L, "unwrap", protect<unwrap>);
+
+    LoadEmbeddedFile("builtins");
+
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
         connect(w, &QObject::destroyed, this, [this, w]{
@@ -159,6 +159,49 @@ radapter::Instance::Instance() : d(new Impl)
     });
     for (auto system: builtin::all) {
         system(this);
+    }
+}
+
+#if defined(RADAPTER_JIT) || defined(CMAKE_CROSSCOMPILING)
+const auto loadmode = "t";
+#else
+const auto loadmode = "b";
+#endif
+
+static string load_builtin(QString name) {
+    QFile f(name);
+    if (!f.open(QIODevice::ReadOnly)) {
+        throw Err("Could not open builtin file: {}", name);
+    }
+    string s(size_t(f.size()), ' ');
+    f.read(s.data(), f.size());
+    return s;
+}
+
+static void load_mod(lua_State* L, const char* name, string_view src) {
+    lua_pushcfunction(L, traceback);
+    auto msgh = lua_gettop(L);
+    auto status = luaL_loadbufferx(L, src.data(), src.size(), name, loadmode);
+    if (status != LUA_OK) {
+        throw Err("Could not compile {}: {}", name, toSV(L));
+    }
+    status = lua_pcall(L, 0, 1, msgh);
+    if (status != LUA_OK) {
+        throw Err("Could not load {}: {}", name, toSV(L));
+    }
+}
+
+static int load_embedded_module(lua_State* L) {
+    const char* mod = lua_tostring(L, 1);
+    load_mod(L, mod, load_builtin(fmt::format(":/scripts/{}.lua", mod).c_str()));
+    return 1;
+}
+
+void Instance::LoadEmbeddedFile(string name, int opts)
+{
+    compat::prequiref(d->L, name.c_str(), protect<load_embedded_module>, opts & LoadEmbedGlobal ? 1 : 0);
+    if (!(opts & LoadEmbedNoPop)) {
+        lua_pop(d->L, 1);
     }
 }
 
@@ -246,15 +289,128 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
     d->schemas[name] = schemaGen;
 }
 
-struct radapter::WorkerImpl {
+namespace radapter {
 
+struct FactoryContext {
+    string name;
+    Factory factory;
+    ExtraMethods methods;
+    int dummy{};
 };
+DESCRIBE(radapter::FactoryContext, &_::dummy)
+
+// object which represents worker inside lua
+struct WorkerImpl {
+    lua_State* L;
+    QPointer<Worker> self{};
+    QMetaObject::Connection conn{};
+    int listenersRef = LUA_NOREF;
+    int dummy{};
+
+    static int get_listeners(lua_State* L) {
+        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
+        return 1;
+    };
+
+    static int worker_call(lua_State* L) {
+        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+        auto w = ud->self.data();
+        if (!w) {
+            throw Err("worker not usable");
+        }
+        w->OnMsg(toQVar(L, 2));
+        return 1;
+    }
+
+    static int call_extra(lua_State* L) {
+        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+        auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
+        auto w = ud->self.data();
+        if (!w) {
+            throw Err("worker not usable");
+        }
+        Push(L, method(w, toArgs(L, 2)));
+        return 1;
+    }
+
+    ~WorkerImpl() {
+        luaL_unref(L, LUA_REGISTRYINDEX, listenersRef);
+        if (self) {
+            QObject::disconnect(conn);
+            self->deleteLater();
+        }
+    }
+};
+
+DESCRIBE(radapter::WorkerImpl, &_::dummy)
+
+} //radapter
+
+static int workerFactory(lua_State* L) {
+    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto ctorArgs = toArgs(L, 1);
+    auto w = ctx->factory(ctorArgs, Instance::FromLua(L));
+    auto* ud = lua_udata(L, sizeof(WorkerImpl));
+    auto* worker = new (ud) WorkerImpl{L};
+    worker->self = w;
+
+    lua_createtable(L, 0, 0); //subs
+    worker->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    worker->conn = QObject::connect(w, &Worker::SendMsg, w, [worker, w, L](QVariant const& msg){
+        if (!lua_checkstack(L, 4)) {
+            w->Error("Could not reserve stack to send msg");
+            return;
+        }
+        lua_pushcfunction(L, traceback);
+        auto msgh = lua_gettop(L);
+        lua_getglobal(L, "call_all");
+        lua_rawgeti(L, LUA_REGISTRYINDEX, worker->listenersRef);
+        Push(L, msg);
+        auto ok = lua_pcall(L, 2, 0, msgh);
+        if (ok != LUA_OK) {
+            w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
+        }
+        lua_settop(L, msgh - 1);
+    });
+    if (luaL_newmetatable(L, ctx->name.c_str())) {
+        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_pushcclosure(L, protect<WorkerImpl::get_listeners>, 1);
+        lua_setfield(L, -2, "get_listeners");
+        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_pushcclosure(L, protect<WorkerImpl::worker_call>, 1);
+        lua_setfield(L, -2, "call");
+
+        for (auto it = ctx->methods.begin(); it != ctx->methods.end(); ++it) {
+            auto name = it.key().toStdString();
+            auto method = it.value();
+            Push(L, it.key().toStdString());
+            static_assert(sizeof(void*) >= sizeof(method));
+            lua_pushvalue(L, lua_upvalueindex(1));
+            lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
+            lua_pushcclosure(L, WorkerImpl::call_extra, 2);
+            lua_settable(L, -3);
+        }
+
+        lua_pushcfunction(L, dtor_for<WorkerImpl>);
+        lua_setfield(L, -2, "__gc");
+        lua_pushvalue(L, -1);
+        lua_setfield(L, -2, "__index");
+    }
+    lua_setmetatable(L, -2);
+    return 1;
+}
 
 void radapter::Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra)
 {
     auto L = d->L;
-    // TODO
-
+    Push(L, FactoryContext{name, factory, extra});
+    lua_pushcclosure(L, protect<workerFactory>, 1);
+    lua_setglobal(L, name);
 }
 
 void radapter::Instance::EvalFile(fs::path path)
@@ -284,12 +440,12 @@ void radapter::Instance::EvalFile(fs::path path)
     }
 }
 
-void radapter::Instance::Eval(std::string_view code)
+void radapter::Instance::Eval(string_view code, string_view chunk)
 {
     auto L = d->L;
     lua_pushcfunction(L, traceback);
     auto msgh = lua_gettop(L);
-    auto load = luaL_loadbufferx(L, code.data(), code.size(), "<eval>", "t");
+    auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {
         throw Err("Error loading code: {}", toSV(L));
     }
@@ -331,4 +487,40 @@ lua_State *Instance::LuaState()
 radapter::Instance::~Instance()
 {
 
+}
+
+void Instance::RegisterGlobal(const char *name, const QVariant &value)
+{
+    auto L = d->L;
+    Push(L, value);
+    lua_setglobal(L, name);
+}
+
+namespace {
+struct ExtraHelper {
+    ExtraFunction func;
+    int dummy{};
+};
+[[maybe_unused]]
+DESCRIBE(ExtraHelper, &_::dummy)
+}
+
+static int wrapFunc(lua_State* L) {
+    auto top = lua_gettop(L);
+    auto args = QVariantList();
+    args.reserve(top);
+    for (auto i = 1; i <= top; ++i) {
+        lua_pushvalue(L, i);
+        args.push_back(toQVar(L));
+        lua_pop(L, 1);
+    }
+    Push(L, CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
+    return 1;
+}
+
+void Instance::RegisterFunc(const char *name, ExtraFunction func)
+{
+    glua::Push(d->L, ExtraHelper{std::move(func)});
+    lua_pushcclosure(d->L, protect<wrapFunc>, 1);
+    lua_setglobal(d->L, name);
 }

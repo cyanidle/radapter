@@ -1,8 +1,3 @@
-log.set_level("info")
-log.set_level("modbus", "debug")
-log "lol"
-log.error("Big achtung")
-
 local device = TcpModbusDevice {
     host = "localhost",
     port = 1502,
@@ -35,7 +30,8 @@ local master = ModbusMaster {
 
 -- TODO: args.key from cli!
 
-master:pipe(function (msg)
+pipe(master,
+function (msg)
     log("Status changed: {}", get(msg, "pump:status"))
     log("Error changed: {}", get(msg, "pump:error"))
     log("Speed changed: {}", get(msg, "pump:speed"))

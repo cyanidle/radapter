@@ -89,25 +89,76 @@ end)
 
 ## Pipeable protocol
 
+* Building data collection pipeline is done using `Workers` and `functions` inside unidirectional `pipes`
 * Every connection is done using `pipe()` function.
-* `Table` or `Userdata`: `set_signal(self)` and `call(self, msg)` methods,
+* `Table` or `Userdata`: Implement `IPipable` interface,
 * `Function`: always pipeable. Subscribers will receive return value
 
 ```lua
 pipe(func1, func2) --> returns 'func1'
 pipe(worker1, worker2, func3) --> returns 'worker1'
+```
 
+### IPipeable
+`get_listeners(self) -> table` -> return table of listeners
+`call(self, msg)` -> handle incoming
+```lua
 function MyWorker()
+   local listeners = {} -- should be a table!
    return {
-      get_listeners = function(self) 
-         return listeners 
-      end,
+      get_listeners = function(self)
+         return listeners
+      end
       call = function(self, msg)
          -- handle msg
       end,
    }
 end
+```
+* listeners table is just an array of functions, which can be called.
+* for convenience `call_all(table, ...)` function is globally available, calls all interies in table with `...` args
+```lua
+local worker1 = MyWorker()
 
-local worker1
+pipe(worker1, ...)
+
+worker1:get_listeners() -- has some entries
+
+-- we can emit msg by
+for i, v in ipairs(worker1:get_listeners()) do
+   v({
+      data = "msg data"
+   })
+end
+-- OR
+call_all(worker1:get_listeners(), {
+   data = "msg data"
+})
+```
+
+### IPipeable for functions
+`pipe(<function>)` call will auto-create a IPipeable wrapper
+
+```lua
+local function fn(msg)
+   log(msg)
+end
+
+local result = pipe(fn) 
+
+-- result looks like this:
+local like_result = {
+   __wrap = fn,
+   __listeners = {},
+   get_listeners = function(self)
+      return self.__listeners
+   end,
+   call = function(self, msg)
+      local temp = self.fn(msg)
+      if temp ~= nil then
+         call_all(self.listeners, temp)
+      end
+   end
+}
 
 ```

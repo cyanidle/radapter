@@ -6,7 +6,7 @@ local stream = RedisStream {
     stream_key = "value:stream"
 }
 
-cache:pipe(wrap("wrapped!")):pipe(stream)
+pipe(cache, wrap("wrapped!"), stream)
 
 pipe {
     cache,
@@ -18,11 +18,11 @@ pipe(
     cache, wrap("wrapped 2!"), stream
 )
 
-cache:pipe(function(msg)
+pipe(cache, function(msg)
     log("Msg from cache: {}", msg)
 end)
 
-stream:pipe(unwrap("wrapped!")):pipe(function(msg)
+pipe(stream, unwrap("wrapped!"), function(msg)
     log("Msg from stream: {}", msg)
 end)
 

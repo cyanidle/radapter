@@ -115,8 +115,15 @@ public:
     };
     void DebuggerConnect(DebuggerOpts opts);
 
+    enum LoadEmbedOpts {
+        LoadEmbedGlobal = 1,
+        LoadEmbedNoPop = 1,
+    };
+
+    void LoadEmbeddedFile(string name, int opts = 0);
+
     void EvalFile(fs::path path);
-    void Eval(std::string_view code);
+    void Eval(string_view code, string_view chunk = "<eval>");
 
     void Shutdown(unsigned timeout = 5000);
 
@@ -130,9 +137,6 @@ private:
 
     QScopedPointer<Impl> d;
 };
-
-//! Convert function on top into :pipe()-able userdata
-void MakePipable(lua_State* L);
 
 template<typename T>
 struct KeyVal {

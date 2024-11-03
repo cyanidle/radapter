@@ -61,7 +61,7 @@ QVariant LuaFunction::Call(QVariantList const& args) const
     auto msgh = lua_gettop(_L);
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
     for (auto& a: args) {
-        push(_L, a);
+        Push(_L, a);
     }
     auto status = lua_pcall(_L, args.size(), 1, msgh);
     if (status != LUA_OK) {
