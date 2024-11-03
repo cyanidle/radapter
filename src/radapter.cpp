@@ -28,7 +28,17 @@ struct radapter::Instance::Impl {
         size_t len;
         auto s = lua_tolstring(L, -1, &len);
         auto sv = string_view{s, len};
-        Instance::FromLua(L)->Log(lvl, "lua", "{}", fmt::make_format_args(sv));
+        string_view cat = "lua";
+        lua_Debug ar;
+        if (lua_getstack(L, 2, &ar) && lua_getinfo(L, "S", &ar)) {
+            cat = ar.short_src;
+            auto pos = cat.find_last_of("/\\");
+            if (pos != string_view::npos) {
+                cat = cat.substr(pos + 1);
+            }
+        }
+        // cat is null-terminated
+        Instance::FromLua(L)->Log(lvl, cat.data(), "{}", fmt::make_format_args(sv));
         return 0;
     }
 
