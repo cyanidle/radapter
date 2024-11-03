@@ -30,7 +30,7 @@ struct radapter::Instance::Impl {
         auto sv = string_view{s, len};
         string_view cat = "lua";
         lua_Debug ar;
-        if (lua_getstack(L, 2, &ar) && lua_getinfo(L, "S", &ar)) {
+        if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "S", &ar)) {
             cat = ar.short_src;
             auto pos = cat.find_last_of("/\\");
             if (pos != string_view::npos) {
@@ -62,6 +62,12 @@ struct radapter::Instance::Impl {
         return 0;
     }
 
+    // convert __call(t, ...) -> luaLog(...)
+    static int log__call(lua_State* L) {
+        lua_remove(L, 1);
+        return luaLog(L);
+    }
+
     static int log_handler(lua_State* L) {
         auto inst = Instance::FromLua(L);
         if (lua_isnil(L, 1)) {
@@ -89,15 +95,6 @@ struct radapter::Instance::Impl {
 
 static int _dummy;
 static void* instKey = &_dummy;
-
-// convert __call(t, ...) -> upvalue(1)(...)
-static int wrapInfo(lua_State* L) noexcept {
-    auto args = lua_gettop(L);
-    lua_pushvalue(L, lua_upvalueindex(1));
-    lua_insert(L, 2);
-    lua_call(L, args - 1, 0);
-    return 0;
-}
 
 static void init_qrc() {
     Q_INIT_RESOURCE(radapter);
@@ -137,8 +134,8 @@ radapter::Instance::Instance() : d(new Impl)
     lua_setfield(L, -2, "set_level");
 
     lua_newtable(L); //log. metatable
-    lua_getfield(L, -2, "info");
-    lua_pushcclosure(L, wrapInfo, 1);
+    lua_pushinteger(L, info);
+    lua_pushcclosure(L, protect<Impl::log__call>, 1);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 
@@ -391,8 +388,11 @@ static int workerFactory(lua_State* L) {
         lua_pushvalue(L, lua_upvalueindex(1));
         lua_pushcclosure(L, protect<WorkerImpl::get_listeners>, 1);
         lua_setfield(L, -2, "get_listeners");
+
         lua_pushvalue(L, lua_upvalueindex(1));
         lua_pushcclosure(L, protect<WorkerImpl::worker_call>, 1);
+        lua_pushvalue(L, -1);
+        lua_setfield(L, -3, "__call");
         lua_setfield(L, -2, "call");
 
         for (auto it = ctx->methods.begin(); it != ctx->methods.end(); ++it) {
