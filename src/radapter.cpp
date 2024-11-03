@@ -365,6 +365,12 @@ static int workerFactory(lua_State* L) {
     auto* worker = new (ud) WorkerImpl{L};
     worker->self = w;
 
+    lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
+    auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    QObject::connect(w, &QObject::destroyed, w, [=]{
+        luaL_unref(L, LUA_REGISTRYINDEX, workerSelfRef);
+    });
+
     lua_createtable(L, 0, 0); //subs
     worker->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
 

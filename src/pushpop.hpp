@@ -50,12 +50,6 @@ inline void iterateTable(lua_State* L, Fn&& f) {
     }
 }
 
-template<typename T>
-static int __gc(lua_State* L) {
-    static_cast<T*>(lua_touserdata(L, -1))->~T();
-    return 0;
-}
-
 static QVariant toQVar(lua_State* L, int idx = -1);
 
 [[maybe_unused]]
@@ -169,7 +163,7 @@ inline void Push(lua_State* L, QVariant const& val) {
             new (ud) qptr{q};
             if (luaL_newmetatable(L, qtptr_name)) {
                 luaL_Reg funcs[] = {
-                    {"__gc", __gc<qptr>},
+                    {"__gc", dtor_for<qptr>},
                     {nullptr, nullptr},
                 };
                 luaL_setfuncs(L, funcs, 0);

@@ -215,7 +215,7 @@ static int timer(lua_State* L, bool oneshot) {
     if (luaL_newmetatable(L, "_each_timer")) {
         luaL_Reg funcs[] = {
             {"Stop", stopTimer},
-            {"__gc", __gc<QTimer>},
+            {"__gc", dtor_for<QTimer>},
             {nullptr, nullptr},
         };
         lua_pushvalue(L, -1);
