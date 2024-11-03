@@ -1,11 +1,13 @@
-log.set_handler(function (msg)
+log.set_handler(function(msg)
     print("LUA handler:", msg.msg)
 end)
 
 log "Start test"
 
+log.set_handler(nil)
+
 local deep = {
-    a = { b = { c = 1 }  }
+    a = { b = { c = 1 } }
 }
 
 assert(set(deep, "extra", 1) == deep)
@@ -39,65 +41,55 @@ local test = TestWorker {
 assert(not pcall(pipe), "Empty pipe() should fail")
 assert(not pcall(pipe, {}), "Empty pipe{} should fail")
 
-assert(pipe {test} == test, "pipe{x} == x")
-assert(pipe (test) == test, "pipe(x) == x")
+assert(pipe { test } == test, "pipe{x} == x")
+assert(pipe(test) == test, "pipe(x) == x")
 
-assert(pcall(pipe(function () end)), "convert function to callable")
+assert(pcall(pipe, function() end), "convert function to callable")
 
 local first = pipe {
     test,
-    function () end,
+    function() end,
 }
 
 assert(first == test, "pipe{x, y} should return x")
 
 pipe {
     test,
-    function () return 1 end,
-    function (msg) return msg end,
+    function()
+        return 1
+    end,
+    function(msg)
+        return msg
+    end,
 }
 
-first = pipe (
+first = pipe {
     test,
     function(msg)
-        log(msg)
+        log("Original: {}", msg)
         return msg + 1
     end,
     function(msg)
-        log(msg)
+        log("After incr: {}", msg)
         --return msg + 1
     end,
     function(msg)
         log(msg)
         error("Should not be reachable")
     end
-)
+}
 
 assert(first == test, "pipe(x, y, z) should return x")
 
-local test_func = function () end
+local test_func = function() end
 
 assert(pipe { test_func } ~= test_func, "pipe{func} -> wrapper for func)")
 assert(pipe { test_func, test_func } ~= test_func, "pipe{func} -> wrapper for func)")
 assert(pipe(test_func) ~= test_func, "pipe(func) -> wrapper for func")
 assert(pipe(test_func, test_func) ~= test_func, "pipe(func) -> wrapper for func")
 
-test
-:pipe(function()
-    return deep
-end)
-:pipe(function(msg)
-    return msg
-end)
-
--- >> syntax for pipes in lua 5.3+
-
--- _ = test 
--- >> function (msg)
---     return msg + 10
--- end 
--- >> test
-
+-- Extra interop
+-- TestWorker:Call(func), calls func with 3 args
 test:Call(function(a, b, c)
     log("{} - {} - {}", a, b, c)
 end)

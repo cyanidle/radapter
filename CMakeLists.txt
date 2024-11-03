@@ -13,6 +13,7 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
+# RADAPTER_EXTRA_SCRIPTS may be a list of extra embedded scripts directories
 
 set(RADAPTER_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
 set(RADAPTER_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
@@ -40,26 +41,26 @@ configure_file(include/radapter_info.hpp.in ${CMAKE_BINARY_DIR}/_info/radapter_i
 
 file(GLOB_RECURSE RADAPTER_SRC CONFIGURE_DEPENDS src/*.cpp)
 file(GLOB_RECURSE RADAPTER_HPP CONFIGURE_DEPENDS src/*.h src/*.hpp include/*.hpp)
+list(TRANSFORM RADAPTER_EXTRA_SCRIPTS APPEND /*.lua)
+file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua ${RADAPTER_EXTRA_SCRIPTS})
 
-file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua)
-
-function(radapter_scripts)
+function(radapter_scripts scripts)
     set(scripts_dir ${CMAKE_CURRENT_BINARY_DIR}/_scripts)
     set(scripts_qrc ${scripts_dir}/radapter.qrc)
 
     file(WRITE ${scripts_qrc} "<RCC>\n")
     file(APPEND ${scripts_qrc} "<qresource prefix=\"/scripts\">\n")
 
-    foreach(file ${RADAPTER_SCRIPTS})
+    foreach(file ${${scripts}})
         get_filename_component(name ${file} NAME)
+        message(STATUS "Embedding file => scripts/${name}")
         if (RADAPTER_JIT OR CMAKE_CROSSCOMPILING) #no precompile for JIT or Cross
             file(COPY ${file} DESTINATION ${scripts_dir})
-            message(STATUS "Embedding file => scripts/${name}")
         else()
             set(out ${scripts_dir}/${name})
             add_custom_command(
                 OUTPUT ${out}
-                DEPENDS radapter-luac
+                DEPENDS radapter-luac ${file}
                 COMMAND $<TARGET_FILE:radapter-luac>
                 ARGS -o ${out} ${file}
                 COMMENT "Precompiling => ${out}"
@@ -75,7 +76,7 @@ function(radapter_scripts)
     set(RADAPTER_QRC ${RADAPTER_QRC} PARENT_SCOPE)
 endfunction()
 
-radapter_scripts()
+radapter_scripts(RADAPTER_SCRIPTS)
 
 add_library(radapter-sdk STATIC ${RADAPTER_SRC} ${RADAPTER_HPP} ${RADAPTER_QRC})
 set_target_warnings(radapter-sdk PRIVATE OFF)

@@ -51,7 +51,7 @@ static int do_prequiref(lua_State* L) noexcept {
 
 void compat::prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb)
 {
-    luaL_checkstack(L, 5, "prequire: no stack left");
+    if (!lua_checkstack(L, 5)) throw Err("prequire: no stack left");
     lua_pushcfunction(L, traceback);
     auto trace = lua_gettop(L);
     lua_pushcfunction(L, do_prequiref);
@@ -61,7 +61,5 @@ void compat::prequiref(lua_State *L, const char *modname, lua_CFunction openf, i
     auto res = lua_pcall(L, 3, 1, trace);
     lua_insert(L, -2); //remove traceback
     lua_pop(L, 1);
-    if (res != LUA_OK) {
-        throw Err("prequire: {}", lua_tostring(L, -1));
-    }
+    if (res != LUA_OK) throw Err("prequire: {}", lua_tostring(L, -1));
 }

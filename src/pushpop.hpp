@@ -50,13 +50,7 @@ inline void iterateTable(lua_State* L, Fn&& f) {
     }
 }
 
-template<typename T>
-static int __gc(lua_State* L) {
-    static_cast<T*>(lua_touserdata(L, -1))->~T();
-    return 0;
-}
-
-static QVariant toQVar(lua_State* L);
+static QVariant toQVar(lua_State* L, int idx = -1);
 
 [[maybe_unused]]
 inline QVariantList toArgs(lua_State* L, int start = 1) {
@@ -76,21 +70,6 @@ inline QVariantList toArgs(lua_State* L, int start = 1) {
 #define lua_udata(L, ...) lua_newuserdatauv(L, (__VA_ARGS__), 0)
 #endif
 
-template<typename T, typename...Args>
-inline T* pushGced(lua_State* L, Args&&...a) {
-
-    auto mem = lua_udata(L, sizeof(T));
-    auto res = new (mem) T{std::forward<Args>(a)...};
-    lua_createtable(L, 0, 1);
-    luaL_Reg metameta[]{
-        {"__gc", __gc<T>},
-        {nullptr, nullptr}
-    };
-    luaL_setfuncs(L, metameta, 0);
-    lua_setmetatable(L, -2);
-    return res;
-}
-
 static void pushQStr(lua_State* L, QString const& str) {
     auto std = str.toStdString();
     lua_pushlstring(L, std.data(), std.size());
@@ -99,7 +78,7 @@ static void pushQStr(lua_State* L, QString const& str) {
 using qptr = QPointer<QObject>;
 constexpr auto qtptr_name = "QObject*";
 
-inline void push(lua_State* L, QVariant const& val) {
+inline void Push(lua_State* L, QVariant const& val) {
     auto t = val.type();
     switch (int(t)) {
     case QVariant::Type::Map: {
@@ -108,7 +87,7 @@ inline void push(lua_State* L, QVariant const& val) {
         lua_createtable(L, 0, map.size());
         for (auto it = map.keyValueBegin(); it != map.keyValueEnd(); ++it) {
             pushQStr(L, it->first);
-            push(L, it->second);
+            Push(L, it->second);
             lua_settable(L, -3);
         }
         break;
@@ -119,7 +98,7 @@ inline void push(lua_State* L, QVariant const& val) {
         lua_createtable(L, arr.size(), 0);
         lua_Integer idx = 1;
         for (auto& v: arr) {
-            push(L, v);
+            Push(L, v);
             lua_rawseti(L, -2, idx++);
         }
         break;
@@ -184,7 +163,7 @@ inline void push(lua_State* L, QVariant const& val) {
             new (ud) qptr{q};
             if (luaL_newmetatable(L, qtptr_name)) {
                 luaL_Reg funcs[] = {
-                    {"__gc", __gc<qptr>},
+                    {"__gc", dtor_for<qptr>},
                     {nullptr, nullptr},
                 };
                 luaL_setfuncs(L, funcs, 0);
@@ -229,25 +208,26 @@ inline QString toQStr(lua_State* L, int idx = -1) {
     return QString::fromUtf8(s, int(len));
 }
 
-inline QVariant toQVar(lua_State* L) {
-    switch (lua_type(L, -1)) {
+inline QVariant toQVar(lua_State* L, int idx) {
+    switch (lua_type(L, idx)) {
     case LUA_TTABLE: {
         if (!lua_checkstack(L, 3)) return {}; // nil + key + val
-        if (luaL_getmetafield(L, -1, "__call")) {
+        if (luaL_getmetafield(L, idx, "__call")) {
             lua_pop(L, 1);
-            return QVariant::fromValue(LuaFunction(L, -1));
+            return QVariant::fromValue(LuaFunction(L, idx));
         }
         if (auto len = isArray(L)) {
             QVariantList arr;
             arr.reserve(int(len));
             for (int i = 1; unsigned(i) <= len; ++i) {
-                lua_rawgeti(L, -1, i);
+                lua_rawgeti(L, idx, i);
                 arr.push_back(toQVar(L));
                 lua_pop(L, 1);
             }
             return arr;
         } else {
             QVariantMap map;
+            lua_pushvalue(L, idx);
             iterateTable(L, [&]{
                 auto key = -2;
                 QString k;
@@ -273,35 +253,36 @@ inline QVariant toQVar(lua_State* L) {
                 auto v = toQVar(L);
                 map.insert(k, std::move(v));
             });
+            lua_pop(L, 1);
             return map;
         }
     }
     case LUA_TSTRING: {
-        return toQStr(L);
+        return toQStr(L, idx);
     }
     case LUA_TBOOLEAN: {
-        return bool(lua_toboolean(L, -1));
+        return bool(lua_toboolean(L, idx));
     }
     case LUA_TNUMBER: {
 #ifdef RADAPTER_JIT
-        return lua_tonumber(L, -1);
+        return lua_tonumber(L, idx);
 #else
-        if (lua_isinteger(L, -1)) {
-            return lua_tointeger(L, -1);
+        if (lua_isinteger(L, idx)) {
+            return lua_tointeger(L, idx);
         } else {
-            return lua_tonumber(L, -1);
+            return lua_tonumber(L, idx);
         }
 #endif
     }
     case LUA_TFUNCTION: {
-        return QVariant::fromValue(LuaFunction(L, -1));
+        return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
-        if (auto q = luaL_testudata(L, -1, qtptr_name)) {
+        if (auto q = luaL_testudata(L, idx, qtptr_name)) {
             return QVariant::fromValue(static_cast<qptr*>(q)->data());
-        } else if (luaL_getmetafield(L, -1, "__call")) {
+        } else if (luaL_getmetafield(L, idx, "__call")) {
             lua_pop(L, 1);
-            return QVariant::fromValue(LuaFunction(L, -1));
+            return QVariant::fromValue(LuaFunction(L, idx));
         } else {
             return {};
         }

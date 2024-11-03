@@ -44,6 +44,11 @@ LuaFunction::operator bool() const noexcept
     return _L && _ref != LUA_NOREF;
 }
 
+bool LuaFunction::operator==(const LuaFunction &o) const noexcept
+{
+    return _ref == o._ref;
+}
+
 QVariant LuaFunction::Call(QVariantList const& args) const
 {
     if (!(*this)) {
@@ -56,7 +61,7 @@ QVariant LuaFunction::Call(QVariantList const& args) const
     auto msgh = lua_gettop(_L);
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
     for (auto& a: args) {
-        push(_L, a);
+        Push(_L, a);
     }
     auto status = lua_pcall(_L, args.size(), 1, msgh);
     if (status != LUA_OK) {

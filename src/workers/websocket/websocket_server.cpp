@@ -131,11 +131,11 @@ public:
         emit SendMsg(var);
     }
     void broadcast(QVariant const& state) {
-        auto toSend = QString(QJsonDocument::fromVariant(state).toJson());
+        auto toSend = QString::fromUtf8(QJsonDocument::fromVariant(state).toJson());
         if (config.print_msgs) {
             Debug("{} ==> {}", objectName(), toSend);
         }
-        for (auto cli: socks) {
+        for (auto& cli: socks) {
             cli->sendTextMessage(toSend);
         }
     }

@@ -28,6 +28,7 @@ struct LuaFunction {
     }
     LuaFunction(lua_State* L, int idx);
     explicit operator bool() const noexcept;
+    bool operator==(LuaFunction const& o) const noexcept;
     bool IsValid() const noexcept {
         return bool(*this);
     }

@@ -6,7 +6,9 @@
 #include <QMap>
 #include <QVariant>
 #include "config.hpp"
+#include "logs.hpp"
 #include "worker.hpp"
+#include "glua/glua.hpp"
 
 struct lua_State;
 typedef int(*lua_CFunction)(lua_State*);
@@ -33,6 +35,9 @@ namespace detail {
 template<typename Cls, typename T> Cls* getcls(QVariant(Cls::*)(T));
 }
 
+template<typename T>
+using if_valid_worker = std::enable_if_t<std::is_base_of_v<Worker, T>, int>;
+
 class Instance;
 using Factory = Worker*(*)(QVariantList const&, Instance*);
 using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
@@ -47,11 +52,11 @@ QVariant SchemaFor() {
     PopulateSchema(val, res);
     return res;
 }
-
 template<typename T>
 Worker* FactoryFor(QVariantList const& args, Instance* parent) {
     return new T{args, parent};
 }
+
 template<auto f>
 QVariant AsExtraMethod(Worker* w, QVariantList const& args) {
     using cls = decltype(detail::getcls(f));
@@ -66,16 +71,21 @@ public:
     Instance();
     virtual ~Instance() override;
 
-    template<typename T>
+    void RegisterGlobal(const char* name, QVariant const& value);
+    void RegisterFunc(const char* name, ExtraFunction func);
+
+    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+    template<typename T, if_valid_worker<T> = 1>
     void RegisterWorker(const char* name, ExtraMethods const& extra = {}) {
         static_assert(std::is_base_of_v<Worker, T>);
         RegisterWorker(name, FactoryFor<T>, extra);
     }
 
     void RegisterSchema(const char* name, ExtraSchema schemaGen);
-    void RegisterFunc(const char* name, ExtraFunction func);
-    void RegisterGlobal(const char* name, QVariant const& value);
-    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+    template<typename T>
+    void RegisterSchema(const char* name) {
+        RegisterSchema(name, SchemaFor<T>);
+    }
 
     QVariantMap GetSchemas();
     QSet<Worker*> GetWorkers();
@@ -105,8 +115,15 @@ public:
     };
     void DebuggerConnect(DebuggerOpts opts);
 
+    enum LoadEmbedOpts {
+        LoadEmbedGlobal = 1,
+        LoadEmbedNoPop = 1,
+    };
+
+    void LoadEmbeddedFile(string name, int opts = 0);
+
     void EvalFile(fs::path path);
-    void Eval(std::string_view code);
+    void Eval(string_view code, string_view chunk = "<eval>");
 
     void Shutdown(unsigned timeout = 5000);
 
@@ -120,9 +137,6 @@ private:
 
     QScopedPointer<Impl> d;
 };
-
-//! Convert function on top into :pipe()-able userdata
-void MakePipable(lua_State* L);
 
 template<typename T>
 struct KeyVal {

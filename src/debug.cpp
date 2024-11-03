@@ -12,57 +12,6 @@ extern "C" {
 int luaopen_socket_core(lua_State *L);
 }
 
-static string load_builtin(QString name) {
-    QFile f(name);
-    if (!f.open(QIODevice::ReadOnly)) {
-        throw Err("Could not open builtin file: {}", name);
-    }
-    string s(size_t(f.size()), ' ');
-    f.read(s.data(), f.size());
-    return s;
-}
-
-#if defined(RADAPTER_JIT) || defined(CMAKE_CROSSCOMPILING) 
-const auto loadmode = "t";
-#else
-const auto loadmode = "b";
-#endif
-
-static void load_mod(lua_State* L, const char* name, string_view src) {
-    lua_pushcfunction(L, traceback);
-    auto msgh = lua_gettop(L);
-    auto status = luaL_loadbufferx(L, src.data(), src.size(), name, loadmode);
-    if (status != LUA_OK) {
-        throw Err("Could not compile {}: {}", name, toSV(L));
-    }
-    status = lua_pcall(L, 0, 1, msgh);
-    if (status != LUA_OK) {
-        throw Err("Could not load {}: {}", name, toSV(L));
-    }
-}
-
-static int load_socket(lua_State* L) {
-    radapter::compat::luaL_requiref(L, "socket.core", luaopen_socket_core, 0);
-    lua_pop(L, 1);
-    load_mod(L, "socket", load_builtin(":/scripts/socket.lua"));
-    return 1;
-}
-
-static int load_mobdebug(lua_State* L) {
-    load_mod(L, "mobdebug", load_builtin(":/scripts/mobdebug.lua"));
-    return 1;
-}
-
-static int load_dkjson(lua_State* L) {
-    load_mod(L, "dkjson", load_builtin(":/scripts/dkjson.lua"));
-    return 1;
-}
-
-static int load_vscode_mobdebug(lua_State* L) {
-    load_mod(L, "mobdebug", load_builtin(":/scripts/mobdebug.vscode.lua"));
-    return 1;
-}
-
 
 void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
 {
@@ -73,14 +22,15 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     defer restart([L]{
         lua_gc(L, LUA_GCRESTART, 0);
     });
-    radapter::compat::prequiref(L, "socket", glua::protect<load_socket>, 0);
+    radapter::compat::prequiref(L, "socket.core", luaopen_socket_core, 0);
     lua_pop(L, 1);
+    LoadEmbeddedFile("socket");
     if (opts.vscode) {
         Warn("debugger", "Using vscode-compatible mobdebug");
-        radapter::compat::prequiref(L, "dkjson", glua::protect<load_dkjson>, 0);
-        radapter::compat::prequiref(L, "mobdebug", glua::protect<load_vscode_mobdebug>, 0);
+        LoadEmbeddedFile("dkjson");
+        LoadEmbeddedFile("mobdebug.vscode", LoadEmbedNoPop);
     } else {
-        radapter::compat::prequiref(L, "mobdebug", glua::protect<load_mobdebug>, 0);
+        LoadEmbeddedFile("mobdebug", LoadEmbedNoPop);
     }
     Info("debugger", "Connecting to debug server on {}:{}", opts.host, opts.port);
     lua_getfield(L, -1, "start");

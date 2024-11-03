@@ -14,8 +14,6 @@ class Worker : public QObject {
     Q_OBJECT
 public:
     Instance* _Inst;
-    int _self;
-    int _subs;
 
     Worker(Instance* parent, const char* category = "worker");
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
