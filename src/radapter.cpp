@@ -302,9 +302,8 @@ struct FactoryContext {
     string name;
     Factory factory;
     ExtraMethods methods;
-    int dummy{};
 };
-DESCRIBE(radapter::FactoryContext, &_::dummy)
+DESCRIBE(radapter::FactoryContext)
 
 // object which represents worker inside lua
 struct WorkerImpl {
@@ -312,7 +311,6 @@ struct WorkerImpl {
     QPointer<Worker> self{};
     QMetaObject::Connection conn{};
     int listenersRef = LUA_NOREF;
-    int dummy{};
 
     static int get_listeners(lua_State* L) {
         auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
@@ -352,8 +350,7 @@ struct WorkerImpl {
         }
     }
 };
-
-DESCRIBE(radapter::WorkerImpl, &_::dummy)
+DESCRIBE(radapter::WorkerImpl)
 
 } //radapter
 

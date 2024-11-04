@@ -109,9 +109,11 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
         throw Err("{}: Cannot get {} from {}", current, desc.name, TypeNameOf(conf));
     }
     auto asMap = conf.toMap();
-    desc.for_each_field([&](auto f){
-        static const QString k = QString::fromLatin1(f.name.data(), int(f.name.size()));
-        Parse(f.get(out), asMap.value(k), TraceFrame(f.name, current));
+    desc.for_each([&](auto f){
+        if constexpr (f.is_field) {
+            static const QString k = QString::fromLatin1(f.name.data(), int(f.name.size()));
+            Parse(f.get(out), asMap.value(k), TraceFrame(f.name, current));
+        }
     });
 }
 
@@ -231,10 +233,12 @@ template<typename T, if_struct<T> = 1>
 void PopulateSchema(T& out, QVariant& schema) {
     constexpr auto desc = describe::Get<T>();
     QVariantMap map;
-    desc.for_each_field([&](auto f){
-        QVariant nested;
-        PopulateSchema(f.get(out), nested);
-        map[QString::fromLatin1(f.name.data(), int(f.name.size()))] = nested;
+    desc.for_each([&](auto f){
+        if constexpr (f.is_field) {
+            QVariant nested;
+            PopulateSchema(f.get(out), nested);
+            map[QString::fromLatin1(f.name.data(), int(f.name.size()))] = nested;
+        }
     });
     schema = map;
 }

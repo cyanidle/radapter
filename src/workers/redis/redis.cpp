@@ -12,7 +12,7 @@ struct CacheConfig : Config {
     optional<string> hash_key;
     WithDefault<unsigned> update_rate = 500u;
 };
-DESCRIBE_INHERIT(redis::CacheConfig, Config, &_::hash_key, &_::update_rate)
+DESCRIBE_INHERIT(Config, redis::CacheConfig, &_::hash_key, &_::update_rate)
 
 enum StreamStart {
     persistent_id,
@@ -32,7 +32,7 @@ struct StreamConfig : Config {
     WithDefault<string> instance_id = "_";
     WithDefault<string> persistent_prefix = "__radapter";
 };
-DESCRIBE_INHERIT(redis::StreamConfig, Config,
+DESCRIBE_INHERIT(Config, redis::StreamConfig,
                  &_::stream_key, &_::start_from, &_::stream_size,
                  &_::block_timeout, &_::entries_per_read,
                  &_::read_enabled, &_::write_enabled, &_::instance_id)

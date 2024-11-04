@@ -89,7 +89,7 @@ struct RtuDevice : Device {
     WithDefault<unsigned> parity = 0u;
     WithDefault<unsigned> stop_bits = 1u;
 };
-DESCRIBE_INHERIT(modbus::RtuDevice, Device,
+DESCRIBE_INHERIT(Device, modbus::RtuDevice,
          &_::port_name, &_::byte_order,
          &_::data_bits, &_::baud,
          &_::parity, &_::stop_bits)
@@ -99,7 +99,7 @@ struct TcpDevice : Device {
     string host;
     uint16_t port;
 };
-DESCRIBE_INHERIT(modbus::TcpDevice, Device, &_::host, &_::port)
+DESCRIBE_INHERIT(Device, modbus::TcpDevice, &_::host, &_::port)
 
 struct WorkerConfig {
     RegistersMap registers;
@@ -131,7 +131,7 @@ struct MasterConfig : WorkerConfig {
     WithDefault<unsigned> write_retries = 3u;
     optional<vector<ManualQuery>> queries = {};
 };
-DESCRIBE_INHERIT(modbus::MasterConfig, WorkerConfig,
+DESCRIBE_INHERIT(WorkerConfig, modbus::MasterConfig,
                  &_::device, &_::response_time,
                  &_::poll_rate, &_::write_retries, &_::queries)
 
