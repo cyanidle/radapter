@@ -363,8 +363,8 @@ static int workerFactory(lua_State* L) {
     auto* inst = Instance::FromLua(L);
     auto* w = ctx->factory(ctorArgs, inst);
     auto* ud = lua_udata(L, sizeof(WorkerImpl));
-    auto* worker = new (ud) WorkerImpl{L};
-    worker->self = w;
+    auto* impl = new (ud) WorkerImpl{L};
+    impl->self = w;
 
     lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
     auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -373,9 +373,9 @@ static int workerFactory(lua_State* L) {
     });
 
     lua_createtable(L, 0, 0); //subs
-    worker->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    impl->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
 
-    worker->conn = QObject::connect(w, &Worker::SendMsg, w, [worker, w, L](QVariant const& msg){
+    impl->conn = QObject::connect(w, &Worker::SendMsg, w, [impl, w, L](QVariant const& msg){
         if (!lua_checkstack(L, 4)) {
             w->Error("Could not reserve stack to send msg");
             return;
@@ -383,7 +383,7 @@ static int workerFactory(lua_State* L) {
         lua_pushcfunction(L, traceback);
         auto msgh = lua_gettop(L);
         lua_getglobal(L, "call_all");
-        lua_rawgeti(L, LUA_REGISTRYINDEX, worker->listenersRef);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, impl->listenersRef);
         Push(L, msg);
         auto ok = lua_pcall(L, 2, 0, msgh);
         if (ok != LUA_OK) {
@@ -409,7 +409,7 @@ static int workerFactory(lua_State* L) {
             static_assert(sizeof(void*) >= sizeof(method));
             lua_pushvalue(L, lua_upvalueindex(1));
             lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
-            lua_pushcclosure(L, WorkerImpl::call_extra, 2);
+            lua_pushcclosure(L, protect<WorkerImpl::call_extra>, 2);
             lua_settable(L, -3);
         }
 
@@ -483,16 +483,12 @@ void Instance::Shutdown(unsigned int timeout)
     Warn("radapter", "Shutting down...");
     emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
-        auto ws = d->workers;
-        for (auto w: ws) {
-            delete w;
-        }
         if (!std::exchange(d->shutdownDone, true)) {
             emit HasShutdown();
         }
     });
-    auto ws = d->workers;
-    for (auto w: ws) {
+    auto temp = d->workers; // may get modified due to Shutdown()
+    for (auto w: temp) {
         w->Shutdown();
     }
 }
@@ -504,6 +500,8 @@ lua_State *Instance::LuaState()
 
 radapter::Instance::~Instance()
 {
+    auto temp = d->workers; // modified due to deletion of each entry
+    qDeleteAll(temp);
 }
 
 void Instance::RegisterGlobal(const char *name, const QVariant &value)

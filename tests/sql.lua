@@ -1,9 +1,16 @@
 local sql = Sql {
     type = "QSQLITE",
-    db = "/home/alexej/repos/radapter/build/test.sqlite",
+    db = "test.sqlite",
 }
 
-sql:Exec("DROP TABLE users")
+local ok, err = pcall(function ()
+    sql:Exec("DROP TABLE users")
+end)
+
+if not ok then
+    log.error("Could not delete table: {}", err)
+end
+
 sql:Exec("CREATE TABLE users (id text, name text, email text)")
 
 local id = 1

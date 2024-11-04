@@ -38,7 +38,7 @@ public:
         }
         if (!db.open()) {
             auto err = db.lastError();
-            throw Err("Could not open db {}:{} => {}",
+            throw Err("Could not open db '{}:{}' => '{}'",
                       config.type, config.db, err.text());
         }
     }
@@ -51,17 +51,17 @@ public:
         QVariantList binds = args.value(1).toList();
         QSqlQuery q(db);
         if (!q.prepare(raw)) {
-            throw Err("Could not prepare {} => {}", raw, q.lastError().text());
+            throw Err("Could not prepare '{}' => '{}'", raw, q.lastError().text());
         }
         int idx = 0;
         for (auto& a: binds) {
             q.bindValue(idx++, std::move(a));
         }
         if (!q.exec()) {
-            throw Err("Could not execute {} => {}", raw, q.lastError().text());
+            throw Err("Could not execute '{}' => '{}'", raw, q.lastError().text());
         }
         QVariantList result;
-        Debug("{}", raw);
+        Debug("'{}'", raw);
         while(q.next()) {
             QVariantList nested;
             auto c = q.record().count();

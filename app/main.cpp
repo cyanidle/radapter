@@ -26,7 +26,7 @@ int main (int argc, char **argv) try {
     argparse::ArgumentParser cli(argv[0], ver);
     cli.add_argument("file")
         .nargs(argparse::nargs_pattern::optional)
-        .help("Execute files");
+        .help("Execute file");
     cli.add_argument("args")
         .nargs(argparse::nargs_pattern::any)
         .action([&](std::string_view str){
