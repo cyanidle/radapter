@@ -360,7 +360,8 @@ DESCRIBE(radapter::WorkerImpl, &_::dummy)
 static int workerFactory(lua_State* L) {
     auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
     auto ctorArgs = toArgs(L, 1);
-    auto w = ctx->factory(ctorArgs, Instance::FromLua(L));
+    auto* inst = Instance::FromLua(L);
+    auto* w = ctx->factory(ctorArgs, inst);
     auto* ud = lua_udata(L, sizeof(WorkerImpl));
     auto* worker = new (ud) WorkerImpl{L};
     worker->self = w;
@@ -418,6 +419,7 @@ static int workerFactory(lua_State* L) {
         lua_setfield(L, -2, "__index");
     }
     lua_setmetatable(L, -2);
+    emit inst->WorkerCreated(w);
     return 1;
 }
 
@@ -502,7 +504,6 @@ lua_State *Instance::LuaState()
 
 radapter::Instance::~Instance()
 {
-
 }
 
 void Instance::RegisterGlobal(const char *name, const QVariant &value)

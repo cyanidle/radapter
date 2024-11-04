@@ -1,8 +1,8 @@
 #include <QCoreApplication>
 #include <QThread>
 #include <QTimer>
+#include <QJsonDocument>
 #include <qctrlsignalhandler.h>
-#include <qjsondocument.h>
 #include "radapter.hpp"
 #include "argparse/argparse.hpp"
 
