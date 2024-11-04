@@ -100,8 +100,8 @@ pipe(worker1, worker2, func3) --> returns 'worker1'
 ```
 
 ### IPipeable
-`get_listeners(self) -> table` -> return table of listeners
-`call(self, msg)` -> handle incoming
+1) `get_listeners(self) -> table` -> return table of listeners
+2) `call(self, msg)` -> handle incoming
 ```lua
 function MyWorker()
    local listeners = {} -- should be a table!
