@@ -314,7 +314,7 @@ public:
 
 }
 
-void radapter::builtin::redis(Instance* inst) {
+void radapter::builtin::workers::redis(Instance* inst) {
     inst->RegisterWorker<redis::Cache>(
         "RedisCache", {
          {"Execute", AsExtraMethod<&redis::Cache::Execute>},

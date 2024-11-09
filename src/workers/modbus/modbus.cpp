@@ -241,7 +241,7 @@ static QVariant makeDevice(radapter::Instance* inst, QVariantList args) {
     return QVariant::fromValue(device);
 }
 
-void radapter::builtin::modbus(Instance* inst) {
+void radapter::builtin::workers::modbus(Instance* inst) {
     inst->RegisterFunc("TcpModbusDevice", makeDevice<modbus::TcpDevice>);
     inst->RegisterSchema("TcpModbusDevice", SchemaFor<modbus::TcpDevice>);
 

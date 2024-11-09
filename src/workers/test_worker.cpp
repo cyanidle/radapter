@@ -42,7 +42,7 @@ public:
     }
 };
 
-void builtin::test(Instance* inst) {
+void builtin::workers::test(Instance* inst) {
     inst->RegisterWorker<TestWorker>("TestWorker", {
         {"Call", AsExtraMethod<&TestWorker::Call>},
     });

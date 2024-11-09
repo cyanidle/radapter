@@ -1,5 +1,5 @@
+#include "builtin.hpp"
 #include "radapter.hpp"
-#include "pushpop.hpp"
 #include "glua/glua.hpp"
 
 using namespace radapter;
@@ -52,7 +52,7 @@ static int do_prequiref(lua_State* L) noexcept {
 void compat::prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb)
 {
     if (!lua_checkstack(L, 5)) throw Err("prequire: no stack left");
-    lua_pushcfunction(L, traceback);
+    lua_pushcfunction(L, builtin::help::traceback);
     auto trace = lua_gettop(L);
     lua_pushcfunction(L, do_prequiref);
     lua_pushstring(L, modname);

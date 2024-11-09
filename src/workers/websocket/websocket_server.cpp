@@ -144,7 +144,7 @@ public:
 
 }
 
-void radapter::builtin::websocket(radapter::Instance* inst) {
+void radapter::builtin::workers::websocket(radapter::Instance* inst) {
     inst->RegisterWorker<ws::Server>("WebsocketServer");
     inst->RegisterSchema("WebsocketServer", SchemaFor<ws::ServerConfig>);
 }

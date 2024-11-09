@@ -1,6 +1,5 @@
 #include "radapter.hpp"
 #include "builtin.hpp"
-#include "builtin_funcs.hpp"
 #include "glua/glua.hpp"
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -16,7 +15,7 @@ int luaopen_socket_core(lua_State *L);
 void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
 {
     auto L = LuaState();
-    lua_pushcfunction(L, traceback);
+    lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     lua_gc(L, LUA_GCSTOP, 0);
     defer restart([L]{
@@ -40,7 +39,7 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     lua_pushinteger(L, opts.port);
     auto status = lua_pcall(L, 2, 1, msgh);
     if (status != LUA_OK) {
-        throw Err("debugger: Could not start: {}", toSV(L));
+        throw Err("debugger: Could not start: {}", builtin::help::toSV(L));
     }
     if (!lua_toboolean(L, -1)) {
         throw Err("debugger: Not available");

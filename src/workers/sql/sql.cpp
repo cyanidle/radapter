@@ -119,7 +119,7 @@ public:
 }
 
 
-void radapter::builtin::sql(radapter::Instance* inst) {
+void radapter::builtin::workers::sql(radapter::Instance* inst) {
     using namespace radapter::sql;
     inst->RegisterWorker<SqlWorker>("Sql", {
         {"Exec", AsExtraMethod<&SqlWorker::Exec>}

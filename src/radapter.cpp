@@ -1,110 +1,27 @@
 #include "radapter.hpp"
 #include <QVariant>
 #include <QMap>
-#include <QSet>
 #include <QTimer>
 #include <qdatetime.h>
 #include <QDir>
-#include "builtin.hpp"
-#include "builtin_funcs.hpp"
 #include "fmt/compile.h"
-
-struct radapter::Instance::Impl {
-    lua_State* L;
-    QSet<Worker*> workers;
-    LogLevel globalLevel = LogLevel::debug;
-    std::map<string, LogLevel, std::less<>> perCat;
-    std::map<string, ExtraSchema> schemas;
-    bool shutdown = false;
-    bool shutdownDone = false;
-    int insideLogHandler = false;
-    int luaHandler = LUA_NOREF;
-
-    static int luaLog(lua_State* L) {
-        auto inst = Instance::FromLua(L);
-        if (inst->d->insideLogHandler) return 0;
-        format(L);
-        auto lvl = LogLevel(lua_tointeger(L, lua_upvalueindex(1)));
-        size_t len;
-        auto s = lua_tolstring(L, -1, &len);
-        auto sv = string_view{s, len};
-        string_view cat = "lua";
-        lua_Debug ar;
-        if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "S", &ar)) {
-            cat = ar.short_src;
-            auto pos = cat.find_last_of("/\\");
-            if (pos != string_view::npos) {
-                cat = cat.substr(pos + 1);
-            }
-        }
-        // cat is null-terminated
-        Instance::FromLua(L)->Log(lvl, cat.data(), "{}", fmt::make_format_args(sv));
-        return 0;
-    }
-
-    static int log_level(lua_State* L) {
-        luaL_checktype(L, 1, LUA_TSTRING);
-        auto count = lua_gettop(L);
-        auto inst = Instance::FromLua(L);
-        if (count == 1) {
-            auto lvl = toSV(L, 1);
-            if (!describe::name_to_enum(lvl, inst->d->globalLevel)) {
-                throw Err("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::field_names<LogLevel>(), ", "));
-            }
-        } else {
-            luaL_checktype(L, 2, LUA_TSTRING);
-            auto cat = toSV(L, 1);
-            auto lvl = toSV(L, 2);
-            if (!describe::name_to_enum(lvl, inst->d->perCat[string{cat}])) {
-                throw Err("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::field_names<LogLevel>(), ", "));
-            }
-        }
-        return 0;
-    }
-
-    // convert __call(t, ...) -> luaLog(...)
-    static int log__call(lua_State* L) {
-        lua_remove(L, 1);
-        return luaLog(L);
-    }
-
-    static int log_handler(lua_State* L) {
-        auto inst = Instance::FromLua(L);
-        if (lua_isnil(L, 1)) {
-            luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
-            inst->d->luaHandler = LUA_NOREF;
-        } else {
-            luaL_checktype(L, 1, LUA_TFUNCTION);
-            luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
-            lua_pushvalue(L, 1);
-            inst->d->luaHandler = luaL_ref(L, LUA_REGISTRYINDEX);
-        }
-        return 0;
-    }
-
-    Impl() {
-        L = luaL_newstate();
-    }
-
-    ~Impl() {
-        luaL_unref(L, LUA_REGISTRYINDEX, luaHandler);
-        lua_close(L);
-    }
-
-};
-
-static int _dummy;
-static void* instKey = &_dummy;
+#include "glua/glua.hpp"
+#include "instance_impl.hpp"
 
 static void init_qrc() {
     Q_INIT_RESOURCE(radapter);
 }
 
+namespace radapter {
+
+static int _dummy;
+static void* instKey = &_dummy;
+
 static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
     Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
 }
 
-radapter::Instance::Instance() : d(new Impl)
+Instance::Instance() : d(new Impl)
 {
     init_qrc();
     auto L = d->L;
@@ -121,36 +38,36 @@ radapter::Instance::Instance() : d(new Impl)
 
     lua_newtable(L);
     lua_pushinteger(L, debug);
-    lua_pushcclosure(L, protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "debug");
     lua_pushinteger(L, info);
-    lua_pushcclosure(L, protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "info");
     lua_pushinteger(L, warn);
-    lua_pushcclosure(L, protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "warn");
     lua_pushinteger(L, error);
-    lua_pushcclosure(L, protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "error");
-    lua_pushcfunction(L, protect<Impl::log_handler>);
+    lua_pushcfunction(L, glua::protect<Impl::log_handler>);
     lua_setfield(L, -2, "set_handler");
-    lua_pushcfunction(L, protect<Impl::log_level>);
+    lua_pushcfunction(L, glua::protect<Impl::log_level>);
     lua_setfield(L, -2, "set_level");
 
     lua_newtable(L); //log. metatable
     lua_pushinteger(L, info);
-    lua_pushcclosure(L, protect<Impl::log__call>, 1);
+    lua_pushcclosure(L, glua::protect<Impl::log__call>, 1);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 
     lua_setglobal(L, "log");
 
-    lua_register(L, "shutdown", Wrap<luaShutdown>);
-    lua_register(L, "fmt", protect<format>);
-    lua_register(L, "each", protect<each>);
-    lua_register(L, "after", protect<after>);
-    lua_register(L, "get", protect<get>);
-    lua_register(L, "set", protect<set>);
+    lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
+    lua_register(L, "fmt", glua::protect<builtin::api::Format>);
+    lua_register(L, "each", glua::protect<builtin::api::Each>);
+    lua_register(L, "after", glua::protect<builtin::api::After>);
+    lua_register(L, "get", glua::protect<builtin::api::Get>);
+    lua_register(L, "set", glua::protect<builtin::api::Set>);
 
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("async", LoadEmbedGlobal);
@@ -170,7 +87,7 @@ radapter::Instance::Instance() : d(new Impl)
         });
         connect(w, &Worker::ShutdownDone, w, &QObject::deleteLater);
     });
-    for (auto system: builtin::all) {
+    for (auto system: builtin::workers::all) {
         system(this);
     }
 }
@@ -192,15 +109,15 @@ static string load_builtin(QString name) {
 }
 
 static void load_mod(lua_State* L, const char* name, string_view src) {
-    lua_pushcfunction(L, traceback);
+    lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     auto status = luaL_loadbufferx(L, src.data(), src.size(), name, loadmode);
     if (status != LUA_OK) {
-        throw Err("Could not compile {}: {}", name, toSV(L));
+        throw Err("Could not compile {}: {}", name, builtin::help::toSV(L));
     }
     status = lua_pcall(L, 0, 1, msgh);
     if (status != LUA_OK) {
-        throw Err("Could not load {}: {}", name, toSV(L));
+        throw Err("Could not load {}: {}", name, builtin::help::toSV(L));
     }
 }
 
@@ -212,7 +129,7 @@ static int load_embedded_module(lua_State* L) {
 
 void Instance::LoadEmbeddedFile(string name, int opts)
 {
-    compat::prequiref(d->L, name.c_str(), protect<load_embedded_module>, opts & LoadEmbedGlobal ? 1 : 0);
+    compat::prequiref(d->L, name.c_str(), glua::protect<load_embedded_module>, opts & LoadEmbedGlobal ? 1 : 0);
     if (!(opts & LoadEmbedNoPop)) {
         lua_pop(d->L, 1);
     }
@@ -241,7 +158,7 @@ QSet<Worker *> Instance::GetWorkers()
     return d->workers;
 }
 
-std::runtime_error radapter::detail::doErr(fmt::string_view fmt, fmt::format_args args)
+std::runtime_error detail::doErr(fmt::string_view fmt, fmt::format_args args)
 {
     return std::runtime_error(fmt::vformat(fmt, args));
 }
@@ -265,7 +182,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
 
     if (d->luaHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
-        lua_pushcfunction(L, traceback);
+        lua_pushcfunction(L, builtin::help::traceback);
         auto msgh = lua_gettop(L);
         d->insideLogHandler = true;
         defer reset([&]{
@@ -302,147 +219,15 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
     d->schemas[name] = schemaGen;
 }
 
-namespace radapter {
-
-struct FactoryContext {
-    string name;
-    Factory factory;
-    ExtraMethods methods;
-};
-DESCRIBE(radapter::FactoryContext)
-
-// object which represents worker inside lua
-struct WorkerImpl {
-    lua_State* L;
-    QPointer<Worker> self{};
-    QMetaObject::Connection conn{};
-    int listenersRef = LUA_NOREF;
-
-    static int get_listeners(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
-        return 1;
-    };
-
-    static int worker_call(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        auto w = ud->self.data();
-        if (!w) {
-            throw Err("worker not usable");
-        }
-        w->OnMsg(toQVar(L, 2));
-        return 1;
-    }
-
-    static int call_extra(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
-        auto w = ud->self.data();
-        if (!w) {
-            throw Err("worker not usable");
-        }
-        Push(L, method(w, toArgs(L, 2)));
-        return 1;
-    }
-
-    ~WorkerImpl() {
-        luaL_unref(L, LUA_REGISTRYINDEX, listenersRef);
-        if (self) {
-            QObject::disconnect(conn);
-            self->deleteLater();
-        }
-    }
-};
-DESCRIBE(radapter::WorkerImpl)
-
-} //radapter
-
-static int workerFactory(lua_State* L) {
-    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto ctorArgs = toArgs(L, 1);
-    auto* inst = Instance::FromLua(L);
-    auto* w = ctx->factory(ctorArgs, inst);
-    auto* ud = lua_udata(L, sizeof(WorkerImpl));
-    auto* impl = new (ud) WorkerImpl{L};
-    impl->self = w;
-
-    lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
-    auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
-    QObject::connect(w, &QObject::destroyed, w, [=]{
-        luaL_unref(L, LUA_REGISTRYINDEX, workerSelfRef);
-    });
-
-    lua_createtable(L, 0, 0); //subs
-    impl->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
-
-    impl->conn = QObject::connect(w, &Worker::SendMsg, w, [impl, w, L](QVariant const& msg){
-        if (!lua_checkstack(L, 4)) {
-            w->Error("Could not reserve stack to send msg");
-            return;
-        }
-        lua_pushcfunction(L, traceback);
-        auto msgh = lua_gettop(L);
-        lua_getglobal(L, "call_all");
-        lua_rawgeti(L, LUA_REGISTRYINDEX, impl->listenersRef);
-        Push(L, msg);
-        auto ok = lua_pcall(L, 2, 0, msgh);
-        if (ok != LUA_OK) {
-            w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
-        }
-        lua_settop(L, msgh - 1);
-    });
-    if (luaL_newmetatable(L, ctx->name.c_str())) {
-        lua_pushvalue(L, lua_upvalueindex(1));
-        lua_pushcclosure(L, protect<WorkerImpl::get_listeners>, 1);
-        lua_setfield(L, -2, "get_listeners");
-
-        lua_pushvalue(L, lua_upvalueindex(1));
-        lua_pushcclosure(L, protect<WorkerImpl::worker_call>, 1);
-        lua_pushvalue(L, -1);
-        lua_setfield(L, -3, "__call");
-        lua_setfield(L, -2, "call");
-
-        for (auto it = ctx->methods.begin(); it != ctx->methods.end(); ++it) {
-            auto name = it.key().toStdString();
-            auto method = it.value();
-            Push(L, it.key().toStdString());
-            static_assert(sizeof(void*) >= sizeof(method));
-            lua_pushvalue(L, lua_upvalueindex(1));
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
-            lua_pushcclosure(L, protect<WorkerImpl::call_extra>, 2);
-            lua_settable(L, -3);
-        }
-
-        lua_pushcfunction(L, dtor_for<WorkerImpl>);
-        lua_setfield(L, -2, "__gc");
-        lua_pushvalue(L, -1);
-        lua_setfield(L, -2, "__index");
-    }
-    lua_setmetatable(L, -2);
-    emit inst->WorkerCreated(w);
-    return 1;
-}
-
-void radapter::Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra)
-{
-    auto L = d->L;
-    Push(L, FactoryContext{name, factory, extra});
-    lua_pushcclosure(L, protect<workerFactory>, 1);
-    lua_setglobal(L, name);
-}
-
-void radapter::Instance::EvalFile(fs::path path)
+void Instance::EvalFile(fs::path path)
 {
     auto L = d->L;
 
-    lua_pushcfunction(L, traceback);
+    lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     auto load = luaL_loadfile(L, path.string().c_str());
     if (load != LUA_OK) {
-        throw Err("Error loading file {}: {}", path.string(), toSV(L));
+        throw Err("Error loading file {}: {}", path.string(), builtin::help::toSV(L));
     }
 
     auto dir = path.parent_path();
@@ -455,23 +240,23 @@ void radapter::Instance::EvalFile(fs::path path)
         QDir::setCurrent(wasCwd);
     }
     if (res != LUA_OK) {
-        auto e = toSV(L);
+        auto e = builtin::help::toSV(L);
         throw Err("EvalFile error: {}", e);
     }
 }
 
-void radapter::Instance::Eval(string_view code, string_view chunk)
+void Instance::Eval(string_view code, string_view chunk)
 {
     auto L = d->L;
-    lua_pushcfunction(L, traceback);
+    lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {
-        throw Err("Error loading code: {}", toSV(L));
+        throw Err("Error loading code: {}", builtin::help::toSV(L));
     }
     auto res = lua_pcall(L, 0, 0, msgh);
     if (res != LUA_OK) {
-        auto e = toSV(L);
+        auto e = builtin::help::toSV(L);
         throw Err("Eval error: {}", e);
     }
 }
@@ -500,7 +285,7 @@ lua_State *Instance::LuaState()
     return d->L;
 }
 
-radapter::Instance::~Instance()
+Instance::~Instance()
 {
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
@@ -509,18 +294,14 @@ radapter::Instance::~Instance()
 void Instance::RegisterGlobal(const char *name, const QVariant &value)
 {
     auto L = d->L;
-    Push(L, value);
+    glua::Push(L, value);
     lua_setglobal(L, name);
 }
 
-namespace {
 struct ExtraHelper {
     ExtraFunction func;
-    int dummy{};
 };
-[[maybe_unused]]
-DESCRIBE(ExtraHelper, &_::dummy)
-}
+DESCRIBE(radapter::ExtraHelper)
 
 static int wrapFunc(lua_State* L) {
     auto top = lua_gettop(L);
@@ -528,16 +309,17 @@ static int wrapFunc(lua_State* L) {
     args.reserve(top);
     for (auto i = 1; i <= top; ++i) {
         lua_pushvalue(L, i);
-        args.push_back(toQVar(L));
+        args.push_back(builtin::help::toQVar(L));
         lua_pop(L, 1);
     }
-    Push(L, CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
+    glua::Push(L, glua::CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
     return 1;
 }
 
 void Instance::RegisterFunc(const char *name, ExtraFunction func)
 {
     glua::Push(d->L, ExtraHelper{std::move(func)});
-    lua_pushcclosure(d->L, protect<wrapFunc>, 1);
+    lua_pushcclosure(d->L, glua::protect<wrapFunc>, 1);
     lua_setglobal(d->L, name);
+}
 }
