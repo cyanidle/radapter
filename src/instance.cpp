@@ -70,10 +70,12 @@ Instance::Instance() : d(new Impl)
     lua_register(L, "set", glua::protect<builtin::api::Set>);
 
     LoadEmbeddedFile("builtins");
+    LoadEmbeddedFile("coro_patch");
     LoadEmbeddedFile("async", LoadEmbedGlobal);
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
+        connect(this, &Instance::ShutdownRequest, w, &Worker::Shutdown);
         connect(w, &QObject::destroyed, this, [this, w]{
             auto it = d->workers.find(w);
             if (it != d->workers.end()) {
@@ -81,7 +83,7 @@ Instance::Instance() : d(new Impl)
             }
             if (d->workers.empty() && d->shutdown) {
                 if (!std::exchange(d->shutdownDone, true)) {
-                    emit HasShutdown();
+                    emit ShutdownDone();
                 }
             }
         });
@@ -175,10 +177,14 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         name = "<inval>";
     }
     auto dt = QDateTime::currentDateTime();
+    auto c = string_view(cat);
+    if (c.size() > d->logCatLen) {
+        d->logCatLen = unsigned(c.size());
+    }
     fmt::print(
-        FMT_COMPILE("{}.{:0>3}|{:>5}|{:>12}| {}\n"),
+        FMT_COMPILE("{}.{:0>3}|{:>5}|{:>{}}| {}\n"),
         dt.toString(Qt::DateFormat::ISODate), dt.time().msec(),
-        name, cat, fmt::vformat(fmt, args));
+        name, cat, d->logCatLen, fmt::vformat(fmt, args));
 
     if (d->luaHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
@@ -271,12 +277,11 @@ void Instance::Shutdown(unsigned int timeout)
     emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
         if (!std::exchange(d->shutdownDone, true)) {
-            emit HasShutdown();
+            emit ShutdownDone();
         }
     });
-    auto temp = d->workers; // may get modified due to Shutdown()
-    for (auto w: temp) {
-        w->Shutdown();
+    if (d->workers.empty()) {
+        emit ShutdownDone();
     }
 }
 

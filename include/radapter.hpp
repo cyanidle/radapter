@@ -132,7 +132,7 @@ public:
 signals:
     void ShutdownRequest();
     void WorkerCreated(Worker* worker);
-    void HasShutdown();
+    void ShutdownDone();
 private:
 
     QScopedPointer<Impl> d;

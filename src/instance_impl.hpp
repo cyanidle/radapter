@@ -13,6 +13,7 @@ struct radapter::Instance::Impl {
     bool shutdownDone = false;
     int insideLogHandler = false;
     int luaHandler = LUA_NOREF;
+    unsigned logCatLen = 12;
 
     static int luaLog(lua_State* L);
     static int log_level(lua_State* L);

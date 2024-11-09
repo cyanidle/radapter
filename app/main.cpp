@@ -75,7 +75,7 @@ int main (int argc, char **argv) try {
     sigs->registerForSignal(QCtrlSignalHandler::SigInt);
     sigs->registerForSignal(QCtrlSignalHandler::SigTerm);
     app.connect(sigs, &QCtrlSignalHandler::ctrlSignal, &inst, &radapter::Instance::Shutdown);
-    app.connect(&inst, &radapter::Instance::HasShutdown, &app, &QCoreApplication::quit);
+    app.connect(&inst, &radapter::Instance::ShutdownDone, &app, &QCoreApplication::quit);
 
     inst.RegisterGlobal("args", lua_args);
 
