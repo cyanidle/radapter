@@ -20,7 +20,7 @@ end)
 
 -- echo_in = function (time, arg)
 --     return function (callback)
---         after(time, function ()
+--         after(time, function()
 --             callback(arg)
 --         end)
 --     end
@@ -35,7 +35,6 @@ async_main = a.sync(function ()
     local B = a.wait(echo_in(3000, 321))
     log "B calculated!"
 
-
     log("a: {}, b: {}", A, B)
 
     a.wait(async_sleep(1000))
@@ -45,4 +44,5 @@ end)
 
 async_main(function(A, B)
     log("Test Done! From main: {}, {}", A, B)
+    shutdown()
 end)

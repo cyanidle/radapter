@@ -100,6 +100,10 @@ static void init_qrc() {
     Q_INIT_RESOURCE(radapter);
 }
 
+static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
+    Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
+}
+
 radapter::Instance::Instance() : d(new Impl)
 {
     init_qrc();
@@ -141,6 +145,7 @@ radapter::Instance::Instance() : d(new Impl)
 
     lua_setglobal(L, "log");
 
+    lua_register(L, "shutdown", Wrap<luaShutdown>);
     lua_register(L, "fmt", protect<format>);
     lua_register(L, "each", protect<each>);
     lua_register(L, "after", protect<after>);

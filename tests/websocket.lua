@@ -1,11 +1,12 @@
 local ws = WebsocketServer{port = 6337}
 
 pipe(ws, log)
-pipe{ws, 
+pipe{
+    ws,
     function(msg)
         return msg
     end,
-    log
+    log.info
 }
 
 local counter = 0
