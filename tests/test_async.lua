@@ -10,6 +10,22 @@ echo_in = a.wrap(function (time, arg, callback)
     end)
 end)
 
+---- THESE two are identical to ^
+
+-- async_sleep = function (time)
+--     return function (callback)
+--         after(time, callback)
+--     end
+-- end
+
+-- echo_in = function (time, arg)
+--     return function (callback)
+--         after(time, function ()
+--             callback(arg)
+--         end)
+--     end
+-- end
+
 async_main = a.sync(function ()
     log "Test Start!"
 
