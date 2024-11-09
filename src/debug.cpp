@@ -33,6 +33,8 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
         LoadEmbeddedFile("mobdebug", LoadEmbedNoPop);
     }
     Info("debugger", "Connecting to debug server on {}:{}", opts.host, opts.port);
+    lua_getfield(L, -1, "coro");
+    lua_pcall(L, 0, 0, 0);
     lua_getfield(L, -1, "start");
     lua_pushlstring(L, opts.host.data(), opts.host.size());
     lua_pushinteger(L, opts.port);

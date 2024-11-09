@@ -5,6 +5,8 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QSemaphore>
+#include <qthread.h>
 
 namespace radapter::sql {
 
@@ -21,25 +23,48 @@ class SqlWorker final: public Worker {
     Q_OBJECT
 
     QSqlDatabase db;
+    QThread* thread{};
+    QObject* context{};
     SqlConfig config;
 public:
+    ~SqlWorker() override {
+        if (context) delete context;
+        thread->quit();
+        thread->wait();
+    }
     SqlWorker(QVariantList args, Instance* inst) : Worker(inst, "sql") {
         Parse(config, args.value(0));
-        db = QSqlDatabase::addDatabase(config.type);
-        db.setDatabaseName(config.db);
-        if (config.port) {
-            db.setPort(*config.port);
-        }
-        if (config.user) {
-            db.setUserName(*config.user);
-        }
-        if (config.pass) {
-            db.setPassword(*config.pass);
-        }
-        if (!db.open()) {
-            auto err = db.lastError();
-            throw Err("Could not open db '{}:{}' => '{}'",
-                      config.type, config.db, err.text());
+        thread = new QThread(this);
+        std::exception_ptr initException;
+        QSemaphore sema;
+        connect(thread, &QThread::started, thread, [&, this]{
+            try {
+                db = QSqlDatabase::addDatabase(config.type);
+                db.setDatabaseName(config.db);
+                if (config.port) {
+                    db.setPort(*config.port);
+                }
+                if (config.user) {
+                    db.setUserName(*config.user);
+                }
+                if (config.pass) {
+                    db.setPassword(*config.pass);
+                }
+                if (!db.open()) {
+                    auto err = db.lastError();
+                    throw Err("Could not open db '{}:{}' => '{}'",
+                              config.type, config.db, err.text());
+                }
+                context = new QObject();
+            } catch (...) {
+                initException = std::current_exception();
+            }
+            sema.release();
+        });
+        thread->start();
+        sema.acquire();
+        if (initException) {
+            std::rethrow_exception(initException);
         }
     }
     QVariant Exec(QVariantList const& args) {
@@ -49,31 +74,44 @@ public:
         }
         QString raw = args.value(0).toString();
         QVariantList binds = args.value(1).toList();
-        QSqlQuery q(db);
-        if (!q.prepare(raw)) {
-            throw Err("Could not prepare '{}' => '{}'", raw, q.lastError().text());
-        }
-        int idx = 0;
-        for (auto& a: binds) {
-            q.bindValue(idx++, std::move(a));
-        }
-        if (!q.exec()) {
-            throw Err("Could not execute '{}' => '{}'", raw, q.lastError().text());
-        }
-        QVariantList result;
-        Debug("'{}'", raw);
-        while(q.next()) {
-            QVariantList nested;
-            auto c = q.record().count();
-            nested.reserve(c);
-            for (auto i = 0; i < c; ++i) {
-                nested.push_back(q.record().value(i));
+        auto cb = args.value(2).value<LuaFunction>();
+        auto do_exec = [=]{
+            QString error;
+            QVariantList result;
+            try {
+                QSqlQuery q(db);
+                if (!q.prepare(raw)) {
+                    throw Err("Could not prepare '{}' => '{}'", raw, q.lastError().text());
+                }
+                int idx = 0;
+                for (auto& a: binds) {
+                    q.bindValue(idx++, std::move(a));
+                }
+                if (!q.exec()) {
+                    throw Err("Could not execute '{}' => '{}'", raw, q.lastError().text());
+                }
+                Debug("'{}'", raw);
+                while(q.next()) {
+                    QVariantList nested;
+                    auto c = q.record().count();
+                    nested.reserve(c);
+                    for (auto i = 0; i < c; ++i) {
+                        nested.push_back(q.record().value(i));
+                    }
+                    result.push_back(nested);
+                }
+            } catch (std::exception& e) {
+                error = e.what();
             }
-            result.push_back(nested);
-        }
-        return result;
+            QMetaObject::invokeMethod(this, [=]{
+                if (cb) cb({result, error.isEmpty() ? QVariant() : error});
+                else if (!error.isEmpty()) Error("Unhandled error in sql: {}", error);
+            });
+        };
+        QMetaObject::invokeMethod(context, do_exec);
+        return {};
     }
-    void OnMsg(QVariant const&) {
+    void OnMsg(QVariant const&) override {
         // TODO: add way to describe schema and append msgs to archive
     }
 };

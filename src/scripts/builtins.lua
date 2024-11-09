@@ -75,3 +75,10 @@ function pipe(first, ...)
     return res
 end
 
+-- Cross-version compatability
+
+unpack = unpack or table.unpack
+
+table.getn = table.getn or function (t)
+    return #t
+end

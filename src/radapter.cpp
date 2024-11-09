@@ -148,6 +148,7 @@ radapter::Instance::Instance() : d(new Impl)
     lua_register(L, "set", protect<set>);
 
     LoadEmbeddedFile("builtins");
+    LoadEmbeddedFile("async", LoadEmbedGlobal);
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
@@ -444,7 +445,6 @@ void radapter::Instance::EvalFile(fs::path path)
     if (!dir.empty()) {
         QDir::setCurrent(QString::fromUtf8(dir.u8string().c_str()));
     }
-
     auto res = lua_pcall(L, 0, 0, msgh);
     if (!dir.empty()) {
         QDir::setCurrent(wasCwd);
