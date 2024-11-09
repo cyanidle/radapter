@@ -77,3 +77,4 @@ end
 
 -- Cross-version compatability
 unpack = unpack or table.unpack
+table.unpack = table.unpack or unpack
