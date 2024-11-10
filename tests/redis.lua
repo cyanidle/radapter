@@ -33,8 +33,8 @@ each(1000, function ()
         current = count,
         lol = "%s"
     }
-    cache:Execute(fmt("SET test {}", count))
-    cache:Execute("GET test", function(res, err)
+    cache:Exec(fmt("SET test {}", count))
+    cache:Exec("GET test", function(res, err)
         log("GET Result: {}, Error: {}", res, err)
     end)
 end)

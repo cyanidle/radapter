@@ -121,9 +121,9 @@ public:
         });
     }
 
-    // 1: Execute(cmd, function (ok, err) ... end)
-    // 2: Execute(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
-    QVariant Execute(QVariantList args) {
+    // 1: Exec(cmd, function (ok, err) ... end)
+    // 2: Exec(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
+    QVariant Exec(QVariantList args) {
         QStringList rawcmd = args.value(0).toString().split(' ');
         RedisCmd cmd;
         for (auto& part: qAsConst(rawcmd)) {
@@ -315,10 +315,9 @@ public:
 }
 
 void radapter::builtin::workers::redis(Instance* inst) {
-    inst->RegisterWorker<redis::Cache>(
-        "RedisCache", {
-         {"Execute", AsExtraMethod<&redis::Cache::Execute>},
-         });
+    inst->RegisterWorker<redis::Cache>("RedisCache", {
+        {"Exec", AsExtraMethod<&redis::Cache::Exec>},
+    });
     inst->RegisterSchema("RedisCache", SchemaFor<redis::CacheConfig>);
 
     inst->RegisterWorker<redis::Stream>("RedisStream");

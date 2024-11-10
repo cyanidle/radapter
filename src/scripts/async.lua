@@ -19,10 +19,12 @@ local pong = function (func, callback)
     local pack = {co.resume(thread, ...)}
     local status = pack[1]
     local ret = pack[2]
-    assert(status, ret)
+    if not status then
+      error(debug.traceback(thread, ret, 2))
+    end
     if co.status(thread) == "dead" then
         if (callback) then 
-            (function (_, ...) callback(...) end)(table.unpack(pack))
+          (function (_, ...) callback(...) end)(table.unpack(pack))
         end
     else
       assert(type(ret) == "function", "type error :: expected func - coroutine yielded some value")

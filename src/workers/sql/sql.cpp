@@ -73,8 +73,13 @@ public:
             throw Err("Expected at least 2 arguments");
         }
         QString raw = args.value(0).toString();
-        QVariantList binds = args.value(1).toList();
-        auto cb = args.value(2).value<LuaFunction>();
+        auto secondArg = args.value(1);
+        QVariantList binds;
+        LuaFunction cb;
+        if (!(cb = secondArg.value<LuaFunction>())) {
+            binds = secondArg.toList();
+            cb = args.value(2).value<LuaFunction>();
+        }
         auto do_exec = [=]{
             QString error;
             QVariantList result;

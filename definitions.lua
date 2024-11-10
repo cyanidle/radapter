@@ -103,13 +103,26 @@ function after(timeout, callback) end
 function each(timeout, callback) end
 
 ---@class TestWorker: Worker
----@field Call fun(self: TestWorker, callback: fun(a: number, b: number, c: number))
+---@field Call fun(self: TestWorker, callback: fun(a: number, b: number, c: number)): nil
 
 ---@return TestWorker
 function TestWorker (params) end
 
 ---@class SqlWorker: Worker
----@field Exec fun(self: SqlWorker, statement: string, params: table?, callback: fun(result: any[][], error: string)?)
+SqlWorker = {}
+
+---@alias SqlCallback fun(result: any[][], error: string)
+
+---@param statement string
+---@param callback SqlCallback?
+---@return nil
+function SqlWorker:Exec(statement, callback) end
+
+---@param statement string
+---@param params table
+---@param callback SqlCallback?
+---@return nil
+function SqlWorker:Exec(statement, params, callback) end
 
 ---@return SqlWorker
 function Sql (params) end
@@ -133,12 +146,14 @@ RedisCacheWorker = {}
 
 ---@param query string
 ---@param callback fun(result: any, error: string)?
-function RedisCacheWorker:Execute(query, callback) end
+---@return nil
+function RedisCacheWorker:Exec(query, callback) end
 
 ---@param query string
 ---@param args any[]
 ---@param callback fun(result: any, error: string)?
-function RedisCacheWorker:Execute(query, args, callback) end
+---@return nil
+function RedisCacheWorker:Exec(query, args, callback) end
 
 ---@return RedisCacheWorker
 function RedisCache(params) end

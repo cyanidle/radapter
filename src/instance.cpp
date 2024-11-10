@@ -247,7 +247,7 @@ void Instance::EvalFile(fs::path path)
     }
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        throw Err("EvalFile error: {}", e);
+        throw Err("EvalFile error: \n{}", e);
     }
 }
 
@@ -263,7 +263,7 @@ void Instance::Eval(string_view code, string_view chunk)
     auto res = lua_pcall(L, 0, 0, msgh);
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        throw Err("Eval error: {}", e);
+        throw Err("Eval error: \n{}", e);
     }
 }
 
