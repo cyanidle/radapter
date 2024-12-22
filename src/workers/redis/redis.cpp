@@ -4,18 +4,20 @@
 #include "fmt/compile.h"
 #include "qtadapter.hpp"
 #include "redis_client.hpp"
+#include <QFile>
 #include <qcoreapplication.h>
+#include <set>
 
 namespace radapter::redis {
 
 struct CacheConfig : Config {
     optional<string> hash_key;
-    WithDefault<unsigned> update_rate = 500u;
+    WithDefault<bool> enable_keyevents = true;
 };
 DESCRIBE("redis::CacheConfig", CacheConfig, void) {
     PARENT(Config);
     MEMBER("hash_key", &_::hash_key);
-    MEMBER("update_rate", &_::update_rate);
+    MEMBER("enable_keyevents", &_::enable_keyevents);
 }
 
 enum StreamStart {
@@ -59,37 +61,71 @@ class Cache : public Worker
 
     CacheConfig config;
     Client* client = nullptr;
+    Client* sub_client = nullptr;
     QVariant state;
+    QString preped_hash_key;
 public:
     Cache(QVariantList args, Instance* inst) : Worker(inst, "redis")
     {
         Parse(config, args.value(0));
+        preped_hash_key = QString::fromStdString(config.hash_key.value_or(""));
         client = new Client(config, this);
+        sub_client = new Client(config, this);
         setObjectName(QString("%1_hash(%2)")
                           .arg(client->objectName())
                           .arg(config.hash_key ? config.hash_key->c_str() : "-"));
         client->setObjectName(objectName());
-        auto poller = new QTimer(this);
-        poller->callOnTimeout(this, &Cache::poll);
-        connect(client, &Client::ConnectedChanged, this, [=](bool _state){
-            if (_state && config.hash_key) {
-                poller->start(int(config.update_rate));
-            } else {
-                poller->stop();
-            }
+        sub_client->setObjectName(objectName() + "_sub");
+        connect(client, &Client::Error, this, [=](QString err){
+            Error("Error: {}", err);
         });
+        auto onConnected = [=]{
+            bool ok = client->IsConnected() && sub_client->IsConnected();
+            if (ok && config.hash_key) {
+                subscribeToHash();
+            }
+        };
+        connect(client, &Client::ConnectedChanged, this, onConnected);
+        connect(sub_client, &Client::ConnectedChanged, this, onConnected);
         client->Start();
+        sub_client->Start();
+    }
+    void subscribeToHash() {
+        client->Execute({"CONFIG", "GET", "notify-keyspace-events"})
+            .ThenSync([this](QVariant res){
+                auto modes = res.toString().toStdString();
+                std::set<char> sorted{modes.begin(), modes.end()};
+                bool missing = sorted.find('E') == sorted.end()
+                               || sorted.find('h') == sorted.end();
+                if (config.enable_keyevents && missing) {
+                    sorted.insert('E');
+                    sorted.insert('h');
+                    return client->Execute(
+                        {"CONFIG", "SET",
+                         "notify-keyspace-events",
+                         string{sorted.begin(), sorted.end()}
+                        });
+                } else {
+                    return fut::Resolved(QVariant{"OK"});
+                }
+            })
+            .ThenSync([this](QVariant res){
+                if (res != "OK") throw Err("Could not enable keyevent notifications");
+                sub_client->PSubscribe(fmt::format("__keyevent@{}__:*", config.db), [this](Client::SubEvent ev){
+                    if (ev.message != preped_hash_key) return;
+                    poll();
+                });
+            })
+            .CatchSync([this](std::exception& e){
+                Error("Could not subscribe to hash: {}", e.what());
+                sub_client->ReconnectLater();
+                client->ReconnectLater();
+            });
     }
     void poll() {
         assert(config.hash_key);
-        client->Execute({"HGETALL", *config.hash_key}, [this](QVariant resp, std::exception_ptr exc){
-            if (exc) {
-                try {
-                    std::rethrow_exception(exc);
-                } catch (std::exception& e) {
-                    Error("{}: Could not read hash {} => {}", objectName(), *config.hash_key, e.what());
-                }
-            } else {
+        client->Execute({"HGETALL", *config.hash_key})
+            .ThenSync([this](QVariant resp){
                 if (resp.type() != QVariant::List) {
                     Error("{}: error reading all keys: {}", objectName(), resp.toString());
                     return;
@@ -107,8 +143,10 @@ public:
                 if (MergePatch(state, unflat, &diff)) {
                     emit SendMsg(diff);
                 }
-            }
-        });
+            })
+            .CatchSync([this](std::exception& e) {
+                Error("{}: Could not read hash {} => {}", objectName(), *config.hash_key, e.what());
+            });
 
     }
     void OnMsg(QVariant const& msg) override {
@@ -124,21 +162,21 @@ public:
             cmd.Arg(k);
             cmd.Temp(v.toString().toStdString());
         }
-        client->Execute(cmd, [this](QVariant resp, std::exception_ptr except){
-            if (except) {
-                try {
-                    std::rethrow_exception(except);
-                } catch (std::exception& e) {
-                    Error("{}: error writing: {}", objectName(), e.what());
+        client->Execute(cmd)
+            .ThenSync([this](QVariant resp){
+                if (resp != "OK") {
+                    Error("{}: non-ok responce: {}", objectName(), resp.toString());
                 }
-            } else if (resp != "OK") {
-                Error("{}: non-ok responce: {}", objectName(), resp.toString());
-            }
-        });
+            })
+            .CatchSync([this](std::exception& e){
+                Error("{}: error writing: {}", objectName(), e.what());
+            });
     }
 
     // 1: Exec(cmd, function (ok, err) ... end)
+    // TODO: 1a: Exec(cmd) -> async thunk with (ok, err)
     // 2: Exec(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
+    // TODO: 2a: Exec(cmd, {arg1, arg2, ...}) -> async thunk with (ok, err)
     QVariant Exec(QVariantList args) {
         QStringList rawcmd = args.value(0).toString().split(' ');
         RedisCmd cmd;
@@ -153,14 +191,13 @@ public:
             }
         }
         LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
-        client->Execute(cmd, [this, cb = std::move(cb)](QVariant res, std::exception_ptr exc) mutable {
-            try {
-                if (exc) std::rethrow_exception(exc);
-                runCb(cb, true, std::move(res));
-            } catch (std::exception& e) {
+        client->Execute(cmd)
+            .ThenSync([this, MV(cb)](QVariant resp) mutable {
+                runCb(cb, true, std::move(resp));
+            })
+            .CatchSync([this, MV(cb)](std::exception& e) mutable {
                 runCb(cb, false, e.what());
-            }
-        });
+            });
         return {};
     }
 
@@ -194,34 +231,26 @@ class Stream : public Worker
     string lastIdKey;
 public:
     void saveLastId() {
-        client->Execute({"SET", lastIdKey, lastId}, [this](QVariant, std::exception_ptr exc){
-            if (exc) {
-                try {
-                    std::rethrow_exception(exc);
-                } catch (std::exception& e) {
-                    Error("{}: Could not save last id: {}", objectName(), e.what());
-                }
-            }
-        });
+        client->Execute({"SET", lastIdKey, lastId})
+            .CatchSync([this](std::exception& e) mutable {
+                Error("{}: Could not save last id: {}", objectName(), e.what());
+            });
     }
     void loadIdAndRead() {
-        client->Execute({"GET", lastIdKey}, [this](QVariant resp, std::exception_ptr exc){
-            if (exc) {
+        client->Execute({"GET", lastIdKey})
+            .AtLastSync([this](Result<QVariant> res) mutable noexcept {
                 try {
-                    std::rethrow_exception(exc);
+                    lastId = res.get().toString().toStdString();
                 } catch (std::exception& e) {
                     Error("{}: Could not get last id: {}", objectName(), e.what());
                 }
-            } else {
-                lastId = resp.toString().toStdString();
-            }
-            if (lastId.empty()) {
-                Warn("{}: empty last id!", objectName());
-                lastId = "0-0";
-            }
-            Info("{}: will start from persistent id: {}", objectName(), lastId);
-            nextRead();
-        });
+                if (lastId.empty()) {
+                    Warn("{}: empty last id!", objectName());
+                    lastId = "0-0";
+                }
+                Info("{}: will start from persistent id: {}", objectName(), lastId);
+                nextRead();
+            });
     }
     Stream(QVariantList args, Instance* inst) : Worker(inst, "redis")
     {
@@ -257,23 +286,20 @@ public:
     }
     void nextRead() {
         read_client
-            ->Execute(
-                {"XREAD",
-                 "COUNT", std::to_string(config.entries_per_read.value),
+            ->Execute({"XREAD", "COUNT", std::to_string(config.entries_per_read.value),
                  "BLOCK", std::to_string(config.block_timeout.value),
                  "STREAMS", config.stream_key, lastId,
-                 },
-                [this](QVariant resp, std::exception_ptr exc){
-                    try {
-                        if (exc) std::rethrow_exception(exc);
-                        parseReply(resp);
-                    } catch (std::exception& e) {
-                        Error("{}: error reading stream: {}", objectName(), e.what());
-                    }
+            })
+            .AtLastSync([this](Result<QVariant> resp){
+                try {
+                    parseReply(resp.get());
                     nextRead();
-                });
+                } catch (std::exception& e) {
+                    Error("{}: error reading stream: {}", objectName(), e.what());
+                }
+            });
     }
-    void parseReply(QVariant& resp) {
+    void parseReply(QVariant resp) {
         if (resp.type() != QVariant::List) {
             Error("{}: error reading stream: {}", objectName(), resp.toString());
             return;
@@ -315,15 +341,8 @@ public:
             cmd.Arg(k);
             cmd.Temp(v.toString().toStdString());
         }
-        client->Execute(cmd, [this](QVariant, std::exception_ptr exc){
-            if (exc) {
-                try {
-                    std::rethrow_exception(exc);
-                } catch (std::exception& e) {
-                    Error("{}: could not write stream: {}", objectName(), e.what());
-                    return;
-                }
-            }
+        client->Execute(cmd).CatchSync([this](std::exception& e){
+            Error("{}: could not write stream: {}", objectName(), e.what());
         });
     }
 };

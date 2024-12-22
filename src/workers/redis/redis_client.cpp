@@ -69,6 +69,7 @@ struct Client::Impl {
         auto adapter = static_cast<Client*>(context->data);
         if (status != REDIS_OK) {
             emit adapter->Error(context->errstr);
+            adapter->ReconnectLater();
         } else {
             redisAsyncCommand(adapter->ctx, Impl::dbCallback, nullptr, "SELECT %d", adapter->config.db.value);
         }
@@ -77,18 +78,23 @@ struct Client::Impl {
     static void disconnectCallback(const redisAsyncContext *context, int)
     {
         auto adapter = static_cast<Client*>(context->data);
+        adapter->ok = false;
         emit adapter->ConnectedChanged(false);
     }
 
-    static void privateCallback(redisAsyncContext* ctx, void *reply, void *data) noexcept try
+    static void privateCallback(redisAsyncContext* ctx, void *reply, void *_data) noexcept try
     {
         auto cast = static_cast<redisReply*>(reply);
-        auto cb = std::unique_ptr<Callback>(static_cast<Callback*>(data));
+        auto* data = static_cast<Data<QVariant>*>(_data);
+        auto promise = Promise<QVariant>(data);
+        // hack, todo: improve Future<> API
+        data->promises--;
+        Unref(data);
         try {
             if (!cast) throw Err("null reply");
-            (*cb)(parseReply(cast), {});
+            promise(parseReply(cast));
         } catch (std::exception& e) {
-            (*cb)({}, std::current_exception());
+            promise(std::current_exception());
         }
     } catch (std::exception& e) {
         static_cast<Worker*>(static_cast<QObject*>(ctx->data)->parent())->Error("Exception in redis callback: {}", e.what());
@@ -102,10 +108,11 @@ struct Client::Impl {
             if (!cast) throw Err("null reply");
             auto resp = parseReply(cast);
             if (resp != "OK") throw Err("Could not change db to {}", adapter->config.db.value);
+            adapter->ok = true;
             emit adapter->ConnectedChanged(true);
         } catch (std::exception& e) {
             emit adapter->Error(e.what());
-            adapter->reconnectLater();
+            adapter->ReconnectLater();
         }
     }
 
@@ -120,19 +127,32 @@ radapter::redis::Client::Client(Config _conf, Worker *parent) :
                       .arg(config.port.value));
 }
 
+Client::~Client()
+{
+    if (ctx) {
+        redisAsyncDisconnect(ctx);
+        ctx = nullptr;
+    }
+}
+
 void radapter::redis::Client::Start() {
     connect(this, &redis::Client::Error, this, [this](auto err){
         static_cast<Worker*>(parent())->Error("{}: {}", objectName(), err);
     });
-    connect(this, &redis::Client::ConnectedChanged, this, [this](bool ok){
-        if (ok) {
+    connect(this, &redis::Client::ConnectedChanged, this, [this](bool _ok){
+        if (_ok) {
             static_cast<Worker*>(parent())->Info("{}: connected", objectName());
         } else {
             static_cast<Worker*>(parent())->Warn("{}: disconnected", objectName());
-            reconnectLater();
+            ReconnectLater();
         }
     });
     doConnect();
+}
+
+bool Client::IsConnected() const
+{
+    return ok;
 }
 
 static string redisFormat(const string_view *argv, size_t argc) {
@@ -143,40 +163,78 @@ static string redisFormat(const string_view *argv, size_t argc) {
     return res;
 }
 
-void Client::Execute(const string_view *argv, size_t argc, Callback cb)
+Future<QVariant> Client::Execute(const string_view *argv, size_t argc)
 {
     if (!ctx) {
-        cb({}, std::make_exception_ptr(Err("Not connected")));
-        return;
+        return fut::Rejected<QVariant>(Err("Not connected"));
     }
     if (!argc) {
-        cb({}, std::make_exception_ptr(Err("Empty command")));
-        return;
+        return fut::Rejected<QVariant>(Err("Empty command"));
     }
     string prep;
     try {
         prep = redisFormat(argv, argc);
     } catch (std::exception& e) {
-        cb({}, std::current_exception());
-        return;
+        return fut::Rejected<QVariant>(std::current_exception());
     }
-    auto c = new Callback{std::move(cb)};
-    auto status = redisAsyncFormattedCommand(ctx, Impl::privateCallback, c, prep.c_str(), prep.size());
+    auto promise = Promise<QVariant>{};
+    auto fut = promise.GetFuture();
+    auto status = redisAsyncFormattedCommand(ctx, Impl::privateCallback, fut.PeekState(), prep.c_str(), prep.size());
     if (status != REDIS_OK) {
-        (*c)({}, std::make_exception_ptr(Err("Could not run command: {}", argv[0])));
-        delete c;
+        promise(Err("Could not run command: {} => ", argv[0], ctx->errstr));
+        ReconnectLater();
+    } else {
+        fut.PeekState()->promises++; // hack, todo: improve Future<> API
+        AddRef(fut.PeekState());
+    }
+    return fut;
+}
+
+static void subCallback(redisAsyncContext* ctx, void *reply, void *_data) noexcept
+{
+    auto adapter = static_cast<Client*>(ctx->data);
+    auto cast = static_cast<redisReply*>(reply);
+    auto* data = static_cast<Client::Subscriber*>(_data);
+    try {
+        if (!cast) throw Err("null reply");
+        auto r = parseReply(cast).toStringList();
+        if (r.size() < 3) {
+            throw Err("Invalid responce: small list?");
+        }
+        if (r[0] == "pmessage") {
+            (*data)(Client::SubEvent{std::move(r[2]), std::move(r[3])});
+        }
+    } catch (std::exception& e) {
+        emit adapter->Error(QString("PSUB: ") + e.what());
+        adapter->ReconnectLater();
+    }
+}
+
+void Client::PSubscribe(string_view glob, Subscriber _sub)
+{
+    if (!ctx) {
+        throw Err("Not connected");
+    }
+    auto* sub = new Subscriber(std::move(_sub));
+    auto status = redisAsyncCommand(ctx, subCallback, sub, "PSUBSCRIBE %s", string{glob}.c_str());
+    if (status != REDIS_OK) {
+        throw Err("Could not psubscribe to: {}", glob);
     }
 }
 
 void radapter::redis::Client::doConnect() {
     if (ctx) {
-        redisAsyncDisconnect(ctx);
+        redisAsyncFree(ctx);
+        ctx = nullptr;
     }
     if (adapter) {
         delete adapter;
+        adapter = nullptr;
     }
+    reconPending = false;
     adapter = new QtRedisAdapter{this};
     auto options = redisOptions{};
+    options.options |= REDIS_OPT_NOAUTOFREE;
     REDIS_OPTIONS_SET_TCP(&options, config.host.value.c_str(), config.port);
     ctx = redisAsyncConnectWithOptions(&options);
     ctx->data = this;
@@ -185,11 +243,13 @@ void radapter::redis::Client::doConnect() {
     redisAsyncSetDisconnectCallback(ctx, Impl::disconnectCallback);
     if (ctx->err) {
         emit Error(ctx->errstr);
-        reconnectLater();
+        ReconnectLater();
     }
 }
 
-void Client::reconnectLater()
+void Client::ReconnectLater()
 {
+    if (reconPending) return;
+    reconPending = true;
     QTimer::singleShot(int(config.reconnect_timeout), this, &Client::doConnect);
 }

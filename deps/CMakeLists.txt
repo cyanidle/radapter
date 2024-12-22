@@ -7,7 +7,7 @@ CPMAddPackage(NAME rpcxx
   GITHUB_REPOSITORY Neolant-Service/rpcxx
   GIT_SHALLOW YES
   VERSION 2.0
-  EXCLUDE_FROM_ALL
+  EXCLUDE_FROM_ALL YES
 )
 
 CPMAddPackage(NAME hiredis

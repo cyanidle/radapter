@@ -78,7 +78,11 @@ endfunction()
 
 radapter_scripts(RADAPTER_SCRIPTS)
 
-add_library(radapter-sdk STATIC ${RADAPTER_SRC} ${RADAPTER_HPP} ${RADAPTER_QRC})
+add_library(radapter-sdk STATIC
+    ${RADAPTER_SRC}
+    ${RADAPTER_HPP}
+    ${RADAPTER_QRC}
+)
 set_target_warnings(radapter-sdk PRIVATE OFF)
 target_compile_definitions(radapter-sdk PUBLIC RADAPTER_API=)
 target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info)
@@ -86,6 +90,7 @@ target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 
 target_link_libraries(radapter-sdk PRIVATE
+    rpcxx-future
     radapter-luasock)
 
 target_link_libraries(radapter-sdk PUBLIC 

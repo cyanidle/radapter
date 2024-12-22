@@ -287,4 +287,11 @@ void PopulateSchema(map<K, T>& out, QVariant& schema) {
 
 } //radapter
 
+template<typename T> struct fmt::formatter<radapter::WithDefault<T>> : fmt::formatter<T>  {
+    template<typename Ctx>
+    auto format(radapter::WithDefault<T>& s, Ctx& ctx) const {
+        return fmt::formatter<T>::format(s.value, ctx);
+    }
+};
+
 #endif //RADAPTER_CONFIG_HPP

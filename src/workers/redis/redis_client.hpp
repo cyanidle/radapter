@@ -1,5 +1,6 @@
 #pragma once
 
+#include "future/future.hpp"
 #include "radapter/radapter.hpp"
 #include <forward_list>
 
@@ -43,22 +44,34 @@ private:
     friend class Client;
 };
 
+using namespace fut;
+
 class Client : public QObject {
     Q_OBJECT
 
     Config config;
+    bool ok = false;
+    bool reconPending = false;
     QtRedisAdapter* adapter{};
     redisAsyncContext* ctx{};
 public:
-    using Callback = std::function<void(QVariant, std::exception_ptr)>;
     Client(Config conf, Worker* parent);
+    ~Client() override;
     void Start();
-    void Execute(const string_view* argv, size_t argc, Callback cb);
-    void Execute(std::initializer_list<string_view> args, Callback cb) {
-        Execute(&*args.begin(), args.size(), std::move(cb));
+    bool IsConnected() const;
+    void ReconnectLater();
+    fut::Future<QVariant> Execute(const string_view* argv, size_t argc);
+    fut::Future<QVariant> Execute(std::initializer_list<string_view> args) {
+        return Execute(&*args.begin(), args.size());
     }
-    void Execute(RedisCmd const& args, Callback cb) {
-        Execute(args.args.data(), args.args.size(), std::move(cb));
+    struct SubEvent {
+        QString channel;
+        QString message;
+    };
+    using Subscriber = std::function<void(SubEvent)>;
+    void PSubscribe(string_view glob, Subscriber sub);
+    fut::Future<QVariant> Execute(RedisCmd const& args) {
+        return Execute(args.args.data(), args.args.size());
     }
 signals:
     void Error(QString err);
@@ -66,7 +79,6 @@ signals:
 private:
     struct Impl;
     void doConnect();
-    void reconnectLater();
 };
 
 }
