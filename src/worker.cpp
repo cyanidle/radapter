@@ -1,4 +1,4 @@
-#include "worker.hpp"
+#include "radapter/worker.hpp"
 #include "instance_impl.hpp"
 #include <QPointer>
 #include "glua/glua.hpp"
@@ -29,7 +29,7 @@ struct FactoryContext {
     Factory factory;
     ExtraMethods methods;
 };
-DESCRIBE(radapter::FactoryContext)
+DESCRIBE("radapter::FactoryContext", FactoryContext, void) {}
 
 // object which represents worker inside lua
 struct WorkerImpl {
@@ -76,7 +76,7 @@ struct WorkerImpl {
         }
     }
 };
-DESCRIBE(radapter::WorkerImpl)
+DESCRIBE("radapter::WorkerImpl", WorkerImpl, void) {}
 
 static int workerFactory(lua_State* L) {
     auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));

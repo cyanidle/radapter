@@ -1,6 +1,6 @@
 #pragma once
 
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include <forward_list>
 
 class QtRedisAdapter;
@@ -14,8 +14,13 @@ struct Config {
     WithDefault<uint16_t> db = uint16_t(0);
     WithDefault<unsigned> reconnect_timeout = 1000u;
 };
-DESCRIBE(redis::Config, &_::host, &_::port, &_::db, &_::reconnect_timeout)
 
+DESCRIBE("redis::Config", Config, void) {
+    MEMBER("host", &_::host);
+    MEMBER("port", &_::port);
+    MEMBER("db", &_::db);
+    MEMBER("reconnect_timeout", &_::reconnect_timeout);
+}
 
 struct RedisCmd {
     RedisCmd() = default;

@@ -1,5 +1,5 @@
 #pragma once
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include "modbus_settings.hpp"
 #include <QModbusDevice>

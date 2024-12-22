@@ -1,5 +1,5 @@
 #pragma once
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 
 namespace glua {
 void Push(lua_State* L, QVariant const& val);

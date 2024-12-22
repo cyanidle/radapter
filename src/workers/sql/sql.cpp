@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include <QSql>
 #include <QSqlDatabase>
@@ -17,7 +17,15 @@ struct SqlConfig {
     optional<QString> pass;
     optional<uint16_t> port;
 };
-DESCRIBE(SqlConfig, &_::type, &_::db, &_::user, &_::pass, &_::port)
+
+DESCRIBE("radapter::ws::SqlConfig", SqlConfig, void) {
+    MEMBER("type", &_::type);
+    MEMBER("db", &_::db);
+    MEMBER("user", &_::user);
+    MEMBER("pass", &_::pass);
+    MEMBER("port", &_::port);
+}
+
 
 class SqlWorker final: public Worker {
     Q_OBJECT

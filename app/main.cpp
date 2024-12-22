@@ -3,7 +3,7 @@
 #include <QTimer>
 #include <QJsonDocument>
 #include <qctrlsignalhandler.h>
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "argparse/argparse.hpp"
 
 int main (int argc, char **argv) try {

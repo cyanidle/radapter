@@ -45,13 +45,13 @@ static bool compareByIndex(T const& lhs, T const& rhs) noexcept {
 }
 
 static void validateReadOnly(string_view key, Register& reg, string_view type) {
-    if (reg.mode == w || reg.mode == rw) {
+    if (reg.mode == write || reg.mode == read_write) {
         throw Err("Register {}: {} registers cannot be writable", key, type);
     }
 }
 
 static void validateSingleBit(string_view key, Register& reg, string_view type) {
-    if (reg.mode == w || reg.mode == rw) {
+    if (reg.mode == write || reg.mode == read_write) {
         throw Err("Register {}: {} registers cannot have a type (single bit only)", key, type);
     }
 }
@@ -61,7 +61,7 @@ static void validateRegisters(RegistersMap& regs) {
     for (auto& [k, v]: regs.di.value) {
         validateReadOnly(k, v, "Discrete Input");
         validateSingleBit(k, v, "Discrete Input");
-        v.mode = r;
+        v.mode = read;
         v.type = bit;
     }
     for (auto& [k, v]: regs.coils.value) {
@@ -71,7 +71,7 @@ static void validateRegisters(RegistersMap& regs) {
     for (auto& [k, v]: regs.input.value) {
         validateReadOnly(k, v, "Input");
         if (v.mode == defaultMode) {
-            v.mode = rw;
+            v.mode = read_write;
         }
         if (v.type == defaultValueType) {
             v.type = uint16;
@@ -79,7 +79,7 @@ static void validateRegisters(RegistersMap& regs) {
     }
     for (auto& [k, v]: regs.holding.value) {
         if (v.mode == defaultMode) {
-            v.mode = rw;
+            v.mode = read_write;
         }
         if (v.type == defaultValueType) {
             v.type = uint16;
@@ -90,7 +90,7 @@ static void validateRegisters(RegistersMap& regs) {
 static vector<PreparedRegister> prepareReadableSorted(SingleTypeMap const& map) {
     vector<PreparedRegister> sorted;
     for (auto& [k, reg]: map) {
-        if (reg.mode == w) {
+        if (reg.mode == write) {
             continue; //write-only register
         }
         PreparedRegister meta;
@@ -218,12 +218,12 @@ static PreparedWrites prepareWrites(RegistersMap const& map) {
     auto add = [&](SingleTypeMap const& src, QModbusDataUnit::RegisterType t) {
         regs.clear();
         for (auto& [k, r]: src) {
-            if (r.mode == RegisterMode::r) {
+            if (r.mode == RegisterMode::read) {
                 continue;
             }
             PreparedWriteRegister reg;
             reg.index = r.index;
-            reg.writeOnly = r.mode == RegisterMode::w;
+            reg.writeOnly = r.mode == RegisterMode::write;
             reg.mbType = t;
             reg.key = k;
             if (r.validator) {

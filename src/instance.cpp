@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include <QVariant>
 #include <QMap>
 #include <QTimer>
@@ -306,7 +306,7 @@ void Instance::RegisterGlobal(const char *name, const QVariant &value)
 struct ExtraHelper {
     ExtraFunction func;
 };
-DESCRIBE(radapter::ExtraHelper)
+DESCRIBE("radapter::ExtraHelper", ExtraHelper, void) {}
 
 static int wrapFunc(lua_State* L) {
     auto top = lua_gettop(L);

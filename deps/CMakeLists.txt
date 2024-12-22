@@ -1,18 +1,20 @@
-CPMAddPackage("gh:cyanidle/describe@2.0")
+CPMAddPackage("gh:cyanidle/describe@3.0")
 CPMAddPackage("gh:p-ranav/argparse@3.1")
-CPMAddPackage("gh:cyanidle/glua@1.2")
+CPMAddPackage("gh:cyanidle/glua@2.0")
+CPMAddPackage("gh:fmtlib/fmt#11.0.2")
 
-CPMAddPackage(NAME fmt
-    GITHUB_REPOSITORY fmtlib/fmt
-    GIT_SHALLOW YES
-    GIT_TAG 11.0.2
+CPMAddPackage(NAME rpcxx
+  GITHUB_REPOSITORY Neolant-Service/rpcxx
+  GIT_SHALLOW YES
+  VERSION 2.0
+  EXCLUDE_FROM_ALL
 )
 
 CPMAddPackage(NAME hiredis
   GITHUB_REPOSITORY redis/hiredis
   GIT_SHALLOW YES
   VERSION 1.2.5
-  GIT_TAG e0f4820
+  GIT_TAG 8d8703e
   OPTIONS
     "DISABLE_TESTS ON"
     "ENABLE_SSL ON"

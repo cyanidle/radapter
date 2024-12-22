@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include <QTimer>
 
@@ -9,8 +9,12 @@ struct TestConfig {
     WithDefault<int> delay = 1000;
 
 };
-DESCRIBE(TestConfig, &_::delay, &_::name)
 
+
+DESCRIBE("radapter::ws::TestConfig", TestConfig, void) {
+    MEMBER("delay", &_::delay);
+    MEMBER("name", &_::name);
+}
 
 class TestWorker : public Worker {
     Q_OBJECT

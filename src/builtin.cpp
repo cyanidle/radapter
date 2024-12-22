@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "utils.hpp"
 #include <fmt/args.h>
 #include <QTimer>
@@ -306,7 +306,8 @@ static void pushQStr(lua_State* L, QString const& str) {
     lua_pushlstring(L, std.data(), std.size());
 }
 
-DESCRIBE(QPointer<QObject>)
+using QObjPtr = QPointer<QObject>;
+DESCRIBE("_radapter::QObjPtr", QObjPtr, void) {}
 
 void glua::Push(lua_State* L, QVariant const& val) {
     auto t = val.type();

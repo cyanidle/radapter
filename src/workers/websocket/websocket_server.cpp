@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include <QJsonDocument>
 #include <QWebSocketServer>
@@ -48,8 +48,16 @@ struct ServerConfig {
     WithDefault<string> cert_file = "";
     WithDefault<string> key_file = "";
 };
-DESCRIBE(ServerConfig, &_::host, &_::port, &_::name,
-         &_::refresh_timeout, &_::print_msgs, &_::cert_file, &_::key_file)
+
+DESCRIBE("radapter::ws::ServerConfig", ServerConfig, void) {
+    MEMBER("host", &_::host);
+    MEMBER("port", &_::port);
+    MEMBER("name", &_::name);
+    MEMBER("refresh_timeout", &_::refresh_timeout);
+    MEMBER("print_msgs", &_::print_msgs);
+    MEMBER("cert_file", &_::cert_file);
+    MEMBER("key_fil", &_::key_file);
+}
 
 class Server : public Worker {
     Q_OBJECT
@@ -130,8 +138,8 @@ public:
         auto var = json.toVariant();
         emit SendMsg(var);
     }
-    void broadcast(QVariant const& state) {
-        auto toSend = QString::fromUtf8(QJsonDocument::fromVariant(state).toJson());
+    void broadcast(QVariant const& _state) {
+        auto toSend = QString::fromUtf8(QJsonDocument::fromVariant(_state).toJson());
         if (config.print_msgs) {
             Debug("{} ==> {}", objectName(), toSend);
         }

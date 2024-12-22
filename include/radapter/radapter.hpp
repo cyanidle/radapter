@@ -5,9 +5,9 @@
 #include <QObject>
 #include <QMap>
 #include <QVariant>
-#include "config.hpp"
+#include "radapter/config.hpp"
 #include "logs.hpp"
-#include "worker.hpp"
+#include "radapter/worker.hpp"
 #include "glua/glua.hpp"
 
 struct lua_State;

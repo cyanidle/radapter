@@ -7,6 +7,12 @@
 
 namespace radapter {
 
+#define _RADAPTER_ENUM(cls, name, ...) \
+enum cls name {}
+
+#define RADAPTER_ENUM_CLASS(name, ...) _RADAPTER_ENUM(class, name, ##__VA_ARGS__)
+#define RADAPTER_ENUM(name, ...) _RADAPTER_ENUM(, name, ##__VA_ARGS__)
+
 enum LogLevel {
     debug = 0,
     info,
@@ -15,7 +21,13 @@ enum LogLevel {
     disabled,
 };
 
-DESCRIBE(radapter::LogLevel, debug, info, warn, error, disabled)
+DESCRIBE("radapter::LogLevel", LogLevel, void) {
+    MEMBER("debug", debug);
+    MEMBER("info", info);
+    MEMBER("warn", warn);
+    MEMBER("error", error);
+    MEMBER("disabled", disabled);
+}
 
 namespace detail {
 std::runtime_error doErr(fmt::string_view fmt, fmt::format_args args);

@@ -1,7 +1,7 @@
 #ifndef RADAPTER_LUA_FUNC_HPP
 #define RADAPTER_LUA_FUNC_HPP
 
-#include "common.hpp"
+#include "radapter/common.hpp"
 #include <QVariantList>
 
 struct lua_State;

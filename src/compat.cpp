@@ -1,5 +1,5 @@
 #include "builtin.hpp"
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "glua/glua.hpp"
 
 using namespace radapter;

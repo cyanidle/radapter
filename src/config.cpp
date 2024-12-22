@@ -1,4 +1,4 @@
-#include "config.hpp"
+#include "radapter/config.hpp"
 
 void radapter::Parse(bool &out, const QVariant &conf, TraceFrame const& frame) {
     CheckCanConvert<bool>(conf, frame);

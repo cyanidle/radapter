@@ -2,7 +2,7 @@
 #define RADAPTER_WORKER_H
 
 #include "logs.hpp"
-#include "config.hpp"
+#include "radapter/config.hpp"
 
 struct lua_State;
 

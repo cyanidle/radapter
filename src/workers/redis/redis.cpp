@@ -1,4 +1,4 @@
-#include "radapter.hpp"
+#include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include <QTimer>
 #include "fmt/compile.h"
@@ -12,14 +12,22 @@ struct CacheConfig : Config {
     optional<string> hash_key;
     WithDefault<unsigned> update_rate = 500u;
 };
-DESCRIBE_INHERIT(Config, redis::CacheConfig, &_::hash_key, &_::update_rate)
+DESCRIBE("redis::CacheConfig", CacheConfig, void) {
+    PARENT(Config);
+    MEMBER("hash_key", &_::hash_key);
+    MEMBER("update_rate", &_::update_rate);
+}
 
 enum StreamStart {
     persistent_id,
     top,
     start,
 };
-DESCRIBE(StreamStart, persistent_id, top, start)
+DESCRIBE("redis::StreamStart", StreamStart, void) {
+    MEMBER("persistent_id", persistent_id);
+    MEMBER("top", top);
+    MEMBER("start", start);
+}
 
 struct StreamConfig : Config {
     string stream_key;
@@ -32,10 +40,18 @@ struct StreamConfig : Config {
     WithDefault<string> instance_id = "_";
     WithDefault<string> persistent_prefix = "__radapter";
 };
-DESCRIBE_INHERIT(Config, redis::StreamConfig,
-                 &_::stream_key, &_::start_from, &_::stream_size,
-                 &_::block_timeout, &_::entries_per_read,
-                 &_::read_enabled, &_::write_enabled, &_::instance_id)
+DESCRIBE("redis::StreamConfig", StreamConfig, void) {
+    PARENT(Config);
+    MEMBER("stream_key", &_::stream_key);
+    MEMBER("start_from", &_::start_from);
+    MEMBER("stream_size", &_::stream_size);
+    MEMBER("block_timeout", &_::block_timeout);
+    MEMBER("entries_per_read", &_::entries_per_read);
+    MEMBER("read_enabled", &_::read_enabled);
+    MEMBER("write_enabled", &_::write_enabled);
+    MEMBER("instance_id", &_::instance_id);
+    MEMBER("persistent_prefix", &_::persistent_prefix);
+}
 
 class Cache : public Worker
 {
@@ -55,8 +71,8 @@ public:
         client->setObjectName(objectName());
         auto poller = new QTimer(this);
         poller->callOnTimeout(this, &Cache::poll);
-        connect(client, &Client::ConnectedChanged, this, [=](bool state){
-            if (state && config.hash_key) {
+        connect(client, &Client::ConnectedChanged, this, [=](bool _state){
+            if (_state && config.hash_key) {
                 poller->start(int(config.update_rate));
             } else {
                 poller->stop();
