@@ -7,6 +7,7 @@
 #include <QFile>
 #include <qcoreapplication.h>
 #include <set>
+#include "async_helpers.hpp"
 
 namespace radapter::redis {
 
@@ -173,9 +174,9 @@ public:
             });
     }
 
-    // 1: Exec(cmd, function (ok, err) ... end)
+    // 1: Exec(cmd, function (ok, err) ... end) -> nil
     // 1a: Exec(cmd) -> async thunk with (ok, err)
-    // 2: Exec(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
+    // 2: Exec(cmd, {arg1, arg2, ...}, function (ok, err) ... end) -> nil
     // 2a: Exec(cmd, {arg1, arg2, ...}) -> async thunk with (ok, err)
     QVariant Exec(QVariantList args) {
         QStringList rawcmd = args.value(0).toString().split(' ');
@@ -192,34 +193,13 @@ public:
         }
         auto future = client->Execute(cmd);
         if (args.size() == funcIdx) {
-            return MakeFunction([this, _state = future.TakeState()](Instance*, QVariantList args) mutable -> QVariant {
-                auto cb = args.value(0).value<LuaFunction>();
-                if (!cb) {
-                    throw Err("Expected function as single argument");
-                }
-                auto fut = Future(_state);
-                runCb(fut, cb);
-                return {};
-            });
+            //async signature
+            return makeLuaPromise(this, future);
         } else {
             LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
-            runCb(future, cb);
+            resolveLuaCallback(this, future, cb);
             return {};
         }
-    }
-
-    void runCb(Future<QVariant>& fut, LuaFunction& func) {
-        fut.AtLastSync([this, cb = std::move(func)](Result<QVariant> res) mutable {
-            try {
-                try {
-                    cb({res.get(), QVariant()});
-                } catch (std::exception& e) {
-                    cb({QVariant(), e.what()});
-                }
-            } catch (std::exception& e) {
-                Error("Error in callback: {}", e.what());
-            }
-        });
     }
 };
 

@@ -114,15 +114,24 @@ SqlWorker = {}
 ---@alias SqlCallback fun(result: any[][], error: string)
 
 ---@param statement string
----@param callback SqlCallback?
+---@param callback SqlCallback
 ---@return nil
 function SqlWorker:Exec(statement, callback) end
 
 ---@param statement string
 ---@param params table
----@param callback SqlCallback?
+---@param callback SqlCallback
 ---@return nil
 function SqlWorker:Exec(statement, params, callback) end
+
+---@param statement string
+---@return fun(defer: SqlCallback)
+function SqlWorker:Exec(statement) end
+
+---@param statement string
+---@param params table
+---@return fun(defer: SqlCallback)
+function SqlWorker:Exec(statement, params) end
 
 ---@return SqlWorker
 function Sql (params) end
@@ -144,23 +153,25 @@ function RtuModbusDevice (params) end
 ---@class RedisCacheWorker: Worker
 RedisCacheWorker = {}
 
+---@alias RedisCallback fun(result: any, error: string)
+
 ---@param query string
----@return fun(defer: fun(result: any, error: string))
+---@return fun(defer: RedisCallback)
 function RedisCacheWorker:Exec(query) end
 
 ---@param query string
----@param callback fun(result: any, error: string)
+---@param callback RedisCallback
 ---@return nil
 function RedisCacheWorker:Exec(query, callback) end
 
 ---@param query string
 ---@param args any[]
----@return fun(defer: fun(result: any, error: string))
+---@return fun(defer: RedisCallback)
 function RedisCacheWorker:Exec(query, args) end
 
 ---@param query string
 ---@param args any[]
----@param callback fun(result: any, error: string)
+---@param callback RedisCallback
 ---@return nil
 function RedisCacheWorker:Exec(query, args, callback) end
 

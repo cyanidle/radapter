@@ -1,3 +1,5 @@
+local a = async
+
 local sql = Sql {
     type = "QSQLITE",
     db = "test.sqlite",
@@ -22,8 +24,11 @@ each(1000, function ()
     id = id + 1
 end)
 
-each(1000, function ()
+each(1000, a.sync(function ()
     sql:Exec("SELECT * FROM users", function(rows, err)
         log("SELECT: {}", rows)
     end)
-end)
+    local rows, err = a.wait(sql:Exec("SELECT * FROM users LIMIT 1"));
+    log("Async select 1: res {}, err {}", rows, err)
+    log("Async select 1 (err): res {}, err {}", a.wait(sql:Exec("SLECT * FROM users LIMIT 1")))
+end))
