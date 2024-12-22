@@ -1,3 +1,5 @@
+local a = async
+
 local cache = RedisCache {
     hash_key = "value"
 }
@@ -27,7 +29,7 @@ pipe(stream, unwrap("wrapped!"), function(msg)
 end)
 
 local count = 0
-each(1000, function ()
+each(1000, a.sync(function()
     count = count + 1
     cache {
         current = count,
@@ -35,9 +37,12 @@ each(1000, function ()
     }
     cache:Exec(fmt("SET test {}", count))
     cache:Exec("GET test", function(res, err)
-        log("GET Result: {}, Error: {}", res, err)
+        log("callback version: Result: {}, Error: {}", res, err)
     end)
-end)
+    local res, err = a.wait(cache:Exec("GET test"));
+    log("async version: GET Result: {}, Error: {}", res, err)
+    log("async version (err): GET Result: {}, Error: {}", a.wait(cache:Exec("asdGET test")))
+end))
 
 
 

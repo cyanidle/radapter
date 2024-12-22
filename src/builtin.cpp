@@ -309,6 +309,25 @@ static void pushQStr(lua_State* L, QString const& str) {
 using QObjPtr = QPointer<QObject>;
 DESCRIBE("_radapter::QObjPtr", QObjPtr, void) {}
 
+
+struct ExtraHelper {
+    ExtraFunction func;
+};
+DESCRIBE("radapter::ExtraHelper", ExtraHelper, void) {}
+
+static int wrapFunc(lua_State* L) {
+    auto top = lua_gettop(L);
+    auto args = QVariantList();
+    args.reserve(top);
+    for (auto i = 1; i <= top; ++i) {
+        lua_pushvalue(L, i);
+        args.push_back(builtin::help::toQVar(L));
+        lua_pop(L, 1);
+    }
+    glua::Push(L, glua::CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
+    return 1;
+}
+
 void glua::Push(lua_State* L, QVariant const& val) {
     auto t = val.type();
     switch (int(t)) {
@@ -389,6 +408,9 @@ void glua::Push(lua_State* L, QVariant const& val) {
     default:
         if (auto f = val.value<LuaFunction>()) {
             lua_rawgeti(f._L, LUA_REGISTRYINDEX, f._ref);
+        } else if (auto cf = val.value<ExtraFunction>()) {
+            glua::Push(L, ExtraHelper{std::move(cf)});
+            lua_pushcclosure(L, glua::protect<wrapFunc>, 1);
         } else if (auto q = val.value<QObject*>()) {
             glua::Push(L, QPointer<QObject>{q});
         } else {

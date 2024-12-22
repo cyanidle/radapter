@@ -303,28 +303,15 @@ void Instance::RegisterGlobal(const char *name, const QVariant &value)
     lua_setglobal(L, name);
 }
 
-struct ExtraHelper {
-    ExtraFunction func;
-};
-DESCRIBE("radapter::ExtraHelper", ExtraHelper, void) {}
 
-static int wrapFunc(lua_State* L) {
-    auto top = lua_gettop(L);
-    auto args = QVariantList();
-    args.reserve(top);
-    for (auto i = 1; i <= top; ++i) {
-        lua_pushvalue(L, i);
-        args.push_back(builtin::help::toQVar(L));
-        lua_pop(L, 1);
-    }
-    glua::Push(L, glua::CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
-    return 1;
+QVariant MakeFunction(ExtraFunction func) {
+    return QVariant::fromValue(std::move(func));
 }
 
 void Instance::RegisterFunc(const char *name, ExtraFunction func)
 {
-    glua::Push(d->L, ExtraHelper{std::move(func)});
-    lua_pushcclosure(d->L, glua::protect<wrapFunc>, 1);
+    glua::Push(d->L, MakeFunction(std::move(func)));
     lua_setglobal(d->L, name);
 }
+
 }

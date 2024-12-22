@@ -174,9 +174,9 @@ public:
     }
 
     // 1: Exec(cmd, function (ok, err) ... end)
-    // TODO: 1a: Exec(cmd) -> async thunk with (ok, err)
+    // 1a: Exec(cmd) -> async thunk with (ok, err)
     // 2: Exec(cmd, {arg1, arg2, ...}, function (ok, err) ... end)
-    // TODO: 2a: Exec(cmd, {arg1, arg2, ...}) -> async thunk with (ok, err)
+    // 2a: Exec(cmd, {arg1, arg2, ...}) -> async thunk with (ok, err)
     QVariant Exec(QVariantList args) {
         QStringList rawcmd = args.value(0).toString().split(' ');
         RedisCmd cmd;
@@ -190,32 +190,36 @@ public:
                 cmd.Temp(arg.toString().toStdString());
             }
         }
-        LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
-        client->Execute(cmd)
-            .ThenSync([this, MV(cb)](QVariant resp) mutable {
-                runCb(cb, true, std::move(resp));
-            })
-            .CatchSync([this, MV(cb)](std::exception& e) mutable {
-                runCb(cb, false, e.what());
+        auto future = client->Execute(cmd);
+        if (args.size() == funcIdx) {
+            return MakeFunction([this, _state = future.TakeState()](Instance*, QVariantList args) mutable -> QVariant {
+                auto cb = args.value(0).value<LuaFunction>();
+                if (!cb) {
+                    throw Err("Expected function as single argument");
+                }
+                auto fut = Future(_state);
+                runCb(fut, cb);
+                return {};
             });
-        return {};
+        } else {
+            LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
+            runCb(future, cb);
+            return {};
+        }
     }
 
-    void runCb(LuaFunction& func, bool ok, QVariant result) {
-        if (!func) {
-            if (!ok) {
-                Error("Unhandled error: {}", result.toString());
+    void runCb(Future<QVariant>& fut, LuaFunction& func) {
+        fut.AtLastSync([this, cb = std::move(func)](Result<QVariant> res) mutable {
+            try {
+                try {
+                    cb({res.get(), QVariant()});
+                } catch (std::exception& e) {
+                    cb({QVariant(), e.what()});
+                }
+            } catch (std::exception& e) {
+                Error("Error in callback: {}", e.what());
             }
-            return;
-        }
-        auto args = ok
-                        ? QVariantList{std::move(result), {}}
-                        : QVariantList{{}, std::move(result)};
-        try {
-            func(args);
-        } catch (std::exception& e) {
-            Error("Error in callback: {}", e.what());
-        }
+        });
     }
 };
 

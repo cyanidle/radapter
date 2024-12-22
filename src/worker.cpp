@@ -16,6 +16,11 @@ void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
     _Inst->Log(lvl, _category, fmt, args);
 }
 
+lua_State *Worker::LuaState() const
+{
+    return _Inst->LuaState();
+}
+
 void Worker::Shutdown() {
     emit ShutdownDone();
 }

@@ -2,6 +2,7 @@
 #define RADAPTER_LUA_FUNC_HPP
 
 #include "radapter/common.hpp"
+#include <functional>
 #include <QVariantList>
 
 struct lua_State;
@@ -9,6 +10,7 @@ struct lua_State;
 namespace radapter
 {
 
+class Instance;
 
 struct LuaFunction {
     LuaFunction();
@@ -42,9 +44,13 @@ struct LuaFunction {
     int _ref;
 };
 
+using ExtraFunction = std::function<QVariant(Instance*, QVariantList const&)>;
+
 }
 
 Q_DECLARE_METATYPE(radapter::LuaFunction)
 Q_DECLARE_TYPEINFO(radapter::LuaFunction, Q_MOVABLE_TYPE);
+Q_DECLARE_METATYPE(radapter::ExtraFunction)
+Q_DECLARE_TYPEINFO(radapter::ExtraFunction, Q_MOVABLE_TYPE);
 
 #endif //RADAPTER_LUA_FUNC_HPP

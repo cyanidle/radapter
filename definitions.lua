@@ -145,13 +145,22 @@ function RtuModbusDevice (params) end
 RedisCacheWorker = {}
 
 ---@param query string
----@param callback fun(result: any, error: string)?
+---@return fun(defer: fun(result: any, error: string))
+function RedisCacheWorker:Exec(query) end
+
+---@param query string
+---@param callback fun(result: any, error: string)
 ---@return nil
 function RedisCacheWorker:Exec(query, callback) end
 
 ---@param query string
 ---@param args any[]
----@param callback fun(result: any, error: string)?
+---@return fun(defer: fun(result: any, error: string))
+function RedisCacheWorker:Exec(query, args) end
+
+---@param query string
+---@param args any[]
+---@param callback fun(result: any, error: string)
 ---@return nil
 function RedisCacheWorker:Exec(query, args, callback) end
 

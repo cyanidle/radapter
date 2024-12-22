@@ -33,6 +33,7 @@ public:
     void Error(fmt::format_string<Args...> fmt, Args&&...a) {
         Log(error, fmt, fmt::make_format_args(a...));
     }
+    lua_State* LuaState() const;
     virtual void OnMsg(QVariant const& msg) = 0;
     virtual void Shutdown();
     virtual ~Worker();

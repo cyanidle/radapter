@@ -42,7 +42,6 @@ class Instance;
 using Factory = Worker*(*)(QVariantList const&, Instance*);
 using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
 using ExtraMethods = QMap<QString, ExtraMethod>;
-using ExtraFunction = std::function<QVariant(Instance*, QVariantList const&)>;
 using ExtraSchema = QVariant(*)();
 
 template<typename T>
@@ -62,6 +61,8 @@ QVariant AsExtraMethod(Worker* w, QVariantList const& args) {
     using cls = decltype(detail::getcls(f));
     return (static_cast<cls>(w)->*f)(args);
 }
+
+QVariant MakeFunction(ExtraFunction func);
 
 class Instance : public QObject
 {
