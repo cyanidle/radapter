@@ -4,3 +4,6 @@ GIT_COMMIT
 *.user
 .vscode
 .vs
+CMakeSettings.json
+CMakeUserPresets.json
+out/

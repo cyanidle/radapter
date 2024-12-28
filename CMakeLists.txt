@@ -33,7 +33,7 @@ if (UNIX)
 elseif(WIN32)
     target_sources(qctrl PRIVATE deps/qctrlsignals/qctrlsignalhandler_win.cpp)
 endif()
-target_link_libraries(qctrl PRIVATE Qt::Core)
+target_link_libraries(qctrl PRIVATE Qt5::Core)
 target_compile_definitions(qctrl PUBLIC Q_CTRL_SIGNALS_EXPORT=)
 
 get_build_identity(RADAPTER)
@@ -94,12 +94,12 @@ target_link_libraries(radapter-sdk PRIVATE
     radapter-luasock)
 
 target_link_libraries(radapter-sdk PUBLIC 
-    Qt::Core
-    Qt::SerialPort
-    Qt::SerialBus
-    Qt::Sql
-    Qt::WebSockets
-    Qt::Network
+    Qt5::Core
+    Qt5::SerialPort
+    Qt5::SerialBus
+    Qt5::Sql
+    Qt5::WebSockets
+    Qt5::Network
     radapter-lua
     glua
     describe

@@ -58,7 +58,10 @@ else()
       target_compile_definitions(radapter-lua PRIVATE LUA_USE_POSIX)
   endif()
   add_executable(radapter-luac EXCLUDE_FROM_ALL ${lua_SOURCE_DIR}/src/luac.c)
-  target_link_libraries(radapter-luac PRIVATE radapter-lua m)
+  if (UNIX)
+    target_link_libraries(radapter-luac PRIVATE m)
+  endif()
+  target_link_libraries(radapter-luac PRIVATE radapter-lua)
 endif()
 
 
