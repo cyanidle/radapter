@@ -8,6 +8,7 @@
 #include <QGridLayout>
 #include <QPointer>
 #include "builtin.hpp"
+#include <QQuickView>
 
 using namespace radapter;
 
@@ -128,6 +129,7 @@ void gui(Instance* inst)
 	});
 	lua_createtable(L, 0, 0);
 	registerClassT<QMainWindow>(L);
+	registerClassT<QQuickView>(L);
 	lua_setglobal(L, "gui");
 }
 

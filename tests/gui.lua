@@ -1,4 +1,8 @@
-local w = gui.QMainWindow()
+local window = gui.QMainWindow()
 
-w:show()
-w:setWindowTitle("Привет из радаптера!")
+local view = gui.QQuickView(window) --TODO: pass arguments to ctor, to embed view into window
+
+view:setSource("./test.qml")
+
+view:show()
+window:show()
