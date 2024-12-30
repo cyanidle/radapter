@@ -94,12 +94,6 @@ Instance::Instance() : d(new Impl)
     }
 }
 
-#if defined(RADAPTER_JIT) || defined(CMAKE_CROSSCOMPILING)
-const auto loadmode = "t";
-#else
-const auto loadmode = "b";
-#endif
-
 static string load_builtin(QString name) {
     QFile f(name);
     if (!f.open(QIODevice::ReadOnly)) {
@@ -113,7 +107,7 @@ static string load_builtin(QString name) {
 static void load_mod(lua_State* L, const char* name, string_view src) {
     lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
-    auto status = luaL_loadbufferx(L, src.data(), src.size(), name, loadmode);
+    auto status = luaL_loadbufferx(L, src.data(), src.size(), name, radapter::JIT || radapter::Cross ? "t" : "b");
     if (status != LUA_OK) {
         throw Err("Could not compile {}: {}", name, builtin::help::toSV(L));
     }

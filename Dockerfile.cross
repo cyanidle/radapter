@@ -43,6 +43,7 @@ RUN set -eux; \
     cmake \
         -D CMAKE_SYSROOT=/sysroot \
         -D CMAKE_SYSTEM_NAME=Linux \
+        -D RADAPTER_GUI=OFF \
         -D CMAKE_FIND_ROOT_PATH=/sysroot \
         -D CMAKE_C_COMPILER=${tool_prefix}gcc \
         -D CMAKE_CXX_COMPILER=${tool_prefix}g++ \

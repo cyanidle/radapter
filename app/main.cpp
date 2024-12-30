@@ -6,11 +6,15 @@
 #include "radapter/radapter.hpp"
 #include "argparse/argparse.hpp"
 
+#ifdef RADAPTER_GUI
+#include <QApplication>
+#endif
+
 int main (int argc, char **argv) try {
-    QCoreApplication app(argc, argv);
+    std::unique_ptr<QCoreApplication> app{ new QCoreApplication(argc, argv) };
     radapter::Instance inst;
     std::vector<std::string> args;
-    for (auto a: app.arguments()) {
+    for (auto a: app->arguments()) {
         args.push_back(a.toStdString());
     }
 
@@ -37,6 +41,11 @@ int main (int argc, char **argv) try {
         .append()
         .store_into(exprs)
         .help("Execute expressions from cli");
+    if constexpr (radapter::GUI) {
+        cli.add_argument("--gui")
+            .flag()
+            .help("Enable native gui mode");
+    }
     cli.add_argument("--schema")
         .flag()
         .help("Print config schema");
@@ -66,6 +75,12 @@ int main (int argc, char **argv) try {
         return 1;
     }
 
+    if constexpr (radapter::GUI) {
+        if (cli["gui"] == true) {
+            app.reset(new QApplication(argc, argv));
+        }
+    }
+
     if (cli["schema"] == true) {
         std::cerr << QJsonDocument::fromVariant(inst.GetSchemas()).toJson().toStdString() << std::endl;
         return 0;
@@ -74,8 +89,8 @@ int main (int argc, char **argv) try {
     auto sigs = QCtrlSignalHandler::instance();
     sigs->registerForSignal(QCtrlSignalHandler::SigInt);
     sigs->registerForSignal(QCtrlSignalHandler::SigTerm);
-    app.connect(sigs, &QCtrlSignalHandler::ctrlSignal, &inst, &radapter::Instance::Shutdown);
-    app.connect(&inst, &radapter::Instance::ShutdownDone, &app, &QCoreApplication::quit);
+    app->connect(sigs, &QCtrlSignalHandler::ctrlSignal, &inst, &radapter::Instance::Shutdown);
+    app->connect(&inst, &radapter::Instance::ShutdownDone, app.get(), &QCoreApplication::quit);
 
     inst.RegisterGlobal("args", lua_args);
 
@@ -98,7 +113,7 @@ int main (int argc, char **argv) try {
         inst.EvalFile(radapter::fs::u8path(*f));
     }
 
-    return app.exec();
+    return app->exec();
 } catch (std::exception& exc) {
     std::cerr << "Critical: " << exc.what() << std::endl;
     return 1;

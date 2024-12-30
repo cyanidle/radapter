@@ -13,6 +13,7 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
+option(RADAPTER_GUI "Enable GUI capabilities" ON)
 # RADAPTER_EXTRA_SCRIPTS may be a list of extra embedded scripts directories
 
 set(RADAPTER_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
@@ -22,6 +23,11 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
+
+if (RADAPTER_GUI)
+    find_package(Qt5 REQUIRED COMPONENTS Gui Widgets Qml Quick)
+endif()
+
 add_subdirectory(deps)
 
 set(CMAKE_AUTOMOC ON)
@@ -104,6 +110,10 @@ target_link_libraries(radapter-sdk PUBLIC
     glua
     describe
     fmt)
+    
+if (RADAPTER_GUI)
+    target_link_libraries(radapter-sdk PUBLIC Qt5::Gui Qt5::Widgets Qt5::Qml Qt5::Quick)
+endif()
 
 add_executable(radapter ./app/main.cpp)
 target_link_libraries(radapter PRIVATE

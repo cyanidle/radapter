@@ -6,10 +6,25 @@ namespace radapter
 {
 
 #cmakedefine CMAKE_CROSSCOMPILING
+#cmakedefine RADAPTER_JIT
+#cmakedefine RADAPTER_GUI
+
 constexpr int VerMajor = @RADAPTER_VERSION_MAJOR@;
 constexpr int VerMinor = @RADAPTER_VERSION_MINOR@;
+constexpr bool Cross = 
+#ifdef CMAKE_CROSSCOMPILING
+    true;
+#else
+    false;
+#endif
 constexpr bool JIT = 
 #ifdef RADAPTER_JIT
+    true;
+#else
+    false;
+#endif
+constexpr bool GUI = 
+#ifdef RADAPTER_GUI
     true;
 #else
     false;
