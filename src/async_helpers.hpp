@@ -26,11 +26,7 @@ void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
             }
         }
         try {
-            try {
-                cb(std::move(args));
-            } catch (std::exception& e) {
-                cb(std::move(args));
-            }
+            cb(std::move(args));
         } catch (std::exception& e) {
             worker->Error("Error in callback: {}", e.what());
         }

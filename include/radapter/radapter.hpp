@@ -74,6 +74,8 @@ public:
 
     void RegisterGlobal(const char* name, QVariant const& value);
     void RegisterFunc(const char* name, ExtraFunction func);
+    
+    void EnableGui();
 
     void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
     template<typename T, if_valid_worker<T> = 1>

@@ -46,7 +46,13 @@ get_build_identity(RADAPTER)
 configure_file(include/radapter_info.hpp.in ${CMAKE_BINARY_DIR}/_info/radapter_info.hpp)
 
 file(GLOB_RECURSE RADAPTER_SRC CONFIGURE_DEPENDS src/*.cpp)
-file(GLOB_RECURSE RADAPTER_HPP CONFIGURE_DEPENDS src/*.h src/*.hpp include/*.hpp)
+file(GLOB_RECURSE RADAPTER_HEADERS CONFIGURE_DEPENDS src/*.h src/*.hpp include/*.hpp)
+
+if (NOT RADAPTER_GUI)
+    list(FILTER RADAPTER_SRC EXCLUDE REGEX src/gui/)
+    list(FILTER RADAPTER_HEADERS EXCLUDE REGEX src/gui/)
+endif()
+
 list(TRANSFORM RADAPTER_EXTRA_SCRIPTS APPEND /*.lua)
 file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua ${RADAPTER_EXTRA_SCRIPTS})
 
@@ -86,7 +92,8 @@ radapter_scripts(RADAPTER_SCRIPTS)
 
 add_library(radapter-sdk STATIC
     ${RADAPTER_SRC}
-    ${RADAPTER_HPP}
+    ${RADAPTER_TOPLEVEL_SRC}
+    ${RADAPTER_HEADERS}
     ${RADAPTER_QRC}
 )
 set_target_warnings(radapter-sdk PRIVATE OFF)

@@ -21,6 +21,14 @@ static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
     Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
 }
 
+void Instance::EnableGui() {
+    if constexpr (GUI) {
+        builtin::gui(this);
+    } else {
+        throw Err("GUI support was not enabled during build");
+    }
+}
+
 Instance::Instance() : d(new Impl)
 {
     init_qrc();

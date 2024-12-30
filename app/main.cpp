@@ -77,7 +77,9 @@ int main (int argc, char **argv) try {
 
     if constexpr (radapter::GUI) {
         if (cli["gui"] == true) {
+            app = nullptr;
             app.reset(new QApplication(argc, argv));
+            inst.EnableGui();
         }
     }
 

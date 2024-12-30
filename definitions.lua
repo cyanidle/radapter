@@ -183,3 +183,6 @@ function RedisStream(params) end
 
 ---@return Worker
 function WebsocketServer(params) end
+
+---@type any
+gui = {}
