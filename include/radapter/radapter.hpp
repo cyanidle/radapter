@@ -36,7 +36,10 @@ template<typename Cls, typename T> Cls* getcls(QVariant(Cls::*)(T));
 }
 
 template<typename T>
-using if_valid_worker = std::enable_if_t<std::is_base_of_v<Worker, T>, int>;
+using if_valid_worker = std::enable_if_t<
+    std::is_constructible_v<T, QVariantList, Instance*>
+    && std::is_base_of_v<Worker, T>, 
+    int>;
 
 class Instance;
 using Factory = Worker*(*)(QVariantList const&, Instance*);
@@ -78,9 +81,9 @@ public:
     void EnableGui();
 
     void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+
     template<typename T, if_valid_worker<T> = 1>
     void RegisterWorker(const char* name, ExtraMethods const& extra = {}) {
-        static_assert(std::is_base_of_v<Worker, T>);
         RegisterWorker(name, FactoryFor<T>, extra);
     }
 

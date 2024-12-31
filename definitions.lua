@@ -149,6 +149,11 @@ function TcpModbusDevice (params) end
 ---@return ModbusDevice
 function RtuModbusDevice (params) end
 
+---@class QmlWorker: Worker
+QmlWorker = {}
+
+---@return QmlWorker
+function Qml(params) end;
 
 ---@class RedisCacheWorker: Worker
 RedisCacheWorker = {}
@@ -186,3 +191,12 @@ function WebsocketServer(params) end
 
 ---@type any
 gui = {}
+
+---@class TempFileObject
+TempFileObject = {}
+
+---@return string
+function TempFileObject:url() end;
+
+---@return TempFileObject
+function temp_file(data) end;

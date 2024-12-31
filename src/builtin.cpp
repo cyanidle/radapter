@@ -5,6 +5,7 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QTemporaryFile>
 #include "QPointer"
 #include "builtin.hpp"
 #include "glua/glua.hpp"
@@ -248,6 +249,37 @@ int builtin::api::Each(lua_State* L) {
 
 int builtin::api::After(lua_State* L) {
     return timer(L, true);
+}
+
+struct TempFileObject {
+    std::shared_ptr<QTemporaryFile> _file;
+    std::string _url;
+
+    TempFileObject() {
+        _file = std::make_shared<QTemporaryFile>();
+        if (!_file->open()) {
+            throw Err("Could not open temp file: {}", _file->errorString());
+        }
+        _url = "file:///" + _file->fileName().toStdString();
+    }
+
+    std::string_view url() {
+        return _url;
+    }
+};
+
+DESCRIBE("TempFileObject", TempFileObject) {
+    MEMBER("url", &_::url);
+}
+
+int radapter::builtin::api::TempFile(lua_State* L)
+{   
+    size_t sz;
+    auto str = luaL_checklstring(L, 1, &sz);
+    TempFileObject temp;
+    temp._file->write(str, sz);
+    glua::Push(L, temp);
+    return 1;
 }
 
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {

@@ -1,8 +1,15 @@
-local window = gui.QMainWindow()
+local component = temp_file [[
 
-local view = gui.QQuickView(window) --TODO: pass arguments to ctor, to embed view into window
+import QtQuick 2.3
 
-view:setSource("./test.qml")
+Rectangle { 
+    width: 300; 
+    height: 300; 
+    color: "red" 
+}
 
-view:show()
-window:show()
+]]
+
+local view = Qml {
+    url = component:url()
+}

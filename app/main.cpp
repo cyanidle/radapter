@@ -12,7 +12,6 @@
 
 int main (int argc, char **argv) try {
     std::unique_ptr<QCoreApplication> app{ new QCoreApplication(argc, argv) };
-    radapter::Instance inst;
     std::vector<std::string> args;
     for (auto a: app->arguments()) {
         args.push_back(a.toStdString());
@@ -74,6 +73,8 @@ int main (int argc, char **argv) try {
         std::cerr << cli << std::endl;
         return 1;
     }
+    
+    radapter::Instance inst;
 
     if constexpr (radapter::GUI) {
         if (cli["gui"] == true) {

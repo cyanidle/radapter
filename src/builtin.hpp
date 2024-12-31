@@ -28,11 +28,13 @@ int Get(lua_State* L) noexcept;
 int Set(lua_State* L) noexcept;
 int Each(lua_State* L);
 int After(lua_State* L);
+int TempFile(lua_State* L);
 }
 
-void gui(Instance* inst);
 
 namespace workers {
+
+void gui(Instance* inst);
 void test(Instance* inst);
 void modbus(Instance* inst);
 void websocket(Instance* inst);
@@ -41,6 +43,7 @@ void sql(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
+// gui is separate
 inline InitSystem all[] = {
     test, modbus, websocket, 
     redis, sql,
