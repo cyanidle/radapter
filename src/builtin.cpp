@@ -268,7 +268,7 @@ struct TempFileObject {
     }
 };
 
-DESCRIBE("TempFileObject", TempFileObject) {
+DESCRIBE("TempFileObject", TempFileObject, void) {
     MEMBER("url", &_::url);
 }
 
@@ -277,7 +277,8 @@ int radapter::builtin::api::TempFile(lua_State* L)
     size_t sz;
     auto str = luaL_checklstring(L, 1, &sz);
     TempFileObject temp;
-    temp._file->write(str, sz);
+    temp._file->write(str, int(sz));
+    temp._file->flush();
     glua::Push(L, temp);
     return 1;
 }
@@ -554,8 +555,10 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
-        if (auto q = glua::TestUData<QPointer<QObject>>(L, idx)) {
-            return QVariant::fromValue(q->data());
+        if (auto qptr = glua::TestUData<QPointer<QObject>>(L, idx)) {
+            auto object = qptr->data();
+            if (!object) return {};
+            return QVariant::fromValue(object);
         } else if (luaL_getmetafield(L, idx, "__call")) {
             lua_pop(L, 1);
             return QVariant::fromValue(LuaFunction(L, idx));

@@ -72,7 +72,7 @@ Instance::Instance() : d(new Impl)
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
-    lua_register(L, "temp_file", glua::Wrap<builtin::api::TempFile>);
+    lua_register(L, "temp_file", glua::protect<builtin::api::TempFile>);
     lua_register(L, "each", glua::protect<builtin::api::Each>);
     lua_register(L, "after", glua::protect<builtin::api::After>);
     lua_register(L, "get", glua::protect<builtin::api::Get>);

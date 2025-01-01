@@ -23,6 +23,8 @@ local master = ModbusMaster {
             },
         },
     },
+
+    -- manual: may be ignored to auto-generate based on readable registers
     queries = {
         {type = "holding", index = 1, count = 10},
     }

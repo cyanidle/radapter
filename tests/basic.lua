@@ -53,6 +53,13 @@ local first = pipe {
 
 assert(first == test, "pipe{x, y} should return x")
 
+local f = filter("kek")
+
+log(f({
+    kek = 1,
+    keklol = 2
+}))
+
 pipe {
     test,
     function()

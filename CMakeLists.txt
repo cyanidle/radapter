@@ -117,7 +117,11 @@ target_link_libraries(radapter-sdk PUBLIC
     glua
     describe
     fmt)
-    
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)
+endif()
+
 if (RADAPTER_GUI)
     target_link_libraries(radapter-sdk PUBLIC Qt5::Gui Qt5::Widgets Qt5::Qml Qt5::Quick)
 endif()

@@ -19,6 +19,23 @@ function unwrap(key)
     end
 end
 
+function filter(pattern)
+    return function (msg)
+        if type(msg) ~= "table" then
+            return nil
+        end
+        local result = {}
+        local hit = false
+        for k, v in pairs(msg) do
+            if string.match(k, pattern) == k then
+                hit = true
+                result[k] = v
+            end
+        end
+        return hit and result or nil
+    end
+end
+
 local function wrap_func(f)
     return {
         __wrap = f,
@@ -39,7 +56,7 @@ local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")
     all[#all + 1] = function(msg)
-        ok, err = pcall(ipipe.call, ipipe, msg)
+        local ok, err = pcall(ipipe.call, ipipe, msg)
         if not ok then
             log.error("In (Pipe): {}", err)
         end
