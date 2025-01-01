@@ -11,8 +11,24 @@
 #endif
 
 int main (int argc, char **argv) try {
-    std::unique_ptr<QCoreApplication> app{ new QCoreApplication(argc, argv) };
+    std::unique_ptr<QCoreApplication> app;
     radapter::Instance inst;
+    bool gui = false;
+    for (auto it = argv; it != argv + argc; ++it) {
+        if (strcmp(*it, "--gui") == 0) {
+            gui = true;
+            break;
+        }
+    }
+    if constexpr (radapter::GUI) {
+        if (gui) {
+            app.reset(new QApplication(argc, argv));
+            inst.EnableGui();
+        }
+    }
+    if (!app) {
+        app.reset(new QCoreApplication(argc, argv));
+    }
     std::vector<std::string> args;
     for (auto a: app->arguments()) {
         args.push_back(a.toStdString());
@@ -74,20 +90,10 @@ int main (int argc, char **argv) try {
         std::cerr << cli << std::endl;
         return 1;
     }
-
-    if constexpr (radapter::GUI) {
-        if (cli["gui"] == true) {
-            app = nullptr;
-            app.reset(new QApplication(argc, argv));
-            inst.EnableGui();
-        }
-    }
-
     if (cli["schema"] == true) {
         std::cerr << QJsonDocument::fromVariant(inst.GetSchemas()).toJson().toStdString() << std::endl;
         return 0;
     }
-
     auto sigs = QCtrlSignalHandler::instance();
     sigs->registerForSignal(QCtrlSignalHandler::SigInt);
     sigs->registerForSignal(QCtrlSignalHandler::SigTerm);

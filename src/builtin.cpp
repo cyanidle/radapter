@@ -5,6 +5,7 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QTemporaryFile>
 #include "QPointer"
 #include "builtin.hpp"
 #include "glua/glua.hpp"
@@ -248,6 +249,38 @@ int builtin::api::Each(lua_State* L) {
 
 int builtin::api::After(lua_State* L) {
     return timer(L, true);
+}
+
+struct TempFileObject {
+    std::shared_ptr<QTemporaryFile> _file;
+    std::string _url;
+
+    TempFileObject() {
+        _file = std::make_shared<QTemporaryFile>();
+        if (!_file->open()) {
+            throw Err("Could not open temp file: {}", _file->errorString());
+        }
+        _url = "file:///" + _file->fileName().toStdString();
+    }
+
+    std::string_view url() {
+        return _url;
+    }
+};
+
+DESCRIBE("TempFileObject", TempFileObject, void) {
+    MEMBER("url", &_::url);
+}
+
+int radapter::builtin::api::TempFile(lua_State* L)
+{   
+    size_t sz;
+    auto str = luaL_checklstring(L, 1, &sz);
+    TempFileObject temp;
+    temp._file->write(str, int(sz));
+    temp._file->flush();
+    glua::Push(L, temp);
+    return 1;
 }
 
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
@@ -522,8 +555,10 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
-        if (auto q = glua::TestUData<QPointer<QObject>>(L, idx)) {
-            return QVariant::fromValue(q->data());
+        if (auto qptr = glua::TestUData<QPointer<QObject>>(L, idx)) {
+            auto object = qptr->data();
+            if (!object) return {};
+            return QVariant::fromValue(object);
         } else if (luaL_getmetafield(L, idx, "__call")) {
             lua_pop(L, 1);
             return QVariant::fromValue(LuaFunction(L, idx));

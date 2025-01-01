@@ -16,6 +16,21 @@ function set(table, key, value, sep) end
 ---@param timeout number?
 function shutdown(timeout) end
 
+---@param key string
+---@return fun(object: any): any
+function wrap(key) end
+
+---@param key string
+---@return fun(object: any): any
+function unwrap(key) end
+
+---@param pattern string
+---@return fun(object: any): any
+function filter(pattern) end
+
+---@param table any[]
+function call_all(table, ...) end
+
 ---@enum (key) loggingLevel
 loggingLevel = {
     debug = 1,
@@ -149,6 +164,14 @@ function TcpModbusDevice (params) end
 ---@return ModbusDevice
 function RtuModbusDevice (params) end
 
+---@class QMLWorker: Worker
+QMLWorker = {}
+
+---@return string
+function QMLWorker:url() end
+
+---@return QMLWorker
+function QML(params) end;
 
 ---@class RedisCacheWorker: Worker
 RedisCacheWorker = {}
@@ -186,3 +209,12 @@ function WebsocketServer(params) end
 
 ---@type any
 gui = {}
+
+---@class TempFileObject
+TempFileObject = {}
+
+---@return string
+function TempFileObject:url() end;
+
+---@return TempFileObject
+function temp_file(data) end;
