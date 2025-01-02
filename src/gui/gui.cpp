@@ -86,19 +86,7 @@ public:
 			throw Err("Could not create qml view: {}", component->errorString());
 		}
         instance->setParent(this);
-        auto* meta = instance->metaObject();
-        auto count = meta->methodCount();
-        for (auto i = 0; i < count; ++i) {
-            auto method = meta->method(i);
-            if (method.methodType() != QMetaMethod::Signal) continue;
-            auto name = method.name();
-            if (name.compare("sendMsg", Qt::CaseInsensitive) == 0)
-            {
-                auto selfIdx = metaObject()->indexOfMethod("handleMsgFromQml(QVariant)");
-                meta->connect(instance, i, this, selfIdx);
-                break;
-            }
-        }
+        QObject::connect(instance, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
 	}
     QVariant url(QVariantList) {
         return config.url;
