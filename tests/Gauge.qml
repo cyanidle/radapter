@@ -62,7 +62,7 @@ Item {
 
         onReleased: isDragMode = false;
 
-        onPressAndHold: {
+        onPressed: {
             isDragMode = true;
             setAngleFromPosition(mouse.x, mouse.y)
         }

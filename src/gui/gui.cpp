@@ -66,8 +66,8 @@ class QMLWorker final : public radapter::Worker
 	Q_OBJECT
 private:
     QmlSettings config;
-	QQmlComponent* component;
-    QObject* instance;
+    QQmlComponent* creator;
+    QObject* root;
     QTemporaryFile* temp = nullptr;
     QHash<int, int> sigsToProps;
 public:
@@ -87,16 +87,16 @@ public:
         } else {
             Parse(config, first);
         }
-        component = new QQmlComponent(engine, config.url);
-		instance = component->create();
-		if (!instance) {
-			throw Err("Could not create qml view: {}", component->errorString());
-		}
-        instance->setParent(this);
-        auto* meta = instance->metaObject();
+        creator = new QQmlComponent(engine, config.url);
+        root = creator->create();
+        if (!root) {
+            throw Err("Could not create qml view: {}", creator->errorString());
+        }
+        root->setParent(this);
+        auto* meta = root->metaObject();
         auto sigidx = meta->indexOfMethod("sendMsg(QVariant)");
         if (sigidx != -1 && meta->method(sigidx).methodType() == QMetaMethod::Signal) {
-            connect(instance, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
+            connect(root, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
         } else {
             Info("No 'signal sendMsg(variant msg)' declared in component");
         }
@@ -107,15 +107,15 @@ public:
                 auto p = meta->property(idx);
                 auto notif = p.notifySignalIndex();
                 sigsToProps[notif] = idx;
-                meta->connect(instance, notif, this, handler);
-                p.read(instance); //kinda kostyl to force QML to update prop aliases
+                meta->connect(root, notif, this, handler);
+                p.read(root); //kinda kostyl to force QML to update prop aliases
             } else {
                 Warn("No property found in loaded qml component: {}", prop);
             }
         }
     }
 	void OnMsg(QVariant const& msg) override {
-        applyToQml(msg, instance);
+        applyToQml(msg, root);
     }
     static QVariant unwrap(QVariant const& var) {
         if (var.type() >= QVariant::UserType) {
@@ -126,9 +126,12 @@ public:
     }
 public slots:
     void handlePropChange() {
-        auto prop = instance->metaObject()->property(sigsToProps.value(senderSignalIndex(), -1));
-        QVariantMap msg {{prop.name(), unwrap(prop.read(instance))}};
-        emit SendMsg(msg);
+        auto propId = sigsToProps.value(senderSignalIndex(), -1);
+        if (propId != -1) {
+            auto prop = root->metaObject()->property(propId);
+            QVariantMap msg {{prop.name(), unwrap(prop.read(root))}};
+            emit SendMsg(msg);
+        }
     }
     void handleMsgFromQml(QVariant const& var) {
         emit SendMsg(unwrap(var));
