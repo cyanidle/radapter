@@ -112,6 +112,7 @@ public:
             })
             .ThenSync([this](QVariant res){
                 if (res != "OK") throw Err("Could not enable keyevent notifications");
+                poll();
                 sub_client->PSubscribe(fmt::format("__keyevent@{}__:*", config.db), [this](Client::SubEvent ev){
                     if (ev.message != preped_hash_key) return;
                     poll();

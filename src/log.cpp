@@ -8,17 +8,18 @@ int radapter::Instance::Impl::luaLog(lua_State *L) {
     size_t len;
     auto s = lua_tolstring(L, -1, &len);
     auto sv = string_view{s, len};
-    string_view cat = "lua";
+    string category = "lua";
     lua_Debug ar;
-    if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "S", &ar)) {
-        cat = ar.short_src;
-        auto pos = cat.find_last_of("/\\");
-        if (pos != string_view::npos) {
-            cat = cat.substr(pos + 1);
+    if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar)) {
+        category = ar.short_src;
+        auto pos = category.find_last_of("/\\");
+        if (pos != string::npos) {
+            category = category.substr(pos + 1);
         }
+        category += ':' + std::to_string(ar.currentline);
     }
     // cat is null-terminated
-    Instance::FromLua(L)->Log(lvl, cat.data(), "{}", fmt::make_format_args(sv));
+    Instance::FromLua(L)->Log(lvl, category.data(), "{}", fmt::make_format_args(sv));
     return 0;
 }
 

@@ -5,16 +5,20 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QTemporaryFile>
+#include <QHash>
+#include <QTemporaryDir>
 
 namespace radapter::gui 
 {
 
 struct QmlSettings {
     QString url;
+    vector<QString> props;
 };
 
 DESCRIBE("gui::QmlSettings", QmlSettings, void) {
     MEMBER("url", &_::url);
+    MEMBER("props", &_::props);
 }
 
 static void applyToQml(QVariant const& msg, QObject* target) {
@@ -55,19 +59,22 @@ static void applyToQml(QVariant const& msg, QObject* target) {
     }
 }
 
+Q_GLOBAL_STATIC(QQmlEngine, g_engine)
+
 class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
 private:
-	QmlSettings config;
-	QQmlEngine engine;
+    QmlSettings config;
 	QQmlComponent* component;
     QObject* instance;
     QTemporaryFile* temp = nullptr;
+    QHash<int, int> sigsToProps;
 public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, "qml")
     {
+        auto* engine = g_engine();
         auto first = args.value(0);
         if (first.type() == QVariant::String) {
             temp = new QTemporaryFile(this);
@@ -80,27 +87,51 @@ public:
         } else {
             Parse(config, first);
         }
-        component = new QQmlComponent(&engine, config.url);
+        component = new QQmlComponent(engine, config.url);
 		instance = component->create();
 		if (!instance) {
 			throw Err("Could not create qml view: {}", component->errorString());
 		}
         instance->setParent(this);
-        QObject::connect(instance, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
-	}
-    QVariant url(QVariantList) {
-        return config.url;
+        auto* meta = instance->metaObject();
+        auto sigidx = meta->indexOfMethod("sendMsg(QVariant)");
+        if (sigidx != -1 && meta->method(sigidx).methodType() == QMetaMethod::Signal) {
+            connect(instance, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
+        } else {
+            Info("No 'signal sendMsg(variant msg)' declared in component");
+        }
+        auto handler = metaObject()->indexOfMethod("handlePropChange()");
+        for (auto& prop: config.props) {
+            auto idx = meta->indexOfProperty(prop.toStdString().c_str());
+            if (idx != - 1) {
+                auto p = meta->property(idx);
+                auto notif = p.notifySignalIndex();
+                sigsToProps[notif] = idx;
+                meta->connect(instance, notif, this, handler);
+                p.read(instance); //kinda kostyl to force QML to update prop aliases
+            } else {
+                Warn("No property found in loaded qml component: {}", prop);
+            }
+        }
     }
 	void OnMsg(QVariant const& msg) override {
         applyToQml(msg, instance);
-	}
-public slots:
-    void handleMsgFromQml(QVariant const& var) {
+    }
+    static QVariant unwrap(QVariant const& var) {
         if (var.type() >= QVariant::UserType) {
-            emit SendMsg(var.value<QJSValue>().toVariant());
+            return var.value<QJSValue>().toVariant();
         } else {
-            emit SendMsg(var);
+            return var;
         }
+    }
+public slots:
+    void handlePropChange() {
+        auto prop = instance->metaObject()->property(sigsToProps.value(senderSignalIndex(), -1));
+        QVariantMap msg {{prop.name(), unwrap(prop.read(instance))}};
+        emit SendMsg(msg);
+    }
+    void handleMsgFromQml(QVariant const& var) {
+        emit SendMsg(unwrap(var));
     }
 };
 
@@ -111,9 +142,7 @@ namespace radapter::builtin {
 
 void workers::gui(Instance* inst) 
 {
-    inst->RegisterWorker<radapter::gui::QMLWorker>("QML", {
-        {"url", AsExtraMethod<&radapter::gui::QMLWorker::url>},
-    });
+    inst->RegisterWorker<radapter::gui::QMLWorker>("QML");
 }
 
 }

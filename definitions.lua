@@ -168,10 +168,19 @@ function RtuModbusDevice (params) end
 QMLWorker = {}
 
 ---@return string
-function QMLWorker:url() end
+function QMLWorker:dir() end
+
+---@class QMLParams
+---@field url string
+---@field props string[]
 
 ---@return QMLWorker
+---@param params QMLParams
 function QML(params) end;
+
+---@return QMLWorker
+---@param qmlSource string
+function QML(qmlSource) end;
 
 ---@class RedisCacheWorker: Worker
 RedisCacheWorker = {}
@@ -198,9 +207,26 @@ function RedisCacheWorker:Exec(query, args) end
 ---@return nil
 function RedisCacheWorker:Exec(query, args, callback) end
 
+---@class RedisConfig
+---@field host string?
+---@field port number?
+---@field db number?
+---@field reconnect_timeout number?
+
+---@class RedisCacheConfig : RedisConfig
+---@field hash_key string?
+---@field enable_keyevents boolean?
+
 ---@return RedisCacheWorker
+---@param params RedisCacheConfig
 function RedisCache(params) end
+
+---@class RedisStreamConfig : RedisConfig
+---@field stream_key string
+---TODO: other fields and enums
+
 ---@return Worker
+---@param params RedisStreamConfig
 function RedisStream(params) end
 
 

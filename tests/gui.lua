@@ -1,4 +1,5 @@
-local view = QML [[
+local view = QML[[
+
 import QtQuick 2.3
 import QtQuick.Window 2.3
 import QtQuick.Controls 2.3
@@ -61,7 +62,6 @@ Window {
 }
 ]]
 
-log(view:url())
 
 pipe(view, function(msg)
     log(msg)
@@ -69,6 +69,7 @@ end)
 
 
 each(3000, function()
+    log("Resetting color to green from LUA")
     view {
         color = "#00FF00",
     }
