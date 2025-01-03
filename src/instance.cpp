@@ -185,7 +185,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         d->logCatLen = unsigned(c.size());
     }
     fmt::print(
-        FMT_COMPILE("{}.{:0>3}|{:>5}|{:>{}}| {}\n"),
+        FMT_COMPILE("{}.{:0>3}|{}|{:>{}}| {}\n"),
         dt.toString(Qt::DateFormat::ISODate), dt.time().msec(),
         name, cat, d->logCatLen, fmt::vformat(fmt, args));
 

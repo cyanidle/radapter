@@ -9,9 +9,10 @@ ApplicationWindow {
     height: 480
     title: qsTr("Demo: Gauge Controls from Redis")
     color: "white";
+    
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
 
     property alias angle: gauge.angle
-
     // onAngleChanged: {
     //     console.log("Angle:", angle)
     // }

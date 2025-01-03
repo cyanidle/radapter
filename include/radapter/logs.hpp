@@ -22,11 +22,10 @@ enum LogLevel {
 };
 
 DESCRIBE("radapter::LogLevel", LogLevel, void) {
-    MEMBER("debug", debug);
-    MEMBER("info", info);
-    MEMBER("warn", warn);
-    MEMBER("error", error);
-    MEMBER("disabled", disabled);
+    MEMBER("D", debug);
+    MEMBER("I", info);
+    MEMBER("W", warn);
+    MEMBER("E", error);
 }
 
 namespace detail {

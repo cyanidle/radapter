@@ -3,12 +3,16 @@ local view = QML {
     props = {"angle"}
 }
 
-local redis = RedisCache {
+local commands = RedisCache {
     hash_key = "gui"
 }
 
+local state = RedisCache {
+    hash_key = "gui:state"
+}
+
 pipe {
-    redis,
+    commands,
     function(msg)
         log("CMD: {}", msg)
         return msg
@@ -23,5 +27,5 @@ pipe {
         log("FROM GUI: {}", msg)
         return msg
     end,
-    redis
+    state
 }

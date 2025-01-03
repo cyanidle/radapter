@@ -25,7 +25,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
 if (RADAPTER_GUI)
-    find_package(Qt5 REQUIRED COMPONENTS Gui Widgets Qml Quick)
+    find_package(Qt5 REQUIRED COMPONENTS Gui Qml Quick)
 endif()
 
 add_subdirectory(deps)
@@ -123,7 +123,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 if (RADAPTER_GUI)
-    target_link_libraries(radapter-sdk PUBLIC Qt5::Gui Qt5::Widgets Qt5::Qml Qt5::Quick)
+    target_link_libraries(radapter-sdk PUBLIC Qt5::Gui Qt5::Qml Qt5::Quick)
 endif()
 
 add_executable(radapter ./app/main.cpp)
