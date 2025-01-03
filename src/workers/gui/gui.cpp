@@ -1,6 +1,6 @@
 #include <radapter/radapter.hpp>
 #include <radapter/logs.hpp>
-#include "./builtin.hpp"
+#include "builtin.hpp"
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
