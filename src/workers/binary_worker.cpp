@@ -146,15 +146,9 @@ radapter::BinaryWorker::BinaryWorker(Instance* parent, const char* category) :
 
 }
 
-void radapter::BinaryWorker::ReceiveMsgpack(QByteArray const& buffer) try
+void radapter::BinaryWorker::ReceiveMsgpacks(QByteArray& buffer) try
 {
-	QVariant msg;
-	{
-		jv::DefaultArena alloc;
-		auto res = jv::ParseMsgPackInPlace(buffer.data(), buffer.size(), alloc);
-		msg = res.result.Get<QVariant>();
-	}
-	emit SendMsg(msg);
+	// TODO: process SLIP frames with msgpacks
 }
 catch (std::exception& e) {
 	Error("Error receiving msgpack: {}", e.what());
@@ -162,11 +156,15 @@ catch (std::exception& e) {
 
 void radapter::BinaryWorker::OnMsg(QVariant const& msg)
 {
-	membuff::StringOut<QByteArray> buff;
+	std::string buffer;
 	{
 		jv::DefaultArena alloc;
+		membuff::FuncOut buff([&](char* buff, size_t size){
+			// TODO: escape as SLIP frame data
+			buffer += string_view(buff, size);
+		});
 		auto json = jv::JsonView::From(msg, alloc);
 		jv::DumpMsgPackInto(buff, json);
 	}
-	SendMsgpack(buff.Consume());
+	SendMsgpack(buffer);
 }

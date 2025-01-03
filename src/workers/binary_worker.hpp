@@ -11,8 +11,8 @@ class BinaryWorker : public Worker
 public:
 	BinaryWorker(Instance* parent, const char* category);
 protected:
-	void ReceiveMsgpack(QByteArray const& buffer);
-	virtual void SendMsgpack(QByteArray const& buffer) = 0;
+	void ReceiveMsgpacks(QByteArray& buffer);
+	virtual void SendMsgpack(string_view buffer) = 0;
 private:
 	void OnMsg(QVariant const& msg) override final;
 };
