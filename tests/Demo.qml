@@ -5,29 +5,28 @@ import "."
 
 ApplicationWindow {
     visible: true
-    width: 640
-    height: 480
+    property int size: 400
+    width: size
+    height: width
     title: qsTr("Demo: Gauge Controls from Redis")
     color: "white";
-    
+
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
 
     property alias angle: gauge.angle
-    // onAngleChanged: {
-    //     console.log("Angle:", angle)
-    // }
 
-    Row {
+    ColumnLayout {
         Gauge {
             id: gauge
             onAngleChanged: spinBox.value = angle
-        }
-        SpinBox {
-            id: spinBox
-            from: 0
-            to: 360
-            stepSize: 1
-            onValueModified: gauge.angle = value
+            SpinBox {
+                anchors.centerIn: parent
+                id: spinBox
+                from: 0
+                to: 360
+                stepSize: 1
+                onValueModified: gauge.angle = value
+            }
         }
     }
 }

@@ -11,7 +11,7 @@ Item {
     // private:
 
     width: size;
-    height: size;
+    height: width;
 
     Rectangle {
         id: background
