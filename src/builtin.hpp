@@ -40,13 +40,14 @@ void modbus(Instance* inst);
 void websocket(Instance* inst);
 void redis(Instance* inst);
 void sql(Instance* inst);
+void serial(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
 // gui is separate
 inline InitSystem all[] = {
     test, modbus, websocket, 
-    redis, sql,
+    redis, sql, serial,
 };
 
 }

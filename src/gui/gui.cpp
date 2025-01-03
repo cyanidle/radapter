@@ -11,12 +11,12 @@
 namespace radapter::gui 
 {
 
-struct QmlSettings {
+struct QMLConfig {
     QString url;
     vector<QString> props;
 };
 
-DESCRIBE("gui::QmlSettings", QmlSettings, void) {
+DESCRIBE("gui::QMLConfig", QMLConfig, void) {
     MEMBER("url", &_::url);
     MEMBER("props", &_::props);
 }
@@ -65,7 +65,7 @@ class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
 private:
-    QmlSettings config;
+    QMLConfig config;
     QQmlComponent* creator;
     QObject* root;
     QTemporaryFile* temp = nullptr;
@@ -145,7 +145,9 @@ namespace radapter::builtin {
 
 void workers::gui(Instance* inst) 
 {
-    inst->RegisterWorker<radapter::gui::QMLWorker>("QML");
+	using namespace radapter::gui;
+    inst->RegisterWorker<QMLWorker>("QML");
+	inst->RegisterSchema<QMLConfig>("QML");
 }
 
 }

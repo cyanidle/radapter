@@ -15,7 +15,7 @@ class Worker : public QObject {
 public:
     Instance* _Inst;
 
-    Worker(Instance* parent, const char* category = "worker");
+    Worker(Instance* parent, const char* category);
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
     template<typename...Args>
     void Debug(fmt::format_string<Args...> fmt, Args&&...a) {
