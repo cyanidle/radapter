@@ -1,6 +1,7 @@
 #include "./binary_worker.hpp"
 #include <json_view/parse.hpp>
 #include <json_view/dump.hpp>
+#include "slipa.hpp"
 
 using namespace jv;
 
@@ -146,12 +147,39 @@ radapter::BinaryWorker::BinaryWorker(Instance* parent, const char* category) :
 
 }
 
-void radapter::BinaryWorker::ReceiveMsgpacks(QByteArray& buffer) try
+void radapter::BinaryWorker::ReceiveMsgpacks(QByteArray& buffer)
 {
-	// TODO: process SLIP frames with msgpacks
-}
-catch (std::exception& e) {
-	Error("Error receiving msgpack: {}", e.what());
+	QVariantList msgs;
+	{
+		DefaultArena alloc;
+		ArenaString recv(alloc);
+		while (true) {
+			auto end = buffer.indexOf(slipa::END);
+			if (end == -1) return;
+			try {
+				auto err = slipa::Read(string_view(buffer.data(), end), [&](string_view part) {
+					recv.Append(part);
+				});
+				if (err != slipa::NoError) {
+					throw Err("Error unpacking SLIP frame: {}",
+						err == slipa::UnterminatedEscape ? "Unterminated ESC" : "Invalid ESC");
+				}
+				auto res = jv::ParseMsgPackInPlace(recv, alloc);
+				if (res.consumed != recv.size()) {
+					throw Err("Not whole msgpack consumed");
+				}
+				msgs.append(res.result.Get<QVariant>());
+			}
+			catch (std::exception& e) {
+				Error("Error receiving msgpack: {}", e.what());
+			}
+			recv.clear();
+			buffer = buffer.mid(end);
+		}
+	}
+	for (auto& m : qAsConst(msgs)) {
+		emit SendMsg(m);
+	}
 }
 
 void radapter::BinaryWorker::OnMsg(QVariant const& msg)
@@ -160,11 +188,13 @@ void radapter::BinaryWorker::OnMsg(QVariant const& msg)
 	{
 		jv::DefaultArena alloc;
 		membuff::FuncOut buff([&](char* buff, size_t size){
-			// TODO: escape as SLIP frame data
-			buffer += string_view(buff, size);
+			slipa::Write(string_view(buff, size), [&](string_view escaped) {
+				buffer += escaped;
+			});
 		});
 		auto json = jv::JsonView::From(msg, alloc);
 		jv::DumpMsgPackInto(buff, json);
 	}
+	buffer += slipa::END;
 	SendMsgpack(buffer);
 }
