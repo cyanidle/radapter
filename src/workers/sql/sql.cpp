@@ -20,12 +20,12 @@ struct SqlConfig {
     optional<uint16_t> port;
 };
 
-DESCRIBE("radapter::ws::SqlConfig", SqlConfig, void) {
-    MEMBER("type", &_::type);
-    MEMBER("db", &_::db);
-    MEMBER("user", &_::user);
-    MEMBER("pass", &_::pass);
-    MEMBER("port", &_::port);
+RAD_DESCRIBE(SqlConfig) {
+    RAD_MEMBER(type);
+    RAD_MEMBER(db);
+    RAD_MEMBER(user);
+    RAD_MEMBER(pass);
+    RAD_MEMBER(port);
 }
 
 using namespace fut;

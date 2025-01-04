@@ -7,12 +7,12 @@ radapter::modbus::MasterDevice::MasterDevice(RtuDevice config, QObject *parent) 
     auto dev = new QModbusRtuSerialMaster(this);
     dev->setInterFrameDelay(int(config.frame_gap.value));
     device = dev;
-    connectionString = config.port_name;
+    connectionString = config.port;
     device->setConnectionParameter(Param::SerialBaudRateParameter, config.baud.value);
     device->setConnectionParameter(Param::SerialDataBitsParameter, config.data_bits.value);
     device->setConnectionParameter(Param::SerialStopBitsParameter, config.stop_bits.value);
     device->setConnectionParameter(Param::SerialParityParameter, config.parity.value);
-    device->setConnectionParameter(Param::SerialPortNameParameter, QString::fromStdString(config.port_name));
+    device->setConnectionParameter(Param::SerialPortNameParameter, QString::fromStdString(config.port));
 }
 
 radapter::modbus::MasterDevice::MasterDevice(TcpDevice config, QObject *parent) :

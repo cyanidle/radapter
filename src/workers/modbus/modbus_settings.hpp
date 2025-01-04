@@ -117,7 +117,7 @@ DESCRIBE("modbus::Device", Device, void) {
 }
 
 struct RtuDevice : Device {
-    string port_name;
+    string port;
 
     WithDefault<ByteOrder> byte_order = little;
     WithDefault<unsigned> data_bits = 8u;
@@ -127,7 +127,7 @@ struct RtuDevice : Device {
 };
 DESCRIBE("modbus::RtuDevice", RtuDevice, void) {
     PARENT(Device);
-    MEMBER("port_name", &_::port_name);
+    MEMBER("port", &_::port);
     MEMBER("byte_order", &_::byte_order);
     MEMBER("data_bits", &_::data_bits);
     MEMBER("baud", &_::baud);

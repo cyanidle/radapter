@@ -6,7 +6,7 @@
 
 using SerialParity = QSerialPort::Parity;
 
-DESCRIBE("SerialParity", SerialParity, void) {
+RAD_DESCRIBE(SerialParity) {
 	MEMBER("no", _::NoParity);
 	MEMBER("even", _::EvenParity);
 	MEMBER("odd", _::OddParity);
@@ -17,7 +17,7 @@ DESCRIBE("SerialParity", SerialParity, void) {
 
 using SerialStopBits = QSerialPort::StopBits;
 
-DESCRIBE("SerialStopBits", SerialStopBits, void) {
+RAD_DESCRIBE(SerialStopBits) {
 	MEMBER("1", _::OneStop);
 	MEMBER("1.5", _::OneAndHalfStop);
 	MEMBER("2", _::TwoStop);
@@ -25,7 +25,7 @@ DESCRIBE("SerialStopBits", SerialStopBits, void) {
 
 using SerialFlowControl = QSerialPort::FlowControl;
 
-DESCRIBE("SerialFlowControl", SerialFlowControl, void) {
+RAD_DESCRIBE(SerialFlowControl) {
 	MEMBER("no", _::NoFlowControl);
 	MEMBER("hardware", _::HardwareControl);
 	MEMBER("software", _::SoftwareControl);
@@ -33,7 +33,7 @@ DESCRIBE("SerialFlowControl", SerialFlowControl, void) {
 
 using SerialOpenMode = QIODevice::OpenModeFlag;
 
-DESCRIBE("SerialOpenMode", SerialOpenMode, void) {
+RAD_DESCRIBE(SerialOpenMode) {
 	MEMBER("read", _::ReadOnly);
 	MEMBER("r", _::ReadOnly);
 	MEMBER("write", _::WriteOnly);

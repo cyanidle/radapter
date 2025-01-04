@@ -38,7 +38,7 @@ static QSslConfiguration CreateSslConfiguration(string cert_file, string key_fil
     return ssl;
 }
 
-struct ServerConfig {
+struct WsServerConfig {
     uint16_t port;
 
     WithDefault<string> host = "0.0.0.0";
@@ -49,20 +49,20 @@ struct ServerConfig {
     WithDefault<string> key_file = "";
 };
 
-DESCRIBE("radapter::ws::ServerConfig", ServerConfig, void) {
-    MEMBER("host", &_::host);
-    MEMBER("port", &_::port);
-    MEMBER("name", &_::name);
-    MEMBER("refresh_timeout", &_::refresh_timeout);
-    MEMBER("print_msgs", &_::print_msgs);
-    MEMBER("cert_file", &_::cert_file);
-    MEMBER("key_fil", &_::key_file);
+RAD_DESCRIBE(WsServerConfig) {
+    RAD_MEMBER(host);
+    RAD_MEMBER(port);
+    RAD_MEMBER(name);
+    RAD_MEMBER(refresh_timeout);
+    RAD_MEMBER(print_msgs);
+    RAD_MEMBER(cert_file);
+    RAD_MEMBER(key_file);
 }
 
 class Server : public Worker {
     Q_OBJECT
 
-    ServerConfig config;
+    WsServerConfig config;
     QWebSocketServer* server = nullptr;
     QVariant state;
     std::set<QWebSocket*> socks;
@@ -154,7 +154,7 @@ public:
 
 void radapter::builtin::workers::websocket(radapter::Instance* inst) {
     inst->RegisterWorker<ws::Server>("WebsocketServer");
-    inst->RegisterSchema("WebsocketServer", SchemaFor<ws::ServerConfig>);
+    inst->RegisterSchema("WebsocketServer", SchemaFor<ws::WsServerConfig>);
 }
 
 #include "websocket_server.moc"
