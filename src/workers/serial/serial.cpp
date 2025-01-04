@@ -45,7 +45,7 @@ DESCRIBE("SerialOpenMode", SerialOpenMode, void) {
 namespace radapter::serial
 {
 
-struct SerialConfig
+struct SerialConfig : BinaryConfig
 {
 	QString port;
 	uint32_t baud;
@@ -58,6 +58,7 @@ struct SerialConfig
 };
 
 RAD_DESCRIBE(SerialConfig) {
+	PARENT(BinaryConfig);
 	RAD_MEMBER(port);
 	RAD_MEMBER(baud);
 	RAD_MEMBER(data_bits);
