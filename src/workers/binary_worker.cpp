@@ -245,5 +245,6 @@ void radapter::BinaryWorker::ReceiveBinary(QByteArray& buffer)
 
 void radapter::BinaryWorker::OnMsg(QVariant const& msg)
 {
-	SendBinary(d->framesDumper(msg, d->protoDumper));
+	auto frame = d->framesDumper(msg, d->protoDumper);
+	SendBinary(frame);
 }
