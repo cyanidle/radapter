@@ -194,6 +194,12 @@ void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     }
 }
 
+template<typename T>
+T ParseAs(QVariant const& conf) {
+    T res;
+    Parse(res, conf);
+    return res;
+}
 
 void PopulateSchema(bool&, QVariant& schema);
 void PopulateSchema(string&, QVariant& schema);

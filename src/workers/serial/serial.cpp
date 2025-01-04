@@ -45,7 +45,7 @@ DESCRIBE("SerialOpenMode", SerialOpenMode, void) {
 namespace radapter::serial
 {
 
-struct SerialConfig 
+struct SerialConfig
 {
 	QString port;
 	uint32_t baud;
@@ -57,14 +57,14 @@ struct SerialConfig
 	WithDefault<SerialOpenMode> open_mode = SerialOpenMode::ReadWrite;
 };
 
-DESCRIBE("SerialConfig", SerialConfig, void) {
-	MEMBER("port", &_::port);
-	MEMBER("baud", &_::baud);
-	MEMBER("data_bits", &_::data_bits);
-	MEMBER("parity", &_::parity);
-	MEMBER("stop_bits", &_::stop_bits);
-	MEMBER("flow_control", &_::flow_control);
-	MEMBER("open_mode", &_::open_mode);
+RAD_DESCRIBE(SerialConfig) {
+	RAD_MEMBER(port);
+	RAD_MEMBER(baud);
+	RAD_MEMBER(data_bits);
+	RAD_MEMBER(parity);
+	RAD_MEMBER(stop_bits);
+	RAD_MEMBER(flow_control);
+	RAD_MEMBER(open_mode);
 }
 
 class SerialWorker final : public BinaryWorker
@@ -76,7 +76,7 @@ private:
 	QByteArray buffer;
 public:
 	SerialWorker(QVariantList const& args, Instance* inst) :
-		BinaryWorker(inst, "serial")
+		BinaryWorker(ParseAs<BinaryConfig>(args.value(0)), inst, "serial")
 	{
 		Parse(config, args.value(0));
 		port = new QSerialPort(config.port, this);
@@ -90,11 +90,11 @@ public:
 		}
 		connect(port, &QSerialPort::readyRead, this, [this]{
 			buffer += port->readAll();
-			ReceiveMsgpacks(buffer);
+			ReceiveBinary(buffer);
 		});
 	}
 
-	void SendMsgpack(string_view buff) override {
+	void SendBinary(string_view buff) override {
 		port->write(buff.data(), buff.size());
 		port->flush();
 	}

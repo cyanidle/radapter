@@ -229,12 +229,8 @@ function RedisCache(params) end
 ---@param params RedisStreamConfig
 function RedisStream(params) end
 
-
 ---@return Worker
 function WebsocketServer(params) end
-
----@type any
-gui = {}
 
 ---@class TempFileObject
 TempFileObject = {}
@@ -243,4 +239,23 @@ TempFileObject = {}
 function TempFileObject:url() end;
 
 ---@return TempFileObject
+---@param data string
 function temp_file(data) end;
+
+---@class BinaryParams
+---@field framing "slip"
+---@field protocol "msgpack"
+
+---@class SerialParams : BinaryParams
+---@field port string
+---@field baud number
+
+---@type string[]
+args = {}
+
+
+---@class SerialWorker : Worker
+
+---@return SerialWorker
+---@param params SerialParams
+function Serial(params) end

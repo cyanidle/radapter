@@ -1,6 +1,9 @@
 #pragma once
 #include "radapter/radapter.hpp"
 
+#define RAD_DESCRIBE(x) DESCRIBE(#x, x, void)
+#define RAD_MEMBER(x) MEMBER(#x, &_::x)
+
 namespace glua {
 void Push(lua_State* L, QVariant const& val);
 }
