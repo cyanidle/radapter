@@ -44,30 +44,28 @@ protected:
 };
 
 template<typename Fn>
-constexpr void Write(std::string_view msg, Fn&& out) noexcept {
+void Write(std::string_view msg, Fn&& out) noexcept {
     constexpr char esc_end[] = {ESC, ESC_END, 0};
     constexpr char esc_esc[] = {ESC, ESC_ESC, 0};
-    size_t offs = 0;
-    size_t last = 0;
+    size_t collected = 0;
+    auto* in = msg.data();
     auto commit = [&]{
-        out(msg.substr(last, offs));
-        last += offs;
-        offs = 0;
+        if (collected) out(std::string_view{in, collected});
+        in += collected;
+        collected = 0;
     };
-    for (auto ch: msg) {
-        switch (ch) {
-        case ESC:
+    for (char ch: msg) {
+        if (ch == ESC) {
             commit();
-            last++;
-            out(std::string_view{esc_esc});
-            break;
-        case END:
+            in++;
+            out(std::string_view{esc_esc, 2});
+        } else if (ch == END) {
             commit();
-            last++;
-            out(std::string_view{esc_end});
-            break;
+            in++;
+            out(std::string_view{esc_end, 2});
+        } else {
+            collected++;
         }
-        offs++;
     }
     commit();
 }
@@ -88,7 +86,7 @@ constexpr ReadErrors Read(std::string_view msg, Fn&& out) {
     }
     size_t pos = 0;
     while (pos < msg.size()) {
-        auto next = msg.find_first_of(esc, pos);
+        auto next = msg.find_first_of(ESC, pos);
         if (next == std::string_view::npos) {
             out(msg.substr(pos));
             break;

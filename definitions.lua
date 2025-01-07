@@ -85,10 +85,13 @@ log = {
 ---@return T1
 function pipe(first, ...) end
 
----@generic T1 : pipeInput
----@param all pipeInput[]
+---@param worker Worker
+---@param msg any
+function notify_all(worker, msg) end
+
+---@param on_msg fun(self: Worker, msg: any)
 ---@return Pipable
-function pipe(all) end
+function create_worker(on_msg) end
 
 ---@alias asyncThunk fun(defer: fun(...))
 

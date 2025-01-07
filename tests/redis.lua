@@ -10,11 +10,11 @@ local stream = RedisStream {
 
 pipe(cache, wrap("wrapped!"), stream)
 
-pipe {
+pipe (
     cache,
     wrap("wrapped 3!"),
-    stream,
-}
+    stream
+)
 
 pipe(
     cache, wrap("wrapped 2!"), stream

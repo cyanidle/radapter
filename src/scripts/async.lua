@@ -88,10 +88,14 @@ local await_all = function (defer)
   return co.yield(join(defer))
 end
 
+local async_after = wrap(after)
 
 return {
   sync = wrap(pong),
   wait = await,
   wait_all = await_all,
   wrap = wrap,
+  sleep = function (time) 
+    await(async_after(time))
+  end,
 }
