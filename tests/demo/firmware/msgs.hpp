@@ -14,4 +14,4 @@
   MAP(MAKE_FIELD, __VA_ARGS__) \
   MSG_2_STRUCT(MAP_LIST(GET_FIELD_NAME, __VA_ARGS__)) \
   void handle();\
-}; void name::handle()
+}

@@ -26,13 +26,14 @@ MAKE_MSG(LogMsg, 0,
 
 MAKE_MSG(LedCmd, 1,
   (unsigned) power
-) {
-  log("New Power!");
-  led.power = 360 - (power > 360 ? 360 : power);
-}
+);
 
 //////////////////////
 
+void LedCmd::handle() {
+  log("New Power!");
+  led.power = 360 - (power > 360 ? 360 : power);
+}
 
 void LedTicker::tick() {
   auto ms = millis();
