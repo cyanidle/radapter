@@ -29,6 +29,10 @@ void Instance::EnableGui() {
     }
 }
 
+extern "C" {
+int luaopen_lfs(lua_State *L);
+}
+
 Instance::Instance() : d(new Impl)
 {
     init_qrc();
@@ -78,6 +82,8 @@ Instance::Instance() : d(new Impl)
     lua_register(L, "get", glua::protect<builtin::api::Get>);
     lua_register(L, "set", glua::protect<builtin::api::Set>);
 
+    radapter::compat::prequiref(L, "lfs", luaopen_lfs, 0);
+    lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("coro_patch");
     LoadEmbeddedFile("async", LoadEmbedGlobal);

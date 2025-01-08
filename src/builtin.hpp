@@ -178,6 +178,8 @@ int TempFile(lua_State* L);
 
 namespace workers {
 
+inline int Marker;
+
 void gui(Instance* inst);
 void test(Instance* inst);
 void modbus(Instance* inst);

@@ -39,6 +39,10 @@ loggingLevel = {
     error = 4,
 }
 
+lfs = {
+
+}
+
 ---@class loggingMsg
 ---@field levl loggingLevel
 ---@field msg string
@@ -70,14 +74,18 @@ log = {
     set_level = function (level) end,
 }
 
+---@alias MsgHandler fun(msg: any, source: Worker): any
+
+
 ---@class Pipable
----@field get_listeners fun(self: Pipable): (fun(msg))[]
----@field call fun(self: Pipable, msg: any)
+---@field get_listeners fun(self: Pipable): MsgHandler[]
+---@field call MsgHandler
+
 
 ---@class Worker: Pipable
----@overload fun(msg: any)
+---@overload fun(msg: any, source: Worker)
 
----@alias pipeInput (Worker | Pipable | fun(msg): any)
+---@alias pipeInput (Worker | Pipable | MsgHandler)
 
 ---@generic T1 : pipeInput
 ---@param first T1
@@ -87,9 +95,10 @@ function pipe(first, ...) end
 
 ---@param worker Worker
 ---@param msg any
-function notify_all(worker, msg) end
+---@param sender Worker?
+function notify_all(worker, msg, sender) end
 
----@param on_msg fun(self: Worker, msg: any)
+---@param on_msg MsgHandler
 ---@return Pipable
 function create_worker(on_msg) end
 

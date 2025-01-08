@@ -34,6 +34,11 @@ public:
     }
 
     void OnMsg(QVariant const& msg) override {
+        auto sender = CurrentSender();
+        auto* w = sender.value<Worker*>();
+        if (w) {
+            assert(w == this);
+        }
         Info("Msg => '{}'", msg.toString());
     }
 

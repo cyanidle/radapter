@@ -149,7 +149,7 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     if constexpr (string_like<T>) {
         if (t == QVariant::StringList) {
             auto l = conf.toStringList();
-            out.resize(l.size());
+            out.resize(unsigned(l.size()));
             int idx = 0;
             for (auto& str: out) {
                 auto i = idx++;

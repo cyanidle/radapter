@@ -1,4 +1,5 @@
 #include "radapter/radapter.hpp"
+#include "worker_impl.hpp"
 #include "utils.hpp"
 #include <fmt/args.h>
 #include <QTimer>
@@ -297,9 +298,7 @@ int builtin::help::traceback(lua_State* L) noexcept {
 
 template<typename Fn>
 inline void iterateTable(lua_State* L, Fn&& f) {
-    if (lua_type(L, -1) != LUA_TTABLE) {
-        throw Err("iterateTable(): Table expected");
-    }
+    assert(lua_type(L, -1) == LUA_TTABLE);
     lua_pushnil(L);
     while(lua_next(L, -2)) {
         auto was = lua_gettop(L);
@@ -454,6 +453,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
 }
 
 inline unsigned isArray(lua_State* L) noexcept {
+    assert(lua_type(L, -1) == LUA_TTABLE);
     lua_Integer hits = 0;
     lua_Integer max = 0;
     lua_pushnil(L);
@@ -486,13 +486,16 @@ QString builtin::help::toQStr(lua_State* L, int idx) {
 }
 
 QVariant builtin::help::toQVar(lua_State* L, int idx) {
+#ifndef NDEBUG
+    auto was = lua_gettop(L);
+    defer check([&]{
+        assert(lua_gettop(L) == was && "toQVar unbalanced stack!");
+    });
+#endif
     switch (lua_type(L, idx)) {
     case LUA_TTABLE: {
         if (!lua_checkstack(L, 3)) return {}; // nil + key + val
-        if (luaL_getmetafield(L, idx, "__call")) {
-            lua_pop(L, 1);
-            return QVariant::fromValue(LuaFunction(L, idx));
-        }
+        lua_pushvalue(L, idx);
         if (auto len = isArray(L)) {
             QVariantList arr;
             arr.reserve(int(len));
@@ -501,10 +504,10 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
                 arr.push_back(toQVar(L));
                 lua_pop(L, 1);
             }
+            lua_pop(L, 1);
             return arr;
         } else {
             QVariantMap map;
-            lua_pushvalue(L, idx);
             iterateTable(L, [&]{
                 auto key = -2;
                 QString k;
@@ -555,13 +558,23 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
-        if (auto qptr = glua::TestUData<QPointer<QObject>>(L, idx)) {
+        auto isWorker = lua_getmetatable(L, idx);
+        if (isWorker) {
+            lua_getfield(L, -1, "__marker");
+            isWorker = lua_type(L, -1) == LUA_TLIGHTUSERDATA && lua_touserdata(L, -1) == &workers::Marker;
+            lua_pop(L, 2);
+        }
+        if (isWorker) {
+            auto* impl = static_cast<WorkerImpl*>(lua_touserdata(L, idx));
+            if (auto* w = impl->self.data()) {
+                return QVariant::fromValue(w);
+            } else {
+                return {};
+            }
+        } else if (auto qptr = glua::TestUData<QObjPtr>(L, idx)) {
             auto object = qptr->data();
             if (!object) return {};
             return QVariant::fromValue(object);
-        } else if (luaL_getmetafield(L, idx, "__call")) {
-            lua_pop(L, 1);
-            return QVariant::fromValue(LuaFunction(L, idx));
         } else {
             return {};
         }

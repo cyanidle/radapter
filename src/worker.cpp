@@ -1,7 +1,7 @@
 #include "radapter/worker.hpp"
 #include "instance_impl.hpp"
-#include <QPointer>
 #include "glua/glua.hpp"
+#include "worker_impl.hpp"
 
 namespace radapter
 {
@@ -21,6 +21,11 @@ lua_State *Worker::LuaState() const
     return _Inst->LuaState();
 }
 
+QVariant Worker::CurrentSender()
+{
+    return _Impl ? _Impl->currentSender : QVariant{};
+}
+
 void Worker::Shutdown() {
     emit ShutdownDone();
 }
@@ -36,52 +41,40 @@ struct FactoryContext {
 };
 DESCRIBE("radapter::FactoryContext", FactoryContext, void) {}
 
-// object which represents worker inside lua
-struct WorkerImpl {
-    lua_State* L;
-    QPointer<Worker> self{};
-    QMetaObject::Connection conn{};
-    int listenersRef = LUA_NOREF;
-
-    static int get_listeners(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
-        return 1;
-    };
-
-    static int worker_call(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        auto w = ud->self.data();
-        if (!w) {
-            throw Err("worker not usable");
-        }
-        w->OnMsg(builtin::help::toQVar(L, 2));
-        return 1;
-    }
-
-    static int call_extra(lua_State* L) {
-        auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-        auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
-        auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
-        auto w = ud->self.data();
-        if (!w) {
-            throw Err("worker not usable");
-        }
-        glua::Push(L, method(w, builtin::help::toArgs(L, 2)));
-        return 1;
-    }
-
-    ~WorkerImpl() {
-        luaL_unref(L, LUA_REGISTRYINDEX, listenersRef);
-        if (self) {
-            QObject::disconnect(conn);
-            self->deleteLater();
-        }
-    }
+static int get_listeners(lua_State* L) {
+    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
+    return 1;
 };
-DESCRIBE("radapter::WorkerImpl", WorkerImpl, void) {}
+
+static int worker_call(lua_State* L) {
+    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    auto was = ud->currentSender;
+    defer revert([&]{
+        ud->currentSender = was;
+    });
+    ud->currentSender = builtin::help::toQVar(L, 3);
+    auto w = ud->self.data();
+    if (!w) {
+        throw Err("worker not usable");
+    }
+    w->OnMsg(builtin::help::toQVar(L, 2));
+    return 1;
+}
+
+static int call_extra(lua_State* L) {
+    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
+    auto w = ud->self.data();
+    if (!w) {
+        throw Err("worker not usable");
+    }
+    glua::Push(L, method(w, builtin::help::toArgs(L, 2)));
+    return 1;
+}
 
 static int workerFactory(lua_State* L) {
     auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
@@ -90,7 +83,9 @@ static int workerFactory(lua_State* L) {
     auto* w = ctx->factory(ctorArgs, inst);
     auto* ud = lua_udata(L, sizeof(WorkerImpl));
     auto* impl = new (ud) WorkerImpl{L};
+
     impl->self = w;
+    w->_Impl = impl;
 
     lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
     auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -101,7 +96,7 @@ static int workerFactory(lua_State* L) {
     lua_createtable(L, 0, 0); //subs
     impl->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
 
-    impl->conn = QObject::connect(w, &Worker::SendMsg, w, [impl, w, L](QVariant const& msg){
+    impl->conn = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
         if (!lua_checkstack(L, 4)) {
             w->Error("Could not reserve stack to send msg");
             return;
@@ -111,19 +106,24 @@ static int workerFactory(lua_State* L) {
         lua_getglobal(L, "call_all");
         lua_rawgeti(L, LUA_REGISTRYINDEX, impl->listenersRef);
         glua::Push(L, msg);
-        auto ok = lua_pcall(L, 2, 0, msgh);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, workerSelfRef);
+        auto ok = lua_pcall(L, 3, 0, msgh);
         if (ok != LUA_OK) {
             w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
         }
         lua_settop(L, msgh - 1);
     });
     if (luaL_newmetatable(L, ctx->name.c_str())) {
+
+        lua_pushlightuserdata(L, &builtin::workers::Marker);
+        lua_setfield(L, -2, "__marker");
+
         lua_pushvalue(L, lua_upvalueindex(1));
-        lua_pushcclosure(L, glua::protect<WorkerImpl::get_listeners>, 1);
+        lua_pushcclosure(L, glua::protect<get_listeners>, 1);
         lua_setfield(L, -2, "get_listeners");
 
         lua_pushvalue(L, lua_upvalueindex(1));
-        lua_pushcclosure(L, glua::protect<WorkerImpl::worker_call>, 1);
+        lua_pushcclosure(L, glua::protect<worker_call>, 1);
         lua_pushvalue(L, -1);
         lua_setfield(L, -3, "__call");
         lua_setfield(L, -2, "call");
@@ -135,7 +135,7 @@ static int workerFactory(lua_State* L) {
             static_assert(sizeof(void*) >= sizeof(method));
             lua_pushvalue(L, lua_upvalueindex(1));
             lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
-            lua_pushcclosure(L, glua::protect<WorkerImpl::call_extra>, 2);
+            lua_pushcclosure(L, glua::protect<call_extra>, 2);
             lua_settable(L, -3);
         }
 

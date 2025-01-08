@@ -81,7 +81,7 @@ public:
 	{
 		Parse(config, args.value(0));
 		port = new QSerialPort(config.port, this);
-		port->setBaudRate(config.baud);
+        port->setBaudRate(int(config.baud));
 		port->setDataBits(QSerialPort::DataBits(config.data_bits.value));
 		port->setParity(config.parity);
 		port->setStopBits(config.stop_bits);
@@ -96,7 +96,7 @@ public:
 	}
 
 	void SendBinary(string_view buff) override {
-		port->write(buff.data(), buff.size());
+        port->write(buff.data(), qint64(buff.size()));
 		port->flush();
 	}
 };

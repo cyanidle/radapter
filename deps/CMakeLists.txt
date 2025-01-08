@@ -73,6 +73,7 @@ CPMAddPackage(NAME luasocket
   DOWNLOAD_ONLY YES
 )
 
+
 set(LUASOCK_SRC
   src/luasocket.c
   src/timeout.c
@@ -101,3 +102,22 @@ target_compile_definitions(radapter-luasock PRIVATE LUASOCKET_DEBUG)
 if (WIN32)
     target_link_libraries(radapter-luasock PUBLIC ws2_32)
 endif()
+
+
+
+CPMAddPackage(NAME luafilesystem
+  GITHUB_REPOSITORY lunarmodules/luafilesystem
+  VERSION 1.8.0
+  GIT_TAG v1_8_0
+  GIT_SHALLOW YES
+  DOWNLOAD_ONLY YES
+)
+
+set(LUAFS_SRC
+  src/lfs.c
+)
+
+list(TRANSFORM LUAFS_SRC PREPEND ${luafilesystem_SOURCE_DIR}/)
+add_library(radapter-luafs STATIC ${LUAFS_SRC})
+target_include_directories(radapter-luafs PRIVATE ${luafilesystem_SOURCE_DIR}/src)
+target_link_libraries(radapter-luafs PRIVATE radapter-lua)

@@ -39,16 +39,16 @@ end
 local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")
-    all[#all + 1] = function(msg)
-        local ok, err = pcall(ipipe.call, ipipe, msg)
+    all[#all + 1] = function(msg, sender)
+        local ok, err = xpcall(ipipe.call, debug.traceback, ipipe, msg, sender)
         if not ok then
             log.error("In (Pipe): {}", err)
         end
     end
 end
 
-function notify_all(worker, msg)
-    call_all(worker:get_listeners(), msg)
+function notify_all(worker, msg, sender)
+    call_all(worker:get_listeners(), msg, sender or worker)
 end
 
 function create_worker(on_msg)
@@ -57,22 +57,22 @@ function create_worker(on_msg)
         get_listeners = function (self)
             return self.__listeners
         end,
-        call = function(self, msg)
-            on_msg(self, msg)
+        call = function(self, msg, sender)
+            on_msg(self, msg, sender)
         end
     }, {
-        __call = function (self, msg)
-            self:call(msg)
+        __call = function (self, msg, sender)
+            on_msg(self, msg, sender)
         end
     })
 end
 
 -- TODO: maybe reuse create_worker() here
 local function wrap_func(f)
-    return create_worker(function(self, msg)
+    return create_worker(function(self, msg, sender)
         local temp = f(msg)
         if temp ~= nil then
-            notify_all(self, temp)
+            notify_all(self, temp, sender)
         end
     end)
 end

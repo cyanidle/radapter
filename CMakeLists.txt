@@ -105,6 +105,7 @@ target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 target_link_libraries(radapter-sdk PRIVATE
     rpcxx-future
     rpcxx-json
+    radapter-luafs
     radapter-luasock)
 
 target_link_libraries(radapter-sdk PUBLIC 

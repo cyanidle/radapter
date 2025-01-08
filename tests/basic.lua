@@ -38,6 +38,8 @@ local test = TestWorker {
     delay = 1000
 }
 
+pipe(test, test)
+
 assert(not pcall(pipe), "Empty pipe() should fail")
 
 assert(pipe(test) == test, "pipe(x) == x")

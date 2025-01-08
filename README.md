@@ -101,7 +101,7 @@ pipe(worker1, worker2, func3) --> returns 'worker1'
 
 ### IPipeable
 1) `get_listeners(self) -> table` -> return table of listeners
-2) `call(self, msg)` -> handle incoming
+2) `call(self, msg, sender?)` -> handle incoming
 ```lua
 function MyWorker()
    local listeners = {} -- should be a table!
@@ -134,6 +134,10 @@ end
 call_all(worker1:get_listeners(), {
    data = "msg data"
 })
+-- OR
+notify_all(worker1, {
+   data = "msg data"
+})
 ```
 
 ### IPipeable for functions
@@ -156,7 +160,7 @@ local like_result = {
    call = function(self, msg)
       local temp = self.fn(msg)
       if temp ~= nil then
-         call_all(self.listeners, temp)
+         call_all(self.listeners, temp, self)
       end
    end
 }

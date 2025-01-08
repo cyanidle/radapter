@@ -9,11 +9,13 @@ struct lua_State;
 namespace radapter
 {
 
+struct WorkerImpl;
 class Instance;
 class Worker : public QObject {
     Q_OBJECT
 public:
     Instance* _Inst;
+    WorkerImpl* _Impl;
 
     Worker(Instance* parent, const char* category);
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
@@ -34,9 +36,12 @@ public:
         Log(error, fmt, fmt::make_format_args(a...));
     }
     lua_State* LuaState() const;
+
     virtual void OnMsg(QVariant const& msg) = 0;
     virtual void Shutdown();
     virtual ~Worker();
+protected:
+    QVariant CurrentSender();
 signals:
     void ShutdownDone();
     void SendMsg(QVariant const& msg);
