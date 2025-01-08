@@ -7,43 +7,44 @@
 
 void log(const char* log);
 
+//////////////////////
+
+MAKE_MSG(LogMsg,
+  (msg2struct::String) data
+);
+
+MAKE_MSG(LedCmd,
+  (unsigned) power
+);
+
+TOPICS(
+  (log, LogMsg, PUB),
+  (led, LedCmd, SUB)
+);
+
+//////////////////////
+
 struct LedTicker {
   unsigned power = 100;
   long lastFlip = 0;
   bool state = false;
 
-  void tick();
+  void tick() {
+    auto ms = millis();
+    auto diff = ms - lastFlip;
+    if (diff > power * 3) {
+      digitalWrite(LED_BUILTIN, state = !state);
+      lastFlip = ms;
+  }
+}
 };
 
 LedTicker led;
 
-//////////////////////
-
-
-MAKE_MSG(LogMsg, 0,
-  (msg2struct::String) data
-);
-
-MAKE_MSG(LedCmd, 1,
-  (unsigned) power
-);
-
-//////////////////////
-
-void LedCmd::handle() {
+void on_led(LedCmd& cmd) {
   log("New Power!");
-  led.power = 360 - (power > 360 ? 360 : power);
+  led.power = 360 - (cmd.power > 360 ? 360 : cmd.power);
 }
-
-void LedTicker::tick() {
-  auto ms = millis();
-  auto diff = ms - lastFlip;
-  if (diff > power * 3) {
-    digitalWrite(LED_BUILTIN, state = !state);
-    lastFlip = ms;
-  }
-}
-
 
 //////////////////////
 
@@ -60,54 +61,19 @@ int ptr = 0;
 bool escaped = false;
 bool error = false;
 
-#define CHECK_MSG(T) \
-case T::ID: { \
-  T m; \
-  if (Parse(m, iter)) m.handle(); \
-  else log("Not a msg of type: "), log(#T); \
-  break; \
+msg2struct::OutIterator topics_send_begin() {
+  return {out_buffer, sizeof(out_buffer)};
 }
 
-void outSlipReady(size_t count) {
-    slipa::Write(msg2struct::String{out_buffer, count}, [&](msg2struct::String part){
-      Serial.write(part.str, part.size);
-    });
-    Serial.write(slipa::END);
-    Serial.flush();
+void topics_send_finish(msg2struct::OutIterator iter) {
+  auto count = iter.Written();
+  slipa::Write(msg2struct::String{out_buffer, count}, [&](msg2struct::String part){
+    Serial.write(part.str, part.size);
+  });
+  Serial.write(slipa::END);
+  Serial.flush();
 }
 
-msg2struct::OutIterator prepareMsg(int id) {
-  msg2struct::OutIterator iter(out_buffer, sizeof(out_buffer));
-  iter.BeginArray(2);
-  iter.WriteInteger(LogMsg::ID);
-  return iter;
-}
-
-template<typename T>
-void sendMsg(const T& msg) {
-  auto iter = prepareMsg(msg.ID);
-  if (Dump(msg, iter)) {
-    outSlipReady(iter.Written());
-  }
-}
-
-void slipReady() {
-  msg2struct::InIterator iter(buffer, ptr);
-  size_t arr;
-  int id;
-  if (!iter.GetArraySize(arr) || arr < 2 || !iter.GetInteger(id)) {
-    log("Error: expected a pair (array) of id + msg");
-    return;
-  }
-  switch (id) {
-  CHECK_MSG(LedCmd)
-  default: {
-    char temp[50];
-    sprintf(temp, "Error: Unknown msg type: %d", id);
-    log(temp);
-  }
-  }
-}
 
 void inputError(const char* err) {
   log("Input Err: Reset input! Details:");
@@ -140,7 +106,7 @@ void loop() {
         continue;
       }
     } else if (ch == slipa::END) {
-      slipReady();
+      ReceiveMsg(msg2struct::InIterator(buffer, ptr));
       ptr = 0;
     } else if (ch == slipa::ESC) {
       escaped = true;
@@ -154,5 +120,11 @@ void loop() {
 void log(const char* log) {
   LogMsg msg;
   msg.data = {log, strlen(log)};
-  sendMsg(msg);
+  send_log(msg);
+}
+
+void topics_error(const char* err) {
+  char buff[50];
+  sprintf(buff, "Topic error: %s", err);
+  log(buff);
 }
