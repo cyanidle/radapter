@@ -57,6 +57,31 @@ local rules = {
     double = tonumber,
 }
 
+---@alias Msgs table<string, TopicField[]>
+
+---@param body string
+---@param out Msgs
+---@param seq number
+local function parse_body(body, out, seq)
+    for field in string.gmatch(body, "[^,]+") do
+        local field_type, field_name  = string.match(field, "%((.*)%)%s*(%w+)")
+        if not (field_type and field_name) then
+            error("Invalid MAKE_MSG() format: "..body)
+        end
+        local value_converter = nil
+        for known_type, converter in pairs(rules) do
+            if string.match(field_type, known_type) then
+                value_converter = converter
+            end
+        end
+        out[seq] = {
+            name = field_name,
+            converter = value_converter
+        }
+        seq = seq + 1
+    end
+end
+
 ---@param worker Worker
 ---@param file string
 ---@return any
@@ -68,24 +93,27 @@ return function (worker, file)
     ---@type string
     local data = f:read("a")
     data = data:gsub("\n", "")
-    ---@type table<string, TopicField[]>
+    ---@type Msgs
     local msgs = {}
+
     for type, body in data:gmatch("MAKE_MSG%s*%(%s*(%w+)%s*,([^;]*)%)%s*;") do
         msgs[type] = {}
         local current_table = msgs[type]
-        for field in string.gmatch(body, "[^,]+") do
-            local field_type, field_name  = string.match(field, "%((.*)%)%s*(%w+)")
-            local value_converter = nil
-            for known_type, converter in pairs(rules) do
-                if string.match(field_type, known_type) then
-                    value_converter = converter
-                end
-            end
-            current_table[#current_table + 1] = {
-                name = field_name,
-                converter = value_converter
-            }
+        parse_body(body, current_table, 1)
+    end
+    for parent, type, body in data:gmatch("MAKE_MSG_INHERIT%s*%(%s*(%w+)%s*,%s*(%w+)%s*,([^;]*)%)%s*;") do
+        msgs[type] = {}
+        local current_table = msgs[type]
+        local parent_desc = msgs[parent]
+        if not parent_desc then
+            error("Could not find parent ("..parent..") for: "..type)
         end
+        local seq = 1
+        for _, v in ipairs(parent_desc) do
+            current_table[seq] = v
+            seq = seq + 1
+        end
+        parse_body(body, current_table, seq)
     end
     local result_topics = {}
     local topics_data = data:match("TOPICS%s*%([^;]*%)%s*;")
