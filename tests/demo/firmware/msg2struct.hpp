@@ -197,21 +197,21 @@ inline size_t nonCompositeSizeof(Headers type) {
 
 template<typename T, typename check<sizeof(T) == 1>::type = 1>
 _ALWAYS_INLINE inline T bswap(T val) noexcept {return val;}
+
+template<typename I, typename T>
+_ALWAYS_INLINE inline T do_bswap(T val, I temp) noexcept {
+    ::memcpy(&temp, &val, sizeof(temp));
+    temp = __builtin_bswap16(temp);
+    ::memcpy(&val, &temp, sizeof(temp));
+    return val;
+}
+
 template<typename T, typename check<sizeof(T) == 2>::type = 1>
-_ALWAYS_INLINE inline T bswap(T& val) noexcept {
-    auto temp = __builtin_bswap16(*reinterpret_cast<uint16_t*>(&val));
-    return *reinterpret_cast<T*>(&temp);
-}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint16_t{});}
 template<typename T, typename check<sizeof(T) == 4>::type = 1>
-_ALWAYS_INLINE inline T bswap(T val) noexcept {
-    auto temp = __builtin_bswap32(*reinterpret_cast<uint32_t*>(&val));
-    return *reinterpret_cast<T*>(&temp);
-}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint32_t{});}
 template<typename T, typename check<sizeof(T) == 8>::type = 1>
-_ALWAYS_INLINE inline T bswap(T val) noexcept {
-    auto temp = __builtin_bswap64(*reinterpret_cast<uint64_t*>(&val));
-    return *reinterpret_cast<T*>(&temp);
-}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint64_t{});}
 
 template<typename T>
 _ALWAYS_INLINE inline T from_big(T val) {
@@ -239,7 +239,7 @@ bool getTrivialWith(U& out, const unsigned char* data, size_t size) {
     if (size < (sizeof(v) + 1)) return false;
     impl::getTrivial(v, data + 1);
     out = T(v);
-    if (out > 0 != v > 0) return false; //sign missmatch
+    if ((out > 0) != (v > 0)) return false; //sign missmatch
     if (sizeof(T) > sizeof(out)) {
         if (v != T(out)) return false; //overflow
     }
@@ -361,7 +361,7 @@ public:
         case Headers::fixint: {
             auto v = int8_t(data[0]);
             out = T(v);
-            if (out > 0 != v > 0) return false;
+            if ((out > 0) != (v > 0)) return false;
             ok = true;
             break;
         }

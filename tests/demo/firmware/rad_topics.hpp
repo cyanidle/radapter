@@ -4,7 +4,7 @@
 #include "map.h"
 
 // Public API
-////////////////////////
+///////////////////////////////////
 enum TopicDir {
   PUB = 1,
   SUB = 2,
@@ -16,11 +16,14 @@ msg2struct::OutIterator topics_send_begin();
 void topics_send_finish();
 inline void topics_receive_msg(msg2struct::InIterator iter);
 
+
 //MAKE_MSG()
 //MAKE_MSG_INHERIT()
 //TOPICS()
 
-////////////////////////
+
+// Private Impl
+///////////////////////////////////
 
 #define OPEN_PARENS(x) x
 #define EAT_PARENS(x)
@@ -39,38 +42,49 @@ inline void topics_receive_msg(msg2struct::InIterator iter);
   MSG_2_STRUCT_INHERIT(parent, MAP_LIST(GET_FIELD_NAME, __VA_ARGS__)) \
 }
 
-#define _MAKE_TOPIC_SUB(name, msg, mode) case (__COUNTER__ - _topics_sub_start): {\
-  if (!(mode & SUB)) return false; \
+///////////////////////////////////
+
+#define _TOPIC_FUNCS_PUB(name, msg) namespace topics {void send_##name(msg const& m) { \
+  auto iter = _topics_prepareMsg(__COUNTER__ - _topics_pub_start); \
+  if (Dump(m, iter)) topics_send_finish(iter); \
+  else topics_error("Could not send: " #name); \
+}}
+
+#define _TOPIC_FUNCS_SUB(name, msg) namespace topics {void on_##name(msg& m);}
+
+#define _TOPIC_FUNCS_PUBSUB(name, msg) \
+  _TOPIC_FUNCS_PUB(name, msg) \
+  _TOPIC_FUNCS_SUB(name, msg)
+
+#define _TOPIC_FUNCS_AUX(name, msg, mode) _TOPIC_FUNCS_##mode(name, msg)
+#define _TOPIC_FUNCS(tuple) _TOPIC_FUNCS_AUX tuple
+
+///////////////////////////////////
+
+#define _TOPIC_BODY_PUB(name, msg) case (__COUNTER__ - _topics_sub_start): return false;
+#define _TOPIC_BODY_PUBSUB(name, msg) _TOPIC_BODY_SUB(name, msg)
+#define _TOPIC_BODY_SUB(name, msg) case (__COUNTER__ - _topics_sub_start): { \
   msg m; \
-  void on_##name(msg& m);\
-  if(msg2struct::Parse(m, iter)) on_##name(m);\
+  if(msg2struct::Parse(m, iter)) topics::on_##name(m);\
   else topics_error("MSG ERR: " #msg);\
   return true; \
 }
 
-#define _DO_MAKE_TOPIC_PUB(name, msg) void send_##name(msg const& m) { \
-  auto iter = _topics_prepareMsg(__COUNTER__ - _topics_pub_start); \
-  if (Dump(m, iter)) topics_send_finish(iter); \
-  else topics_error("Could not send: " #name); \
-}
-#define _DO_MAKE_TOPIC_PUBSUB(...) _DO_MAKE_TOPIC_PUB(__VA_ARGS__)
-#define _DO_MAKE_TOPIC_SUB(...)
+#define _TOPIC_BODY_AUX(name, msg, mode) _TOPIC_BODY_##mode(name, msg)
+#define _TOPIC_BODY(tuple) _TOPIC_BODY_AUX tuple
 
-#define _MAKE_TOPIC_PUB(name, msg, mode) _DO_MAKE_TOPIC_##mode(name, msg)
-
-#define _MAKE_TOPIC_SUB0(...) _MAKE_TOPIC_SUB __VA_ARGS__
-#define _MAKE_TOPIC_PUB0(...) _MAKE_TOPIC_PUB __VA_ARGS__
+///////////////////////////////////
 
 #define TOPICS(...) \
+  constexpr int _topics_pub_start = __COUNTER__ + 1; \
+  MAP(_TOPIC_FUNCS, __VA_ARGS__) \
   constexpr int _topics_sub_start = __COUNTER__ + 1; \
   bool _topics_check_msg(int id, msg2struct::InIterator iter) { \
-    switch (id) { MAP(_MAKE_TOPIC_SUB0, __VA_ARGS__) default: return false;} \
+    switch (id) { MAP(_TOPIC_BODY, __VA_ARGS__) default: return false;} \
   } \
-  constexpr int _topics_pub_start = __COUNTER__ + 1; \
-  MAP(_MAKE_TOPIC_PUB0, __VA_ARGS__) \
-  struct TopicsSub {}
+  struct Topics {}
 
-
+///////////////////////////////////
 
 bool _topics_check_msg(int id, msg2struct::InIterator iter);
 

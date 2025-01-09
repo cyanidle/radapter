@@ -19,6 +19,7 @@ MAKE_MSG(LedCmd,
 
 TOPICS(
   (log, LogMsg, PUB),
+  (error, LogMsg, PUB),
   (led, LedCmd, SUB)
 );
 
@@ -41,7 +42,7 @@ struct LedTicker {
 
 LedTicker led;
 
-void on_led(LedCmd& cmd) {
+void topics::on_led(LedCmd& cmd) {
   log("New Power!");
   led.power = 360 - (cmd.power > 360 ? 360 : cmd.power);
 }
@@ -55,8 +56,8 @@ void setup() {
   log("### Reset!");
 }
 
-char buffer[400];
-char out_buffer[400];
+unsigned char buffer[400];
+unsigned char out_buffer[400];
 int ptr = 0;
 bool escaped = false;
 bool error = false;
@@ -67,7 +68,7 @@ msg2struct::OutIterator topics_send_begin() {
 
 void topics_send_finish(msg2struct::OutIterator iter) {
   auto count = iter.Written();
-  slipa::Write(msg2struct::String{out_buffer, count}, [&](msg2struct::String part){
+  slipa::Write(msg2struct::String{(const char*)out_buffer, count}, [&](msg2struct::String part){
     Serial.write(part.str, part.size);
   });
   Serial.write(slipa::END);
@@ -120,7 +121,7 @@ void loop() {
 void log(const char* log) {
   LogMsg msg;
   msg.data = {log, strlen(log)};
-  send_log(msg);
+  topics::send_log(msg);
 }
 
 void topics_error(const char* err) {
