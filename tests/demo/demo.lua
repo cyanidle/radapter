@@ -1,6 +1,10 @@
 local com = args[1]
-local make_msg_topic = require "make_topic"
-local led
+local parse_topics = require "parse_topics"
+
+---@class topics
+---@field logs Worker?
+---@field led Worker?
+local topics = {}
 
 if com then
     local serial = Serial {
@@ -10,10 +14,9 @@ if com then
         baud = 57600
     }
     
-    local logs = make_msg_topic(serial, 0, {"data"})
-    led = make_msg_topic(serial, 1, {"power"})
+    topics = parse_topics(serial, "./firmware/firmware.ino")
 
-    pipe(logs, function (msg)
+    pipe(topics.log, function (msg)
         log("From device: {}", msg.data)
     end)
 end
@@ -31,9 +34,9 @@ local state = RedisCache {
     hash_key = "gui:state"
 }
 
-if (led) then
+if (topics.led) then
     pipe(view, filter("angle"), function(msg)
-        led {
+        topics.led {
             power = math.floor(msg.angle)
         }
     end)

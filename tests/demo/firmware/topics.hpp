@@ -14,7 +14,7 @@ enum TopicDir {
 void topics_error(const char* err);
 msg2struct::OutIterator topics_send_begin();
 void topics_send_finish();
-inline void ReceiveMsg(msg2struct::InIterator iter);
+inline void topics_receive_msg(msg2struct::InIterator iter);
 
 //MAKE_MSG()
 //MAKE_MSG_INHERIT()
@@ -63,7 +63,7 @@ inline void ReceiveMsg(msg2struct::InIterator iter);
 
 #define TOPICS(...) \
   constexpr int _topics_sub_start = __COUNTER__ + 1; \
-  bool _TopicsRun(int id, msg2struct::InIterator iter) { \
+  bool _topics_check_msg(int id, msg2struct::InIterator iter) { \
     switch (id) { MAP(_MAKE_TOPIC_SUB0, __VA_ARGS__) default: return false;} \
   } \
   constexpr int _topics_pub_start = __COUNTER__ + 1; \
@@ -72,7 +72,7 @@ inline void ReceiveMsg(msg2struct::InIterator iter);
 
 
 
-bool _TopicsRun(int id, msg2struct::InIterator iter);
+bool _topics_check_msg(int id, msg2struct::InIterator iter);
 
 inline msg2struct::OutIterator _topics_prepareMsg(int id) {
   msg2struct::OutIterator iter = topics_send_begin();
@@ -81,14 +81,14 @@ inline msg2struct::OutIterator _topics_prepareMsg(int id) {
   return iter;
 }
 
-inline void ReceiveMsg(msg2struct::InIterator iter) {
+inline void topics_receive_msg(msg2struct::InIterator iter) {
   size_t arr;
   int id;
   if (!iter.GetArraySize(arr) || arr < 2 || !iter.GetInteger(id)) {
     topics_error("Error: could not get topic ID");
     return;
   }
-  if (!_TopicsRun(id, iter)) {
+  if (!_topics_check_msg(id, iter)) {
     char temp[50];
     sprintf(temp, "Error: Unknown msg type: %d", id);
     topics_error(temp);

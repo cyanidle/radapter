@@ -3,7 +3,7 @@
 
 #include "msg2struct.hpp"
 #include "slipa.hpp"
-#include "msgs.hpp"
+#include "topics.hpp"
 
 void log(const char* log);
 
@@ -106,7 +106,7 @@ void loop() {
         continue;
       }
     } else if (ch == slipa::END) {
-      ReceiveMsg(msg2struct::InIterator(buffer, ptr));
+      topics_receive_msg(msg2struct::InIterator(buffer, ptr));
       ptr = 0;
     } else if (ch == slipa::ESC) {
       escaped = true;
