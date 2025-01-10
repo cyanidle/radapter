@@ -1,17 +1,32 @@
-local ws = WebsocketServer{port = 6337}
+local server = WebsocketServer{
+    port = 6337,
+    protocol = "msgpack",
+    compression = "zlib",
+}
 
-pipe(ws, log)
-pipe(
-    ws,
-    function(msg)
-        return msg
-    end,
-    log.info
-)
+local client = WebsocketClient{
+    url = "ws://127.0.0.1:6337",
+    protocol = "msgpack",
+    compression = "zlib",
+}
+
+pipe(server, function(msg)
+    log.info("SERVER <= {}", msg)
+end)
+
+pipe(client, function(msg)
+    log.info("CLIENT <= {}", msg)
+end)
+
 
 local counter = 0
 each(1000, function ()
     counter = counter + 1
-    ws {data = fmt("This is a msg #{}", counter)}
-    return counter
+    server {data = fmt("From from server #{}", counter)}
+end)
+
+
+each(2000, function ()
+    counter = counter + 1
+    client {data = fmt("From from client #{}", counter)}
 end)

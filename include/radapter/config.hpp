@@ -85,8 +85,8 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     }
     auto name = conf.toString().toStdString();
     if (!describe::name_to_enum(name, out)) {
-        throw Err("{}: Invalid value for enum ({}): {}. Valid: []",
-                  frame, desc.name, name, fmt::join(describe::field_names<T>(), ", "));
+        throw Err("{}: Invalid value for enum ({}): {}. Valid: [{}]",
+                  frame, desc.name, name, fmt::join(describe::enum_names<T>(), ", "));
     }
 }
 

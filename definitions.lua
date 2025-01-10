@@ -336,6 +336,9 @@ function RedisStream(params) end
 ---@return Worker
 function WebsocketServer(params) end
 
+---@return Worker
+function WebsocketClient(params) end
+
 ---@class TempFileObject
 TempFileObject = {}
 
