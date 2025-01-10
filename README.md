@@ -33,7 +33,7 @@ radapter --schema # -> prints a json with available config description
 ```
 
 ## JIT
-Для сборки с поддержкой Just in Time Compiltion:
+Для сборки с поддержкой Just in Time Compilation:
 ```bash
 sudo apt install libluajit2-5.1-dev #статическая 
 cmake -B build -G Ninja -D RADAPTER_JIT=ON
