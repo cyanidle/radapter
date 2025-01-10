@@ -22,11 +22,11 @@ end)
 local counter = 0
 each(1000, function ()
     counter = counter + 1
-    server {data = fmt("From from server #{}", counter)}
+    server {data = fmt("From from server #{}", counter), arr = {1, 2, 3}}
 end)
 
 
 each(2000, function ()
     counter = counter + 1
-    client {data = fmt("From from client #{}", counter)}
+    client {data = fmt("From from client #{}", counter), arr = {1, 2, 3}}
 end)

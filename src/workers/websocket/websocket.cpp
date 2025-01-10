@@ -188,13 +188,15 @@ public:
             throw Err("{}: could not listen on: {}:{}", objectName(), config.host.value, config.port);
         }
         Info("{}: listening on {}:{}", objectName(), config.host.value, config.port);
-        auto timer = new QTimer(this);
-        timer->callOnTimeout(this, [this]{
-            if (state.isValid()) {
-                broadcast(state);
-            }
-        });
-        timer->start(int(config.refresh_timeout));
+        if (config.refresh_timeout) {
+            auto timer = new QTimer(this);
+            timer->callOnTimeout(this, [this]{
+                if (state.isValid()) {
+                    broadcast(state);
+                }
+            });
+            timer->start(int(config.refresh_timeout));
+        }
         connect(server, &QWebSocketServer::newConnection, this, [this]{
             while(server->hasPendingConnections()) {
                 accept(server->nextPendingConnection());
@@ -202,10 +204,7 @@ public:
         });
     }
     void OnMsg(QVariant const& msg) override {
-        QVariant diff;
-        if (MergePatch(state, msg, &diff)) {
-            broadcast(diff);
-        }
+        broadcast(msg);
     }
     void accept(QWebSocket* sock) {
         sock->setParent(this);

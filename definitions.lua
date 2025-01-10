@@ -345,6 +345,9 @@ TempFileObject = {}
 ---@return string
 function TempFileObject:url() end;
 
+---@return string
+function TempFileObject:path() end;
+
 ---@return TempFileObject
 ---@param data string
 function temp_file(data) end;

@@ -254,23 +254,27 @@ int builtin::api::After(lua_State* L) {
 
 struct TempFileObject {
     std::shared_ptr<QTemporaryFile> _file;
-    std::string _url;
+    std::string _path;
 
     TempFileObject() {
         _file = std::make_shared<QTemporaryFile>();
         if (!_file->open()) {
             throw Err("Could not open temp file: {}", _file->errorString());
         }
-        _url = "file:///" + _file->fileName().toStdString();
+        _path = _file->fileName().toStdString();
     }
 
-    std::string_view url() {
-        return _url;
+    std::string url() {
+        return "file:///" + _path;
+    }
+    std::string_view path() {
+        return _path;
     }
 };
 
-DESCRIBE("TempFileObject", TempFileObject, void) {
-    MEMBER("url", &_::url);
+RAD_DESCRIBE(TempFileObject) {
+    RAD_MEMBER(url);
+    RAD_MEMBER(path);
 }
 
 int radapter::builtin::api::TempFile(lua_State* L)
@@ -452,33 +456,6 @@ void glua::Push(lua_State* L, QVariant const& val) {
     }
 }
 
-inline unsigned isArray(lua_State* L) noexcept {
-    assert(lua_type(L, -1) == LUA_TTABLE);
-    lua_Integer hits = 0;
-    lua_Integer max = 0;
-    lua_pushnil(L);
-    while(lua_next(L, -2)) {
-        ++hits;
-        if (lua_type(L, -2) != LUA_TNUMBER) {
-            lua_pop(L, 2); //pop key, value
-            return 0;
-        }
-        auto k = lua_tointeger(L, -2);
-        if (k < 1) {
-            lua_pop(L, 2); //pop key, value
-            return 0;
-        }
-        if (k > max) {
-            max = k;
-        }
-        lua_pop(L, 1); //pop value
-    }
-    if (hits < max) {
-        return 0;
-    }
-    return unsigned(hits);
-}
-
 QString builtin::help::toQStr(lua_State* L, int idx) {
     size_t len;
     auto s = lua_tolstring(L, idx, &len);
@@ -494,19 +471,13 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
 #endif
     switch (lua_type(L, idx)) {
     case LUA_TTABLE: {
-        if (!lua_checkstack(L, 3)) return {}; // nil + key + val
+        if (!lua_checkstack(L, 3)) // nil + key + val
+            return {};
         lua_pushvalue(L, idx);
-        if (auto len = isArray(L)) {
-            QVariantList arr;
-            arr.reserve(int(len));
-            for (int i = 1; unsigned(i) <= len; ++i) {
-                lua_rawgeti(L, idx, i);
-                arr.push_back(toQVar(L));
-                lua_pop(L, 1);
-            }
+        lua_rawgeti(L, -1, 1);
+        if (lua_type(L, -1) == LUA_TNIL) {
             lua_pop(L, 1);
-            return arr;
-        } else {
+            //object
             QVariantMap map;
             iterateTable(L, [&]{
                 auto key = -2;
@@ -520,11 +491,11 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
 #ifdef RADAPTER_JIT
                     k = QString::number(lua_tonumber(L, key));
 #else
-                    if (lua_isinteger(L, key)) {
-                        k = QString::number(lua_tointeger(L, key));
-                    } else {
-                        k = QString::number(lua_tonumber(L, key));
-                    }
+                        if (lua_isinteger(L, key)) {
+                            k = QString::number(lua_tointeger(L, key));
+                        } else {
+                            k = QString::number(lua_tonumber(L, key));
+                        }
 #endif
                     break;
                 }
@@ -535,6 +506,17 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
             });
             lua_pop(L, 1);
             return map;
+        } else {
+            //array
+            QVariantList arr;
+            arr.push_back(toQVar(L, -1));
+            lua_pop(L, 1);
+            for (lua_Integer i = 2; lua_rawgeti(L, -1, i), lua_type(L, -1) != LUA_TNIL; ++i) {
+                arr.push_back(toQVar(L, -1));
+                lua_pop(L, 1);
+            }
+            lua_pop(L, 2); //pop temp top and last iter nil
+            return arr;
         }
     }
     case LUA_TSTRING: {
