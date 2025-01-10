@@ -218,7 +218,7 @@ void PopulateSchema(T*&, QVariant& schema) {
 template<typename T, if_enum<T> = 1>
 void PopulateSchema(T&, QVariant& schema) {
     QVariantList opts;
-    for (auto k: describe::field_names<T>()) {
+    for (auto k: describe::enum_names<T>()) {
         opts.push_back(QString::fromLatin1(k.data(), int(k.size())));
     }
     schema = opts;
