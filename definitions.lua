@@ -31,6 +31,12 @@ function filter(pattern) end
 ---@param table any[]
 function call_all(table, ...) end
 
+-- TODO: docs regarding Service API
+---@param request Worker
+---@param responce Worker
+---@param id_field string
+function make_service(request, responce, id_field) end
+
 ---@enum (key) loggingLevel
 loggingLevel = {
     debug = 1,
