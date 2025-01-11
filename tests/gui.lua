@@ -12,8 +12,6 @@ Window {
     property alias цвет: rect.color
     title: "Привет из радаптера"
 
-    signal sendMsg(variant msg)
-
     Rectangle {
 
         TextArea {
@@ -39,7 +37,7 @@ Window {
             } else {
                 color = "#0000ff";
             }
-            sendMsg({
+            radapter.sendMsg({
                 flip: flip,
                 color: String(color),
                 nested: {

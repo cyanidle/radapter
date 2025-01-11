@@ -128,6 +128,8 @@ public:
 
     void LoadEmbeddedFile(string name, int opts = 0);
 
+    optional<fs::path> CurrentFile();
+
     void EvalFile(fs::path path);
     void Eval(string_view code, string_view chunk = "<eval>");
 

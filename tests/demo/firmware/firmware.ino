@@ -19,20 +19,20 @@ MAKE_MSG(LedCmd,
 );
 
 MAKE_MSG(Responce,
-  (int) id,
+  (uint32_t) id,
   (bool) ok
 );
 
 MAKE_MSG(Request, 
-  (int) id
+  (uint32_t) id
 );
 
 MAKE_MSG_INHERIT(Request, Gamble,
-  (unsigned) amount
+  (int32_t) amount
 );
 
 MAKE_MSG_INHERIT(Responce, Payout,
-  (int) amount
+  (int32_t) amount
 );
 
 TOPICS(
@@ -67,12 +67,21 @@ void topics::on_led(LedCmd& cmd) {
   led.power = 360 - (cmd.power > 360 ? 360 : cmd.power);
 }
 
-void topics::on_gamble_req(Gamble &m) {
-  Log("GAMBLE!!!");
+void topics::on_gamble_req(Gamble &gamble) {
+  char buff[50];
+  sprintf(buff, "GAMBLE!!! %lu", gamble.amount);
+  Log(buff);
   Payout resp;
-  resp.id = m.id;
+  resp.id = gamble.id;
   resp.ok = true;
-  resp.amount = -1000;
+  auto r = random();
+  if (r < RANDOM_MAX / 3) {
+    resp.amount = 1 * gamble.amount;
+  } else if (r < RANDOM_MAX / 10) {
+    resp.amount = 3 * gamble.amount;
+  } else {
+    resp.amount = -1 * gamble.amount;
+  }
   topics::send_gamble_resp(resp);
 }
 

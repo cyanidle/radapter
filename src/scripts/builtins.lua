@@ -19,23 +19,6 @@ function unwrap(key)
     end
 end
 
-function filter(pattern)
-    return function (msg)
-        if type(msg) ~= "table" then
-            return nil
-        end
-        local result = {}
-        local hit = false
-        for k, v in pairs(msg) do
-            if string.match(k, pattern) == k then
-                hit = true
-                result[k] = v
-            end
-        end
-        return hit and result or nil
-    end
-end
-
 local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")
@@ -109,8 +92,46 @@ unpack = unpack or table.unpack
 table.unpack = table.unpack or unpack
 
 
-function make_service(request, responce, id_field)
-    return function (req)
-        
+function make_service(request, responce, id_field, timeout)
+    id_field = id_field or "id"
+    timeout = timeout or 3000
+    local reqs = {}
+    local check_delta = 500
+    each(check_delta, function ()
+        local count = 0
+        local toRemove = {}
+        for k, v in pairs(reqs) do
+            local time_left = v.timeout
+            if (time_left <= check_delta) then
+                count = count + 1
+                toRemove[count] = k
+            else
+                v.timeout = time_left - check_delta
+            end
+        end
+        for _, v in ipairs(toRemove) do
+            local cb = reqs[v].cb
+            reqs[v] = nil
+            cb(nil, "Timeout error")
+        end
+    end)
+    pipe(responce, function (msg)
+        local id = msg[id_field]
+        local found = reqs[id]
+        if found then
+            local cb = found.cb
+            reqs[id] = nil
+            cb(msg)
+        end
+    end)
+    return function (req, callback)
+        assert(type(req) == "table", "table expected for arg#1")
+        local id = __builtin_gen_id() --simpler to make u32 number in C
+        req[id_field] = id
+        reqs[id] = {
+            timeout = timeout,
+            cb = callback,
+        }
+        request(req)
     end
 end

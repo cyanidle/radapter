@@ -61,16 +61,27 @@ static void applyToQml(QVariant const& msg, QObject* target) {
 
 Q_GLOBAL_STATIC(QQmlEngine, g_engine)
 
+static QVariant unwrapQmlVar(QVariant const& var) {
+    if (var.type() >= QVariant::UserType) {
+        return var.value<QJSValue>().toVariant();
+    } else {
+        return var;
+    }
+}
+
+class QMLWorker;
+
 class GuiInstanceProxy : public QObject {
     Q_OBJECT
 
-    Instance* inst;
+    QMLWorker* w;
 public:
-    GuiInstanceProxy(Instance* inst) : QObject(inst), inst(inst) {}
+    GuiInstanceProxy(QMLWorker* w);
+signals:
+    void msg(QVariant const& msg);
 public slots:
-    void shutdown(unsigned timeout = 5000) {
-        inst->Shutdown(timeout);
-    }
+    void shutdown(unsigned timeout = 5000);
+    void sendMsg(QVariant const& msg);
 };
 
 class QMLWorker final : public radapter::Worker
@@ -80,43 +91,32 @@ private:
     QMLConfig config;
     QQmlComponent* creator;
     QObject* root;
-    QTemporaryFile* temp = nullptr;
     QHash<int, int> sigsToProps;
+    GuiInstanceProxy* proxy;
 public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, "qml")
     {
-        static auto* engine = [&]{
-            auto e = g_engine();
-            auto proxy = new GuiInstanceProxy{inst};
-            e->rootContext()->setContextProperty("radapter", proxy);
-            return e;
-        }();
+        auto* engine = g_engine();
+        proxy = new GuiInstanceProxy{this};
+        auto ctx = new QQmlContext(engine, this);
+        ctx->setContextProperty("radapter", proxy);
         auto first = args.value(0);
         if (first.type() == QVariant::String) {
-            temp = new QTemporaryFile(this);
-            if (!temp->open()) {
-                throw Err("Could not open temp file for script: {}", temp->errorString());
-            }
-            temp->write(first.toString().toStdString().c_str());
-            temp->flush();
-            config.url = "file:///" + temp->fileName();
+            creator = new QQmlComponent(engine);
+            auto f = inst->CurrentFile();
+            auto base = QUrl::fromLocalFile(f ? QString::fromStdString(f->u8string()) : QDir::currentPath());
+            creator->setData(first.toByteArray(), base);
         } else {
             Parse(config, first);
+            creator = new QQmlComponent(engine, config.url);
         }
-        creator = new QQmlComponent(engine, config.url);
-        root = creator->create();
+        root = creator->create(ctx);
         if (!root) {
             throw Err("Could not create qml view: {}", creator->errorString());
         }
         root->setParent(this);
         auto* meta = root->metaObject();
-        auto sigidx = meta->indexOfMethod("sendMsg(QVariant)");
-        if (sigidx != -1 && meta->method(sigidx).methodType() == QMetaMethod::Signal) {
-            connect(root, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
-        } else {
-            Info("No 'signal sendMsg(variant)' declared in component");
-        }
         auto handler = metaObject()->indexOfMethod("handlePropChange()");
         for (auto& prop: config.props) {
             auto idx = meta->indexOfProperty(prop.toStdString().c_str());
@@ -132,28 +132,33 @@ public:
         }
     }
 	void OnMsg(QVariant const& msg) override {
+        emit proxy->msg(msg);
         applyToQml(msg, root);
-    }
-    static QVariant unwrap(QVariant const& var) {
-        if (var.type() >= QVariant::UserType) {
-            return var.value<QJSValue>().toVariant();
-        } else {
-            return var;
-        }
     }
 public slots:
     void handlePropChange() {
         auto propId = sigsToProps.value(senderSignalIndex(), -1);
         if (propId != -1) {
             auto prop = root->metaObject()->property(propId);
-            QVariantMap msg {{prop.name(), unwrap(prop.read(root))}};
+            QVariantMap msg {{prop.name(), unwrapQmlVar(prop.read(root))}};
             emit SendMsg(msg);
         }
     }
     void handleMsgFromQml(QVariant const& var) {
-        emit SendMsg(unwrap(var));
+        emit SendMsg(unwrapQmlVar(var));
     }
 };
+
+
+GuiInstanceProxy::GuiInstanceProxy(QMLWorker *w) : QObject(w), w(w) {}
+
+void GuiInstanceProxy::shutdown(unsigned int timeout) {
+    w->_Inst->Shutdown(timeout);
+}
+
+void GuiInstanceProxy::sendMsg(const QVariant &msg) {
+    w->handleMsgFromQml(msg);
+}
 
 }
 

@@ -96,12 +96,12 @@ return function (worker, file)
     ---@type Msgs
     local msgs = {}
 
-    for type, body in data:gmatch("MAKE_MSG%s*%(%s*(%w+)%s*,([^;]*)%)%s*;") do
+    for type, body in data:gmatch("MAKE_MSG%s*%(%s*([_%w]+)%s*,([^;]*)%)%s*;") do
         msgs[type] = {}
         local current_table = msgs[type]
         parse_body(body, current_table, 1)
     end
-    for parent, type, body in data:gmatch("MAKE_MSG_INHERIT%s*%(%s*(%w+)%s*,%s*(%w+)%s*,([^;]*)%)%s*;") do
+    for parent, type, body in data:gmatch("MAKE_MSG_INHERIT%s*%(%s*([_%w]+)%s*,%s*([_%w]+)%s*,([^;]*)%)%s*;") do
         msgs[type] = {}
         local current_table = msgs[type]
         local parent_desc = msgs[parent]
@@ -118,7 +118,7 @@ return function (worker, file)
     local result_topics = {}
     local topics_data = data:match("TOPICS%s*%([^;]*%)%s*;")
     local id = 0
-    for name, msg, _ in string.gmatch(topics_data, "%(%s*(%w+)%s*,%s*(%w+)%s*,%s*(%w+)%s*%)") do
+    for name, msg, _ in string.gmatch(topics_data, "%(%s*([_%w]+)%s*,%s*([_%w]+)%s*,%s*([_%w]+)%s*%)") do
         local topic_msg = msgs[msg]
         assert(topic_msg, "Could not find msg type for topic: "..name)
         result_topics[name] = make_topic(worker, id, topic_msg)

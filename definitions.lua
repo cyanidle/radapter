@@ -24,18 +24,16 @@ function wrap(key) end
 ---@return fun(object: any): any
 function unwrap(key) end
 
----@param pattern string
----@return fun(object: any): any
-function filter(pattern) end
-
 ---@param table any[]
 function call_all(table, ...) end
 
 -- TODO: docs regarding Service API
 ---@param request Worker
 ---@param responce Worker
----@param id_field string
-function make_service(request, responce, id_field) end
+---@param id_field string?
+---@param timeout number?
+---@return fun(req: any, timeout: number?): asyncThunk
+function make_service(request, responce, id_field, timeout) end
 
 ---@enum (key) loggingLevel
 loggingLevel = {
@@ -210,7 +208,10 @@ async = {
     ---@param thunk asyncThunk
     wait = function (thunk) end,
     ---@param thunks asyncThunk[]
-    wait_all = function (thunks) end
+    wait_all = function (thunks) end,
+    ---@param timeout number
+    ---@return asyncThunk
+    sleep = function (timeout) end,
 }
 
 ---@class builtinTimer

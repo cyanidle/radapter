@@ -46,13 +46,6 @@ assert(pipe(test) == test, "pipe(x) == x")
 
 assert(pcall(pipe, function() end), "convert function to callable")
 
-local f = filter("kek")
-
-log(f({
-    kek = 1,
-    keklol = 2
-}))
-
 pipe(
     test,
     function()

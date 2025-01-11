@@ -198,20 +198,27 @@ inline size_t nonCompositeSizeof(Headers type) {
 template<typename T, typename check<sizeof(T) == 1>::type = 1>
 _ALWAYS_INLINE inline T bswap(T val) noexcept {return val;}
 
-template<typename I, typename T>
-_ALWAYS_INLINE inline T do_bswap(T val, I temp) noexcept {
-    ::memcpy(&temp, &val, sizeof(temp));
-    temp = __builtin_bswap16(temp);
-    ::memcpy(&val, &temp, sizeof(temp));
-    return val;
-}
+#define _M2S_DO_BSWAP(bits, target) \
+    uint##bits##_t temp; \
+    ::memcpy(&temp, &target, sizeof(temp)); \
+    temp = __builtin_bswap##bits(temp);  \
+    ::memcpy(&target, &temp, sizeof(temp));
 
 template<typename T, typename check<sizeof(T) == 2>::type = 1>
-_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint16_t{});}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {
+    _M2S_DO_BSWAP(16, val);
+    return val;
+}
 template<typename T, typename check<sizeof(T) == 4>::type = 1>
-_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint32_t{});}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {
+    _M2S_DO_BSWAP(32, val);
+    return val;
+}
 template<typename T, typename check<sizeof(T) == 8>::type = 1>
-_ALWAYS_INLINE inline T bswap(T val) noexcept {return do_bswap(val, uint64_t{});}
+_ALWAYS_INLINE inline T bswap(T val) noexcept {
+    _M2S_DO_BSWAP(64, val);
+    return val;
+}
 
 template<typename T>
 _ALWAYS_INLINE inline T from_big(T val) {

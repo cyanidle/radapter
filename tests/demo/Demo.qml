@@ -10,29 +10,28 @@ ApplicationWindow {
     title: qsTr("Demo: Gauge Controls + Redis + Serial")
     color: "white";
 
+    width: 400
+    height: 400
+
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
 
     property alias angle: gauge.angle
     property bool kiosk: false
 
-
-    ColumnLayout {
+    Gauge {
+        id: gauge
         anchors.centerIn: parent
-        Gauge {
-            id: gauge
+        size: root.height < root.width ? root.height : root.width
+        onAngleChanged: {
+            spinBox.value = angle
+        }
+        SpinBox {
             anchors.centerIn: parent
-            size: root.height < root.width ? root.height : root.width
-            onAngleChanged: {
-                spinBox.value = angle
-            }
-            SpinBox {
-                anchors.centerIn: parent
-                id: spinBox
-                from: 0
-                to: 360
-                stepSize: 1
-                onValueModified: gauge.angle = value
-            }
+            id: spinBox
+            from: 0
+            to: 360
+            stepSize: 1
+            onValueModified: gauge.angle = value
         }
     }
 
@@ -55,6 +54,46 @@ ApplicationWindow {
         text: "Quit"
         onClicked: {
             radapter.shutdown()
+        }
+    }
+    
+    Text {
+        id: money
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        property int amount: 1000000
+        property int in_flight: 0
+        text: in_flight ? `Wait...(${in_flight})` : amount + "$"
+    }
+
+    Button {
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        text: "GAMBLE!"
+        onClicked: {
+            if (money.amount <= 0) {
+                alert("YOU ARE BROKE!!!");
+                return;
+            }
+
+            var amount = money.amount * gauge.angle / 360 + 10
+            money.in_flight++
+            radapter.sendMsg({gamble_request: {amount}});
+        }
+
+        function onMsg(msg) {
+            var res = msg.gamble_result
+            if (res) {
+                money.in_flight--
+                if (res.ok === true) {
+                    console.log(`Amount: ${res.amount}`)
+                    money.amount += res.amount
+                }
+            }
+        }
+
+        Component.onCompleted: {
+            radapter.msg.connect(onMsg);
         }
     }
 }

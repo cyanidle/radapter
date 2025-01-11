@@ -33,6 +33,13 @@ extern "C" {
 int luaopen_lfs(lua_State *L);
 }
 
+static std::atomic<unsigned> _curr_id = 0;
+
+static int _gen_id(lua_State* L) noexcept {
+    lua_pushinteger(L, _curr_id.fetch_add(1, std::memory_order_relaxed));
+    return 1;
+}
+
 Instance::Instance() : d(new Impl)
 {
     init_qrc();
@@ -73,6 +80,8 @@ Instance::Instance() : d(new Impl)
     lua_setmetatable(L, -2);
 
     lua_setglobal(L, "log");
+
+    lua_register(L, "__builtin_gen_id", _gen_id);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
@@ -144,6 +153,11 @@ void Instance::LoadEmbeddedFile(string name, int opts)
     if (!(opts & LoadEmbedNoPop)) {
         lua_pop(d->L, 1);
     }
+}
+
+optional<fs::path> Instance::CurrentFile()
+{
+    return d->currentFile;
 }
 
 Instance *Instance::FromLua(lua_State *L)
@@ -237,7 +251,11 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
 void Instance::EvalFile(fs::path path)
 {
     auto L = d->L;
-
+    auto was = std::move(d->currentFile);
+    defer revert([&]{
+        d->currentFile = std::move(was);
+    });
+    d->currentFile = path;
     lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     auto load = luaL_loadfile(L, path.string().c_str());
