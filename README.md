@@ -13,7 +13,8 @@ sudo apt update
 sudo apt install \
    cmake ninja-build build-essential \
    libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
-   libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite
+   libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
+   qtdeclarative5-dev libqt5quickcontrols2-5
 
 # clone repo
 cmake -B build -G Ninja
