@@ -1,4 +1,4 @@
----@meta
+---@meta radapter
 
 ---@param table table
 ---@param key string

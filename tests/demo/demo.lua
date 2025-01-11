@@ -17,7 +17,10 @@ if com then
     topics = parse_topics(serial, "./firmware/firmware.ino")
 
     pipe(topics.log, function (msg)
-        log("From device: {}", msg.data)
+        log.info("Device: {}", msg.data)
+    end)
+    pipe(topics.error, function (msg)
+        log.error("DEVICE ERROR: {}", msg.data)
     end)
 end
 

@@ -13,7 +13,7 @@ enum TopicDir {
 
 void topics_error(const char* err);
 msg2struct::OutIterator topics_send_begin();
-void topics_send_finish();
+void topics_send_finish(msg2struct::OutIterator iter);
 inline void topics_receive_msg(msg2struct::InIterator iter);
 
 
@@ -44,8 +44,13 @@ inline void topics_receive_msg(msg2struct::InIterator iter);
 
 ///////////////////////////////////
 
+#define _TOPIC_FUNCS_COMMON(name, msg) namespace topics { \
+  using name##MSG = msg; \
+  static constexpr int name##ID = __COUNTER__ - _topics_id_begin; \
+}
+
 #define _TOPIC_FUNCS_PUB(name, msg) namespace topics {void send_##name(msg const& m) { \
-  auto iter = _topics_prepareMsg(__COUNTER__ - _topics_pub_start); \
+  auto iter = _topics_prepareMsg(name##ID); \
   if (Dump(m, iter)) topics_send_finish(iter); \
   else topics_error("Could not send: " #name); \
 }}
@@ -56,14 +61,17 @@ inline void topics_receive_msg(msg2struct::InIterator iter);
   _TOPIC_FUNCS_PUB(name, msg) \
   _TOPIC_FUNCS_SUB(name, msg)
 
-#define _TOPIC_FUNCS_AUX(name, msg, mode) _TOPIC_FUNCS_##mode(name, msg)
+#define _TOPIC_FUNCS_AUX(name, msg, mode) \
+  _TOPIC_FUNCS_COMMON(name, msg) \
+  _TOPIC_FUNCS_##mode(name, msg)
+
 #define _TOPIC_FUNCS(tuple) _TOPIC_FUNCS_AUX tuple
 
 ///////////////////////////////////
 
-#define _TOPIC_BODY_PUB(name, msg) case (__COUNTER__ - _topics_sub_start): return false;
+#define _TOPIC_BODY_PUB(name, msg) case (name##ID): return false;
 #define _TOPIC_BODY_PUBSUB(name, msg) _TOPIC_BODY_SUB(name, msg)
-#define _TOPIC_BODY_SUB(name, msg) case (__COUNTER__ - _topics_sub_start): { \
+#define _TOPIC_BODY_SUB(name, msg) case (name##ID): { \
   msg m; \
   if(msg2struct::Parse(m, iter)) topics::on_##name(m);\
   else topics_error("MSG ERR: " #msg);\
@@ -76,17 +84,18 @@ inline void topics_receive_msg(msg2struct::InIterator iter);
 ///////////////////////////////////
 
 #define TOPICS(...) \
-  constexpr int _topics_pub_start = __COUNTER__ + 1; \
+  constexpr int _topics_id_begin = __COUNTER__ + 1; \
   MAP(_TOPIC_FUNCS, __VA_ARGS__) \
-  constexpr int _topics_sub_start = __COUNTER__ + 1; \
-  bool _topics_check_msg(int id, msg2struct::InIterator iter) { \
+  namespace topics { bool _check_msg(int id, msg2struct::InIterator iter) { \
     switch (id) { MAP(_TOPIC_BODY, __VA_ARGS__) default: return false;} \
-  } \
+  } } \
   struct Topics {}
 
 ///////////////////////////////////
 
-bool _topics_check_msg(int id, msg2struct::InIterator iter);
+namespace topics {
+bool _check_msg(int id, msg2struct::InIterator iter);
+}
 
 inline msg2struct::OutIterator _topics_prepareMsg(int id) {
   msg2struct::OutIterator iter = topics_send_begin();
@@ -102,7 +111,7 @@ inline void topics_receive_msg(msg2struct::InIterator iter) {
     topics_error("Error: could not get topic ID");
     return;
   }
-  if (!_topics_check_msg(id, iter)) {
+  if (!topics::_check_msg(id, iter)) {
     char temp[50];
     sprintf(temp, "Error: Unknown msg type: %d", id);
     topics_error(temp);

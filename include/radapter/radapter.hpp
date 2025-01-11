@@ -131,10 +131,10 @@ public:
     void EvalFile(fs::path path);
     void Eval(string_view code, string_view chunk = "<eval>");
 
-    void Shutdown(unsigned timeout = 5000);
-
     lua_State* LuaState();
     static Instance* FromLua(lua_State* L);
+public slots:
+    void Shutdown(unsigned timeout = 5000);
 signals:
     void ShutdownRequest();
     void WorkerCreated(Worker* worker);

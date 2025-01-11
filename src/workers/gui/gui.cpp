@@ -61,6 +61,18 @@ static void applyToQml(QVariant const& msg, QObject* target) {
 
 Q_GLOBAL_STATIC(QQmlEngine, g_engine)
 
+class GuiInstanceProxy : public QObject {
+    Q_OBJECT
+
+    Instance* inst;
+public:
+    GuiInstanceProxy(Instance* inst) : QObject(inst), inst(inst) {}
+public slots:
+    void shutdown(unsigned timeout = 5000) {
+        inst->Shutdown(timeout);
+    }
+};
+
 class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
@@ -74,7 +86,12 @@ public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, "qml")
     {
-        auto* engine = g_engine();
+        static auto* engine = [&]{
+            auto e = g_engine();
+            auto proxy = new GuiInstanceProxy{inst};
+            e->rootContext()->setContextProperty("radapter", proxy);
+            return e;
+        }();
         auto first = args.value(0);
         if (first.type() == QVariant::String) {
             temp = new QTemporaryFile(this);
@@ -98,7 +115,7 @@ public:
         if (sigidx != -1 && meta->method(sigidx).methodType() == QMetaMethod::Signal) {
             connect(root, SIGNAL(sendMsg(QVariant)), this, SLOT(handleMsgFromQml(QVariant)));
         } else {
-            Info("No 'signal sendMsg(variant msg)' declared in component");
+            Info("No 'signal sendMsg(variant)' declared in component");
         }
         auto handler = metaObject()->indexOfMethod("handlePropChange()");
         for (auto& prop: config.props) {
