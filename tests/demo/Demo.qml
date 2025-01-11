@@ -2,6 +2,7 @@ import QtQuick 2.7
 import QtQuick.Controls 2.0
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.7
+import QtQuick.Dialogs 1.1
 import "."
 
 ApplicationWindow {
@@ -17,6 +18,15 @@ ApplicationWindow {
 
     property alias angle: gauge.angle
     property bool kiosk: false
+
+    MessageDialog {
+        id: broke
+        title: "SKILL ISSUE"
+        text: "YOU ARE BROKE!!!"
+        onAccepted: {
+            radapter.shutdown()
+        }
+    }
 
     Gauge {
         id: gauge
@@ -72,7 +82,7 @@ ApplicationWindow {
         text: "GAMBLE!"
         onClicked: {
             if (money.amount <= 0) {
-                alert("YOU ARE BROKE!!!");
+                broke.open()
                 return;
             }
 
