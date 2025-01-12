@@ -96,7 +96,6 @@ ApplicationWindow {
             if (res) {
                 money.in_flight--
                 if (res.ok === true) {
-                    console.log(`Amount: ${res.amount}`)
                     money.amount += res.amount
                 }
             }
