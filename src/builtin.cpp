@@ -347,10 +347,10 @@ void glua::Push(lua_State* L, QVariant const& val) {
         lua_checkstack(L, 2); //val, table
         auto arr = val.toList();
         lua_createtable(L, arr.size(), 0);
-        lua_Integer idx = 1;
+        int i = 1;
         for (auto& v: arr) {
             Push(L, v);
-            lua_rawseti(L, -2, idx++);
+            lua_rawseti(L, -2, i++);
         }
         break;
     }
@@ -399,7 +399,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
         lua_checkstack(L, 1); //val
         auto arr = val.toStringList();
         lua_createtable(L, arr.size(), 0);
-        lua_Integer i = 1;
+        int i = 1;
         for (auto& v: arr) {
             pushQStr(L, v);
             lua_rawseti(L, -2, i++);
@@ -476,7 +476,7 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
             QVariantList arr;
             arr.push_back(toQVar(L, -1));
             lua_pop(L, 1);
-            for (lua_Integer i = 2; lua_rawgeti(L, -1, i), lua_type(L, -1) != LUA_TNIL; ++i) {
+            for (int i = 2; lua_rawgeti(L, -1, i), lua_type(L, -1) != LUA_TNIL; ++i) {
                 arr.push_back(toQVar(L, -1));
                 lua_pop(L, 1);
             }

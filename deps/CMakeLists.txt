@@ -36,7 +36,6 @@ if (RADAPTER_JIT) #libluajit2-5.1-dev
   target_include_system_directories(radapter-lua INTERFACE ${LUA_JIT_INCLUDE_DIRS})
   target_link_libraries(radapter-lua INTERFACE ${LUA_JIT_STATIC_LIBRARIES})
   target_link_directories(radapter-lua INTERFACE ${LUA_JIT_LIBRARY_DIRS})
-  target_compile_definitions(radapter-lua INTERFACE RADAPTER_JIT)
 else()
   CPMAddPackage(NAME lua
     URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
