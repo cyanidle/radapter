@@ -15,6 +15,21 @@
 using namespace radapter;
 using namespace glua;
 
+
+#ifdef RADAPTER_JIT
+
+static bool is_int(lua_State* L, int idx, lua_Integer& i, lua_Number& n) {
+    n = lua_tonumber(L, idx);
+    i = lua_tointeger(L, idx);
+    if (n == lua_Number(i)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+#endif
+
 void builtin::help::PrintStack(lua_State* L, string msg) {
     auto top = lua_gettop(L);
     for (auto i = 1; i <= top; ++i) {
@@ -50,7 +65,13 @@ int builtin::api::Format(lua_State* L) {
         }
         case LUA_TNUMBER: {
 #ifdef RADAPTER_JIT
-            args.push_back(lua_tonumber(L, idx));
+            lua_Integer i;
+            lua_Number n;
+            if (is_int(L, idx, i, n)) {
+                args.push_back(i);
+            } else {
+                args.push_back(n);
+            }
 #else
             if (lua_isinteger(L, idx)) {
                 args.push_back(lua_tointeger(L, idx));
@@ -454,7 +475,13 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
                 }
                 case LUA_TNUMBER: {
 #ifdef RADAPTER_JIT
-                    k = QString::number(lua_tonumber(L, key));
+                    lua_Integer i;
+                    lua_Number n;
+                    if (is_int(L, key, i, n)) {
+                        k = QString::number(i);
+                    } else {
+                        k = QString::number(n);
+                    }
 #else
                         if (lua_isinteger(L, key)) {
                             k = QString::number(lua_tointeger(L, key));
@@ -492,7 +519,13 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
     }
     case LUA_TNUMBER: {
 #ifdef RADAPTER_JIT
-        return lua_tonumber(L, idx);
+        lua_Integer i;
+        lua_Number n;
+        if (is_int(L, idx, i, n)) {
+            return qlonglong(i);
+        } else {
+            return n;
+        }
 #else
         if (lua_isinteger(L, idx)) {
             return lua_tointeger(L, idx);
