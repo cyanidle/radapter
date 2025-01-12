@@ -523,7 +523,7 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
             if (!object) return {};
             return QVariant::fromValue(object);
         } else {
-            return {};
+            return QVariant::fromValue(LuaUserData(L, idx));
         }
     }
     default:
