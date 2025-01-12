@@ -45,7 +45,20 @@ struct LuaValue {
 struct LuaUserData : LuaValue {
     using LuaValue::LuaValue;
 
-    void* Data();
+    using Dtor = void(*)(void*);
+
+    template<typename T>
+    LuaUserData Create(lua_State* L, const char* tname, T value) noexcept {
+        auto* mem = init(L, sizeof(T));
+        new (mem) T{std::move(value)};
+        return initDone(L, tname, [](void* d){ static_cast<T*>(d)->~T(); });
+    }
+
+    void* Data(const char* tname);
+
+private:
+    static void* init(lua_State* L, size_t sz);
+    static LuaUserData initDone(lua_State* L, const char* tname, Dtor dtor);
 };
 
 }

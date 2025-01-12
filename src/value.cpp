@@ -61,7 +61,7 @@ LuaValue::~LuaValue()
     _ref = LUA_NOREF;
 }
 
-void *LuaUserData::Data()
+void *LuaUserData::Data(const char *tname)
 {
     if (!(*this)) {
         throw Err("Attempt to get data of invalid UserData");
@@ -70,7 +70,31 @@ void *LuaUserData::Data()
         throw Err("Could not reserve stack for call");
     }
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
-    auto* d = lua_touserdata(_L, -1);
+    auto* d = luaL_testudata(_L, -1, tname);
     lua_pop(_L, 1);
     return d;
+}
+
+void* LuaUserData::init(lua_State *L, size_t sz)
+{
+    return lua_udata(L, sz);
+}
+
+static int wrapDtor(lua_State* L) noexcept {
+    auto* dtor = reinterpret_cast<LuaUserData::Dtor>(lua_touserdata(L, lua_upvalueindex(1)));
+    dtor(lua_touserdata(L, 1));
+    return 0;
+}
+
+LuaUserData LuaUserData::initDone(lua_State* L, const char *tname, Dtor dtor)
+{
+    if (luaL_newmetatable(L, tname)) {
+        lua_pushlightuserdata(L, reinterpret_cast<void*>(dtor));
+        lua_pushcclosure(L, wrapDtor, 1);
+        lua_setfield(L, -2, "__gc");
+    }
+    lua_setmetatable(L, -1);
+    auto res = LuaUserData{L, -1};
+    lua_pop(L, 1);
+    return res;
 }
