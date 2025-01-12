@@ -10,6 +10,10 @@
 #include "trace_frame.hpp"
 #include "function.hpp"
 
+#define RAD_DESCRIBE(x) DESCRIBE(#x, x, void)
+#define RAD_MEMBER(x) MEMBER(#x, &_::x)
+#define RAD_ENUM(x) MEMBER(#x, _::x)
+
 namespace radapter {
 
 template<typename T>

@@ -11,6 +11,7 @@ include(cmake/Versioning.cmake)
 
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
 option(RADAPTER_GUI "Enable GUI capabilities" ON)
@@ -90,7 +91,7 @@ endfunction()
 
 radapter_scripts(RADAPTER_SCRIPTS)
 
-add_library(radapter-sdk STATIC
+add_library(radapter-sdk SHARED
     ${RADAPTER_SRC}
     ${RADAPTER_TOPLEVEL_SRC}
     ${RADAPTER_HEADERS}
@@ -108,13 +109,18 @@ target_link_libraries(radapter-sdk PRIVATE
     radapter-luafs
     radapter-luasock)
 
+add_library(radapter-qt INTERFACE)
+
+target_link_libraries(radapter-qt INTERFACE
+    Qt5::Core Qt5::SerialPort Qt5::SerialBus
+    Qt5::Sql Qt5::WebSockets Qt5::Network
+)
+if (RADAPTER_GUI)
+    target_link_libraries(radapter-qt INTERFACE Qt5::Gui Qt5::Qml Qt5::Quick)
+endif()
+
 target_link_libraries(radapter-sdk PUBLIC 
-    Qt5::Core
-    Qt5::SerialPort
-    Qt5::SerialBus
-    Qt5::Sql
-    Qt5::WebSockets
-    Qt5::Network
+    radapter-qt
     radapter-lua
     glua
     describe
@@ -124,12 +130,24 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)
 endif()
 
-if (RADAPTER_GUI)
-    target_link_libraries(radapter-sdk PUBLIC Qt5::Gui Qt5::Qml Qt5::Quick)
-endif()
-
 add_executable(radapter ./app/main.cpp)
 target_link_libraries(radapter PRIVATE
     qctrl
     argparse
     radapter-sdk)
+
+function(create_radapter_plugin name)
+    set(options)
+    set(args)
+    set(multi_args FILES)
+    cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
+
+    add_library(${name} SHARED ${ARG_FILES})
+    target_link_libraries(${name} PUBLIC radapter-qt describe)
+    target_include_directories(${name} PUBLIC $<TARGET_PROPERTY:radapter-sdk,INCLUDE_DIRECTORIES>)
+endfunction()
+
+
+create_radapter_plugin(radapter_test_plugin
+    FILES plugins/test.cpp
+)

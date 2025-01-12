@@ -43,8 +43,6 @@ using if_valid_worker = std::enable_if_t<
 
 class Instance;
 using Factory = Worker*(*)(QVariantList const&, Instance*);
-using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
-using ExtraMethods = QMap<QString, ExtraMethod>;
 using ExtraSchema = QVariant(*)();
 
 template<typename T>

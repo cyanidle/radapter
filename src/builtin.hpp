@@ -2,9 +2,6 @@
 #include "radapter/radapter.hpp"
 #include "json_view/json_view.hpp"
 
-#define RAD_DESCRIBE(x) DESCRIBE(#x, x, void)
-#define RAD_MEMBER(x) MEMBER(#x, &_::x)
-
 static constexpr int intCut(size_t src) {
     return (std::max)(0, int(src));
 }
@@ -172,7 +169,7 @@ int Get(lua_State* L) noexcept;
 int Set(lua_State* L) noexcept;
 int Each(lua_State* L);
 int After(lua_State* L);
-int TempFile(lua_State* L);
+int LoadPlugin(lua_State* L);
 }
 
 

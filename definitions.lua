@@ -1,5 +1,9 @@
 ---@meta radapter
 
+---@param path string
+---@return fun(params: any): Worker
+function load_plugin(path) end
+
 ---@param table table
 ---@param key string
 ---@param sep string?
@@ -171,11 +175,12 @@ log = {
 }
 
 ---@alias MsgHandler fun(msg: any, source: Worker): any
+---@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker): any
 
 
 ---@class Pipable
 ---@field get_listeners fun(self: Pipable): MsgHandler[]
----@field call MsgHandler
+---@field call MsgHandlerEx
 
 
 ---@class Worker: Pipable
@@ -194,7 +199,7 @@ function pipe(first, ...) end
 ---@param sender Worker?
 function notify_all(worker, msg, sender) end
 
----@param on_msg MsgHandler
+---@param on_msg MsgHandlerEx
 ---@return Pipable
 function create_worker(on_msg) end
 
@@ -345,19 +350,6 @@ function WebsocketServer(params) end
 
 ---@return Worker
 function WebsocketClient(params) end
-
----@class TempFileObject
-TempFileObject = {}
-
----@return string
-function TempFileObject:url() end;
-
----@return string
-function TempFileObject:path() end;
-
----@return TempFileObject
----@param data string
-function temp_file(data) end;
 
 ---@class BinaryParams
 ---@field framing "slip"

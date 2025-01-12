@@ -3,6 +3,7 @@
 
 #include "logs.hpp"
 #include "radapter/config.hpp"
+#include <QtPlugin>
 
 struct lua_State;
 
@@ -11,6 +12,12 @@ namespace radapter
 
 struct WorkerImpl;
 class Instance;
+class Worker;
+
+
+using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
+using ExtraMethods = QMap<QString, ExtraMethod>;
+
 class Worker : public QObject {
     Q_OBJECT
 public:
@@ -49,6 +56,21 @@ private:
     const char *_category;
 };
 
+struct WorkerPlugin {
+    virtual ~WorkerPlugin() = default;
+    virtual const ExtraMethods* ExtraMethods() { return nullptr; }
+    virtual const char* ClassName() = 0;
+    virtual Worker* Create(QVariantList const& args, Instance* inst) = 0;
+};
+
+namespace impl {
+void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods);
 }
+
+}
+
+
+#define RadapterWorkerPlugin_iid "radapter.plugins.Worker/1.0"
+Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
 
 #endif //RADAPTER_WORKER_H

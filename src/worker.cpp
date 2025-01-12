@@ -39,18 +39,21 @@ struct FactoryContext {
     Factory factory;
     ExtraMethods methods;
 };
-DESCRIBE("radapter::FactoryContext", FactoryContext, void) {}
+DESCRIBE("radapter::FactoryContext", FactoryContext, void) {
+
+
+}
 
 static int get_listeners(lua_State* L) {
-    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    auto* cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
     return 1;
 };
 
 static int worker_call(lua_State* L) {
-    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    auto* cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     auto was = ud->currentSender;
     defer revert([&]{
         ud->currentSender = was;
@@ -65,8 +68,8 @@ static int worker_call(lua_State* L) {
 }
 
 static int call_extra(lua_State* L) {
-    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, ctx->name.c_str()));
+    auto* cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
     auto w = ud->self.data();
     if (!w) {
@@ -76,11 +79,13 @@ static int call_extra(lua_State* L) {
     return 1;
 }
 
-static int workerFactory(lua_State* L) {
-    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
-    auto ctorArgs = builtin::help::toArgs(L, 1);
-    auto* inst = Instance::FromLua(L);
-    auto* w = ctx->factory(ctorArgs, inst);
+void impl::push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
+{
+    auto L = inst->LuaState();
+
+    lua_pushstring(L, clsname);
+    auto clsIdx = lua_gettop(L);
+
     auto* ud = lua_udata(L, sizeof(WorkerImpl));
     auto* impl = new (ud) WorkerImpl{L};
 
@@ -113,27 +118,27 @@ static int workerFactory(lua_State* L) {
         }
         lua_settop(L, msgh - 1);
     });
-    if (luaL_newmetatable(L, ctx->name.c_str())) {
+    if (luaL_newmetatable(L, clsname)) {
 
         lua_pushlightuserdata(L, &builtin::workers::Marker);
         lua_setfield(L, -2, "__marker");
 
-        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<get_listeners>, 1);
         lua_setfield(L, -2, "get_listeners");
 
-        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<worker_call>, 1);
         lua_pushvalue(L, -1);
         lua_setfield(L, -3, "__call");
         lua_setfield(L, -2, "call");
 
-        for (auto it = ctx->methods.begin(); it != ctx->methods.end(); ++it) {
+        for (auto it = methods.begin(); it != methods.end(); ++it) {
             auto name = it.key().toStdString();
             auto method = it.value();
             glua::Push(L, it.key().toStdString());
             static_assert(sizeof(void*) >= sizeof(method));
-            lua_pushvalue(L, lua_upvalueindex(1));
+            lua_pushvalue(L, clsIdx);
             lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
             lua_pushcclosure(L, glua::protect<call_extra>, 2);
             lua_settable(L, -3);
@@ -145,7 +150,17 @@ static int workerFactory(lua_State* L) {
         lua_setfield(L, -2, "__index");
     }
     lua_setmetatable(L, -2);
+    lua_insert(L, -2);
+    lua_pop(L, 1);
     emit inst->WorkerCreated(w);
+}
+
+static int workerFactory(lua_State* L) {
+    auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto ctorArgs = builtin::help::toArgs(L, 1);
+    auto* inst = Instance::FromLua(L);
+    auto* w = ctx->factory(ctorArgs, inst);
+    impl::push_worker(inst, ctx->name.c_str(), w, ctx->methods);
     return 1;
 }
 

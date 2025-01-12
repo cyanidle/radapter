@@ -10,6 +10,7 @@
 #include "QPointer"
 #include "builtin.hpp"
 #include "glua/glua.hpp"
+#include <QPluginLoader>
 
 using namespace radapter;
 using namespace glua;
@@ -250,42 +251,6 @@ int builtin::api::Each(lua_State* L) {
 
 int builtin::api::After(lua_State* L) {
     return timer(L, true);
-}
-
-struct TempFileObject {
-    std::shared_ptr<QTemporaryFile> _file;
-    std::string _path;
-
-    TempFileObject() {
-        _file = std::make_shared<QTemporaryFile>();
-        if (!_file->open()) {
-            throw Err("Could not open temp file: {}", _file->errorString());
-        }
-        _path = _file->fileName().toStdString();
-    }
-
-    std::string url() {
-        return "file:///" + _path;
-    }
-    std::string_view path() {
-        return _path;
-    }
-};
-
-RAD_DESCRIBE(TempFileObject) {
-    RAD_MEMBER(url);
-    RAD_MEMBER(path);
-}
-
-int radapter::builtin::api::TempFile(lua_State* L)
-{   
-    size_t sz;
-    auto str = luaL_checklstring(L, 1, &sz);
-    TempFileObject temp;
-    temp._file->write(str, int(sz));
-    temp._file->flush();
-    glua::Push(L, temp);
-    return 1;
 }
 
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
@@ -563,5 +528,40 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
     }
     default:
         return {};
+    }
+}
+
+static int wrapPlugin(lua_State* L) {
+    auto* plug = static_cast<WorkerPlugin*>(lua_touserdata(L, lua_upvalueindex(1)));
+    auto ctorArgs = builtin::help::toArgs(L, 1);
+    auto* inst = Instance::FromLua(L);
+    auto* w = plug->Create(ctorArgs, inst);
+    auto* extra = plug->ExtraMethods();
+    impl::push_worker(inst, plug->ClassName(), w, extra ? *extra : ExtraMethods{});
+    return 1;
+}
+
+int builtin::api::LoadPlugin(lua_State *L)
+{
+    size_t len;
+    auto* _path = luaL_checklstring(L, 1, &len);
+    auto path = QString::fromUtf8(_path, int(len));
+    auto* self = Instance::FromLua(L);
+    auto* loader = new QPluginLoader(path, self);
+    try {
+        if (!loader->load()) {
+            throw Err("Could not load {} => {}", path, loader->errorString());
+        }
+        auto* inst = loader->instance();
+        auto* plug = qobject_cast<WorkerPlugin*>(inst);
+        if (!plug) {
+            throw Err("Loaded plugin does not implement: {}", qobject_interface_iid<WorkerPlugin*>());
+        }
+        lua_pushlightuserdata(L, plug);
+        lua_pushcclosure(L, glua::protect<wrapPlugin>, 1);
+        return 1;
+    } catch (...) {
+        delete loader;
+        throw;
     }
 }
