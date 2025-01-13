@@ -29,7 +29,7 @@ DESCRIBE("radapter::LogLevel", LogLevel, void) {
 }
 
 namespace detail {
-std::runtime_error doErr(fmt::string_view fmt, fmt::format_args args);
+std::runtime_error RADAPTER_API doErr(fmt::string_view fmt, fmt::format_args args);
 }
 
 template<typename...Args>

@@ -18,7 +18,7 @@ class Worker;
 using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
 using ExtraMethods = QMap<QString, ExtraMethod>;
 
-class Worker : public QObject {
+class RADAPTER_API Worker : public QObject {
     Q_OBJECT
 public:
     Instance* _Inst;
@@ -56,7 +56,7 @@ private:
     const char *_category;
 };
 
-struct WorkerPlugin {
+struct RADAPTER_API WorkerPlugin {
     virtual ~WorkerPlugin() = default;
     virtual const ExtraMethods* ExtraMethods() { return nullptr; }
     virtual const char* ClassName() = 0;
@@ -64,7 +64,7 @@ struct WorkerPlugin {
 };
 
 namespace impl {
-void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods);
+void RADAPTER_API push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods);
 }
 
 }

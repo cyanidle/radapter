@@ -4,11 +4,12 @@
 #include <fmt/base.h>
 #include <string_view>
 #include <string>
+#include <QtGlobal>
 
 namespace radapter
 {
 
-struct TraceFrame {
+struct RADAPTER_API TraceFrame {
     constexpr TraceFrame() noexcept {}
     TraceFrame(TraceFrame&&) = delete;
     constexpr TraceFrame(unsigned idx, TraceFrame const& prev) noexcept :

@@ -98,7 +98,8 @@ add_library(radapter-sdk SHARED
     ${RADAPTER_QRC}
 )
 set_target_warnings(radapter-sdk PRIVATE OFF)
-target_compile_definitions(radapter-sdk PUBLIC RADAPTER_API=)
+target_compile_definitions(radapter-sdk PRIVATE RADAPTER_API=Q_DECL_EXPORT)
+target_compile_definitions(radapter-sdk INTERFACE RADAPTER_API=Q_DECL_IMPORT)
 target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info)
 target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
@@ -143,8 +144,7 @@ function(create_radapter_plugin name)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
 
     add_library(${name} SHARED ${ARG_FILES})
-    target_link_libraries(${name} PUBLIC radapter-qt describe)
-    target_include_directories(${name} PUBLIC $<TARGET_PROPERTY:radapter-sdk,INCLUDE_DIRECTORIES>)
+    target_link_libraries(${name} PUBLIC radapter-sdk)
 endfunction()
 
 

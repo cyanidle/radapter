@@ -8,7 +8,7 @@
 namespace radapter
 {
 
-struct LuaFunction : LuaValue {
+struct RADAPTER_API LuaFunction : LuaValue {
     using LuaValue::LuaValue;
     QVariant Call(const QVariantList &args) const;
     QVariant operator()(QVariantList const& args) const {

@@ -40,8 +40,8 @@ struct OptionalPtr {
     }
 };
 
-string TypeNameOf(QVariant const& conf);
-void CheckCanConvert(int targetTypeId, QVariant const& from, TraceFrame const& frame);
+string RADAPTER_API TypeNameOf(QVariant const& conf);
+void RADAPTER_API CheckCanConvert(int targetTypeId, QVariant const& from, TraceFrame const& frame);
 template<typename T>
 void CheckCanConvert(QVariant const& from, TraceFrame const& frame) {
     CheckCanConvert(QMetaType::fromType<T>().id(), from, frame);
@@ -58,14 +58,14 @@ using if_numeric = std::enable_if_t<std::is_arithmetic_v<T>, int>;
 template<typename T>
 using if_custom_object = std::enable_if_t<std::is_base_of_v<QObject, T>, int>;
 
-void Parse(bool& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(string& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(QString& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(QVariant& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(QVariantMap& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(QVariantList& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(QObject*& out, QVariant const& conf, const TraceFrame &frame = {});
-void Parse(LuaFunction& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(bool& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(string& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(QString& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(QVariant& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(QVariantMap& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(QVariantList& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(QObject*& out, QVariant const& conf, const TraceFrame &frame = {});
+void RADAPTER_API Parse(LuaFunction& out, QVariant const& conf, const TraceFrame &frame = {});
 
 template<typename T, if_custom_object<T> = 1>
 void Parse(T*& out, QVariant const& conf, TraceFrame const& frame = {}) {
@@ -205,14 +205,14 @@ T ParseAs(QVariant const& conf) {
     return res;
 }
 
-void PopulateSchema(bool&, QVariant& schema);
-void PopulateSchema(string&, QVariant& schema);
-void PopulateSchema(QString&, QVariant& schema);
-void PopulateSchema(QVariant&, QVariant& schema);
-void PopulateSchema(QVariantMap&, QVariant& schema);
-void PopulateSchema(QVariantList&, QVariant& schema);
-void PopulateSchema(QObject*&, QVariant& schema);
-void PopulateSchema(LuaFunction&, QVariant& schema);
+void RADAPTER_API PopulateSchema(bool&, QVariant& schema);
+void RADAPTER_API PopulateSchema(string&, QVariant& schema);
+void RADAPTER_API PopulateSchema(QString&, QVariant& schema);
+void RADAPTER_API PopulateSchema(QVariant&, QVariant& schema);
+void RADAPTER_API PopulateSchema(QVariantMap&, QVariant& schema);
+void RADAPTER_API PopulateSchema(QVariantList&, QVariant& schema);
+void RADAPTER_API PopulateSchema(QObject*&, QVariant& schema);
+void RADAPTER_API PopulateSchema(LuaFunction&, QVariant& schema);
 
 template<typename T, if_custom_object<T> = 1>
 void PopulateSchema(T*&, QVariant& schema) {

@@ -25,10 +25,10 @@ template<typename Fn> struct defer {
 template<typename T> defer(T) -> defer<T>;
 
 namespace compat {
-int lua_absindex(lua_State *L, int i);
-int luaL_getsubtable(lua_State *L, int i, const char *name);
-void luaL_requiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
-void prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
+int RADAPTER_API lua_absindex(lua_State *L, int i);
+int RADAPTER_API luaL_getsubtable(lua_State *L, int i, const char *name);
+void RADAPTER_API luaL_requiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
+void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
 }
 
 namespace detail {
@@ -63,9 +63,9 @@ QVariant AsExtraMethod(Worker* w, QVariantList const& args) {
     return (static_cast<cls>(w)->*f)(args);
 }
 
-QVariant MakeFunction(ExtraFunction func);
+QVariant RADAPTER_API MakeFunction(ExtraFunction func);
 
-class Instance : public QObject
+class RADAPTER_API Instance : public QObject
 {
     Q_OBJECT
 public:
@@ -150,10 +150,10 @@ struct KeyVal {
     T value;
 };
 using FlatMap = vector<KeyVal<QVariant>>;
-void Flatten(FlatMap& out, QVariant const& input);
-void Unflatten(QVariant& out, FlatMap const& flat);
+void RADAPTER_API Flatten(FlatMap& out, QVariant const& input);
+void RADAPTER_API Unflatten(QVariant& out, FlatMap const& flat);
 //! @return amount of affected keys
-size_t MergePatch(QVariant& out, QVariant const& patch, QVariant* diff = nullptr);
+size_t RADAPTER_API MergePatch(QVariant& out, QVariant const& patch, QVariant* diff = nullptr);
 
 }
 

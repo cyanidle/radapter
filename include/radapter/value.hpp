@@ -12,7 +12,7 @@ namespace radapter {
 
 class Instance;
 
-struct LuaValue {
+struct RADAPTER_API LuaValue {
     LuaValue(lua_State* L, int idx);
 
     LuaValue();
@@ -42,7 +42,7 @@ struct LuaValue {
 };
 
 
-struct LuaUserData : LuaValue {
+struct RADAPTER_API LuaUserData : LuaValue {
     using LuaValue::LuaValue;
 
     using Dtor = void(*)(void*);
