@@ -167,4 +167,3 @@ local like_result = {
 }
 
 ```
-# radapter_slam
