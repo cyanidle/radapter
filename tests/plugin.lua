@@ -6,6 +6,8 @@ local worker = test {
     delay = 2000
 }
 
-pipe(worker, log.info)
+pipe(worker, function (msg)
+    log.info(msg)
+end)
 
 worker("Radapter!")

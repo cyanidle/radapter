@@ -32,16 +32,6 @@ public:
     }
 };
 
-class TestPluginImpl final : public QObject, public radapter::WorkerPlugin
-{
-    Q_OBJECT
-    Q_PLUGIN_METADATA(IID "radapter.plugins.TestPluginWorker")
-    Q_INTERFACES(radapter::WorkerPlugin)
-public:
-    const char* ClassName() override { return "TestPlugin"; }
-    Worker* Create(QVariantList const& args, Instance* inst) override {
-        return new TestPlugin(args, inst);
-    }
-};
+RADAPTER_PLUGIN(TestPlugin, "radapter.plugins.Test")
 
 #include "test.moc"

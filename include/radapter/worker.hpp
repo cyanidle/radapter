@@ -73,4 +73,15 @@ void RADAPTER_API push_worker(Instance* inst, const char* clsname, Worker* w, Ex
 #define RadapterWorkerPlugin_iid "radapter.plugins.Worker/1.0"
 Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
 
+#define RADAPTER_PLUGIN(worker, iid) \
+    class worker##_RadPluginImpl final : public QObject, public radapter::WorkerPlugin \
+    {  \
+        Q_OBJECT  \
+        Q_PLUGIN_METADATA(IID iid) \
+        Q_INTERFACES(radapter::WorkerPlugin)  \
+    public:  \
+        const char* ClassName() override { return #worker; }  \
+        Worker* Create(QVariantList const& args, Instance* inst) override { return new worker(args, inst);} \
+    };
+
 #endif //RADAPTER_WORKER_H

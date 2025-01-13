@@ -10,7 +10,8 @@ int radapter::Instance::Impl::luaLog(lua_State *L) {
     auto sv = string_view{s, len};
     string category = "lua";
     lua_Debug ar;
-    if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar)) {
+    int level = 1;
+    if (lua_getstack(L, level, &ar) && lua_getinfo(L, "Sl", &ar)) {
         category = ar.short_src;
         auto pos = category.find_last_of("/\\");
         if (pos != string::npos) {
