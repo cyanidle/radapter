@@ -130,7 +130,7 @@ static void pushPart(lua_State* L, string_view part) {
 }
 
 // get(table, "deep:nested:key", sep = ':') -> nil/value
-int builtin::api::Get(lua_State* L) noexcept {
+int builtin::api::Get(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TSTRING);
     string_view sep = ":";
@@ -168,7 +168,7 @@ int builtin::api::Get(lua_State* L) noexcept {
 }
 
 // get(table, "deep:nested:key", val, sep = ':') -> table
-int builtin::api::Set(lua_State* L) noexcept {
+int builtin::api::Set(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TSTRING);
     luaL_checkany(L, 3);
@@ -215,7 +215,7 @@ int builtin::api::Set(lua_State* L) noexcept {
     }
 }
 
-static int stopTimer(lua_State* L) noexcept {
+static int stopTimer(lua_State* L) {
     auto t = static_cast<QTimer*>(luaL_checkudata(L, 1, "_each_timer"));
     t->stop();
     luaL_unref(L, LUA_REGISTRYINDEX, t->objectName().toInt());

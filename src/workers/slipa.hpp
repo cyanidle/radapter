@@ -17,34 +17,8 @@ enum Special : char {
     ESC_END = char(0xDC),
 };
 
-using CannotFail = std::false_type;
-
-struct Encoder {
-    Encoder() noexcept = default;
-    std::string_view Encode(char byte) {
-        switch (byte) {
-        case ESC:
-            buff[0] = ESC;
-            buff[1] = ESC_ESC;
-            buff[2] = 0;
-            return {buff, 2};
-        case END:
-            buff[0] = ESC;
-            buff[1] = ESC_END;
-            buff[2] = 0;
-            return {buff, 2};
-        default:
-            buff[0] = byte;
-            buff[1] = 0;
-            return {buff, 1};
-        }
-    }
-protected:
-    char buff[4] = {};
-};
-
 template<typename Fn>
-void Write(std::string_view msg, Fn&& out) noexcept {
+void Write(std::string_view msg, Fn&& out) {
     constexpr char esc_end[] = {ESC, ESC_END, 0};
     constexpr char esc_esc[] = {ESC, ESC_ESC, 0};
     size_t collected = 0;

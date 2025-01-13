@@ -44,7 +44,7 @@ void radapter::compat::luaL_requiref (lua_State *L, const char *modname, lua_CFu
     lua_replace(L, -2);
 }
 
-static int do_prequiref(lua_State* L) noexcept {
+static int do_prequiref(lua_State* L) {
 #ifdef RADAPTER_JIT
     compat::luaL_requiref(L, lua_tostring(L, 1), lua_tocfunction(L, 2), int(lua_tointeger(L, 3)));
 #else

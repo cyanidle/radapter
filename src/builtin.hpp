@@ -165,8 +165,8 @@ QVariantList toArgs(lua_State* L, int from);
 
 namespace api {
 int Format(lua_State* L);
-int Get(lua_State* L) noexcept;
-int Set(lua_State* L) noexcept;
+int Get(lua_State* L);
+int Set(lua_State* L);
 int Each(lua_State* L);
 int After(lua_State* L);
 int LoadPlugin(lua_State* L);

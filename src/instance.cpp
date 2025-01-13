@@ -35,7 +35,7 @@ int luaopen_lfs(lua_State *L);
 
 static std::atomic<unsigned> _curr_id = 0;
 
-static int _gen_id(lua_State* L) noexcept {
+static int _gen_id(lua_State* L) {
     lua_pushinteger(L, _curr_id.fetch_add(1, std::memory_order_relaxed));
     return 1;
 }

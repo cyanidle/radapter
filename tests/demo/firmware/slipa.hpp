@@ -13,7 +13,7 @@ enum Special : char {
 
 
 template<typename Fn>
-_FLATTEN void Write(msg2struct::String msg, Fn&& out) noexcept {
+_FLATTEN void Write(msg2struct::String msg, Fn&& out) {
     constexpr char esc_end[] = {ESC, ESC_END, 0};
     constexpr char esc_esc[] = {ESC, ESC_ESC, 0};
     size_t collected = 0;
