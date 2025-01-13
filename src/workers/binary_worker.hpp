@@ -6,33 +6,43 @@
 namespace radapter 
 {
 
+enum class BinaryCrc
+{
+    modbus,
+};
 
-enum BinaryProtocol
+RAD_DESCRIBE(BinaryCrc) {
+    MEMBER("msgpack", _::modbus);
+}
+
+enum class BinaryProtocol
 {
 	msgpack,
 };
 
 RAD_DESCRIBE(BinaryProtocol) {
-	MEMBER("msgpack", msgpack);
+    MEMBER("msgpack", _::msgpack);
 }
 
-enum BinaryFraming 
+enum class BinaryFraming
 {
 	slip,
 };
 
 RAD_DESCRIBE(BinaryFraming) {
-	MEMBER("slip", slip);
+    MEMBER("slip", _::slip);
 }
 
 struct BinaryConfig {
 	BinaryFraming framing;
 	BinaryProtocol protocol;
+    optional<BinaryCrc> crc;
 };
 
 RAD_DESCRIBE(BinaryConfig) {
 	RAD_MEMBER(framing);
 	RAD_MEMBER(protocol);
+    RAD_MEMBER(crc);
 }
 
 class BinaryWorker : public Worker
