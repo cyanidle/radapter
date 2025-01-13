@@ -1,6 +1,6 @@
 CPMAddPackage("gh:cyanidle/describe@3.1")
 CPMAddPackage("gh:p-ranav/argparse@3.1")
-CPMAddPackage("gh:cyanidle/glua@2.1")
+CPMAddPackage("gh:cyanidle/glua@2.1.1")
 CPMAddPackage("gh:fmtlib/fmt#11.0.2")
 
 CPMAddPackage(NAME rpcxx
