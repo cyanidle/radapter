@@ -1,3 +1,4 @@
+#include "radapter/radapter.hpp"
 #include "radapter/worker.hpp"
 #include "radapter/config.hpp"
 #include <qtimer.h>
@@ -32,6 +33,8 @@ public:
     }
 };
 
-RADAPTER_PLUGIN(TestPlugin, "radapter.plugins.Test")
+RADAPTER_PLUGIN(TestPlugin, "radapter.plugins.Test") {
+    radapter->Info("global!", "Log on plugin load!");
+}
 
 #include "test.moc"

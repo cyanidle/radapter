@@ -58,9 +58,10 @@ private:
 
 struct RADAPTER_API WorkerPlugin {
     virtual ~WorkerPlugin() = default;
-    virtual const ExtraMethods* ExtraMethods() { return nullptr; }
+    virtual void RegisterGlobals(Instance* target) {(void)target;}
     virtual const char* ClassName() = 0;
     virtual Worker* Create(QVariantList const& args, Instance* inst) = 0;
+    virtual const ExtraMethods* GetExtraMethods() { return nullptr; }
 };
 
 namespace impl {
@@ -82,6 +83,8 @@ Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
     public:  \
         const char* ClassName() override { return #worker; }  \
         Worker* Create(QVariantList const& args, Instance* inst) override { return new worker(args, inst);} \
-    };
+        void RegisterGlobals(Instance* radapter) override;\
+    }; \
+void worker##_RadPluginImpl::RegisterGlobals(Instance* radapter)
 
 #endif //RADAPTER_WORKER_H

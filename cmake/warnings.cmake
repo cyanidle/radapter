@@ -3,7 +3,7 @@
 function(set_target_warnings target_name LINK_TYPE WARNING_AS_ERROR)
     set(CLANG_WARNINGS -Wall                       # reasonable and standard
                        -Wextra                     # same
-                       -Wshadow                    # warn if shadow decalration
+                       -Wno-shadow                    # warn if shadow decalration
                        -Wno-gnu-zero-variadic-macro-arguments
                        -Wpedantic                  # warn on language extansions
                        -Wnon-virtual-dtor          # warn if a class with virtual functions has a non-virtual dtor
