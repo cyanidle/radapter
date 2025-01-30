@@ -96,7 +96,7 @@ public:
             }
             auto asVariant = [&]() -> QVariant {
                 switch (reg.type) {
-                case defaultValueType: assert(false && "lib error");
+                case defaultValueType: assert(false && "lib error"); std::abort();
                 case bit:
                 case uint16: return parseType<uint16_t>(reg.packing, data);
                 case uint32: return parseType<uint32_t>(reg.packing, data);
@@ -142,7 +142,9 @@ public:
             unit.setValueCount(uint32_t(reg.sizeOf/2));
             QVector<uint16_t> words;
             switch (reg.type) {
-            case defaultValueType: assert(false && "lib error");
+            case defaultValueType: 
+                assert(false && "lib error"); 
+                std::abort();
             case bit: {
                 words.push_back(uint16_t(v.toBool()));
                 break;

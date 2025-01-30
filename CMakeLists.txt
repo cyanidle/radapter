@@ -21,7 +21,7 @@ set(RADAPTER_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
 set(RADAPTER_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
@@ -151,3 +151,6 @@ endfunction()
 create_radapter_plugin(radapter_test_plugin
     FILES plugins/test.cpp
 )
+
+
+install(TARGETS radapter radapter-sdk EXPORT radapter-config)
