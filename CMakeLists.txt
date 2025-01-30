@@ -135,6 +135,7 @@ add_executable(radapter ./app/main.cpp)
 target_link_libraries(radapter PRIVATE
     qctrl
     argparse
+    efsw-static
     radapter-sdk)
 
 function(create_radapter_plugin name)

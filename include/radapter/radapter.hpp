@@ -70,7 +70,7 @@ class RADAPTER_API Instance : public QObject
     Q_OBJECT
 public:
     struct Impl;
-    Instance();
+    explicit Instance(QObject* parent = nullptr);
     virtual ~Instance() override;
 
     void RegisterGlobal(const char* name, QVariant const& value);

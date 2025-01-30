@@ -40,7 +40,9 @@ static int _gen_id(lua_State* L) {
     return 1;
 }
 
-Instance::Instance() : d(new Impl)
+Instance::Instance(QObject *parent) :
+    QObject(parent),
+    d(new Impl)
 {
     init_qrc();
     auto L = d->L;
