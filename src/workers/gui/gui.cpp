@@ -168,6 +168,7 @@ namespace radapter::builtin {
 void workers::gui(Instance* inst) 
 {
 	using namespace radapter::gui;
+    g_engine()->clearComponentCache();
     inst->RegisterWorker<QMLWorker>("QML");
 	inst->RegisterSchema<QMLConfig>("QML");
 }
