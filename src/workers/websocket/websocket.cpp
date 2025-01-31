@@ -93,14 +93,12 @@ struct WsServerConfig : WsConfig {
     uint16_t port;
 
     WithDefault<string> host = "0.0.0.0";
-    WithDefault<unsigned> refresh_timeout = 10'000u;
 };
 
 RAD_DESCRIBE(WsServerConfig) {
     PARENT(WsConfig);
     RAD_MEMBER(port);
     RAD_MEMBER(host);
-    RAD_MEMBER(refresh_timeout);
 }
 
 using namespace jv;
@@ -164,7 +162,6 @@ class Server : public Worker {
 
     WsServerConfig config;
     QWebSocketServer* server = nullptr;
-    QVariant state;
     std::set<QWebSocket*> socks;
 public:
     Server(QVariantList args, Instance* inst) :
@@ -188,15 +185,6 @@ public:
             throw Err("{}: could not listen on: {}:{}", objectName(), config.host.value, config.port);
         }
         Info("{}: listening on {}:{}", objectName(), config.host.value, config.port);
-        if (config.refresh_timeout) {
-            auto timer = new QTimer(this);
-            timer->callOnTimeout(this, [this]{
-                if (state.isValid()) {
-                    broadcast(state);
-                }
-            });
-            timer->start(int(config.refresh_timeout));
-        }
         connect(server, &QWebSocketServer::newConnection, this, [this]{
             while(server->hasPendingConnections()) {
                 accept(server->nextPendingConnection());
@@ -226,15 +214,6 @@ public:
             socks.erase(sock);
         });
         socks.insert(sock);
-        if (state.isValid()) {
-            auto toSend = prepareMsg(config, state);
-            if (isBinary(config)) {
-                sock->sendBinaryMessage(toSend);
-            } else {
-                auto str = QString::fromUtf8(toSend);
-                sock->sendTextMessage(str);
-            }
-        }
     }
 
     void broadcast(QVariant const& _state) {
