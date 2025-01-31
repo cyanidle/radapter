@@ -61,6 +61,16 @@ public:
 
         QObject::connect(inst, &radapter::Instance::ShutdownDone, this, &QObject::deleteLater);
 
+        QObject::connect(config->sigs, &QCtrlSignalHandler::sigInt, this, [this]{
+            sigint = true;
+            shutdown();
+        });
+        QObject::connect(config->sigs, &QCtrlSignalHandler::sigTerm, this, [this]{
+            sigterm = true;
+            shutdown();
+        });
+
+
         if (config->cli["gui"] == true) {
             inst->EnableGui();
         }
@@ -89,15 +99,6 @@ public:
         if (auto f = config->cli.present("file")) {
             inst->EvalFile(radapter::fs::u8path(*f));
         }
-        // Three one-shot callbacks
-        QObject::connect(config->sigs, &QCtrlSignalHandler::sigInt, this, [this]{
-            sigint = true;
-            shutdown();
-        });
-        QObject::connect(config->sigs, &QCtrlSignalHandler::sigTerm, this, [this]{
-            sigterm = true;
-            shutdown();
-        });
         if (config->listener) {
             QObject::connect(config->listener, &Listener::FileChanged, this, [this, done = false]() mutable {
                 if (!done) reload();
@@ -107,15 +108,21 @@ public:
     }
 
     void shutdown() {
-        QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
+        QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit);
         inst->Shutdown(sigterm ? 500 : 5000);
         return;
     }
 
     void reload() {
-        std::cerr << "# Hot reload." << std::endl;
+        std::cerr << "# Hot reload..." << std::endl;
         QObject::connect(inst, &QObject::destroyed, [config = config]{
-            new AppState{config};
+            try {
+                new AppState{config};
+                std::cerr << "# Hot reload done." << std::endl;
+            } catch (std::exception& e) {
+                std::cerr << "# Hot reload error: " << e.what() << std::endl;
+                qApp->exit(1);
+            }
         });
         inst->Shutdown();
     }

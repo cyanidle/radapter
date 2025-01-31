@@ -11,14 +11,32 @@
 
 namespace radapter::redis {
 
+enum CacheMode {
+    r = 1,
+    w = 2,
+    rw = r | w,
+};
+
+RAD_DESCRIBE(CacheMode) {
+    MEMBER("r", r);
+    MEMBER("w", w);
+    MEMBER("rw", rw);
+    MEMBER("read", r);
+    MEMBER("write", w);
+    MEMBER("read_write", rw);
+}
+
 struct CacheConfig : Config {
     optional<string> hash_key;
     WithDefault<bool> enable_keyevents = true;
+    WithDefault<CacheMode> mode = rw;
 };
+
 DESCRIBE("redis::CacheConfig", CacheConfig, void) {
     PARENT(Config);
-    MEMBER("hash_key", &_::hash_key);
-    MEMBER("enable_keyevents", &_::enable_keyevents);
+    RAD_MEMBER(hash_key);
+    RAD_MEMBER(enable_keyevents);
+    RAD_MEMBER(mode);
 }
 
 enum StreamStart {
@@ -38,22 +56,21 @@ struct StreamConfig : Config {
     WithDefault<unsigned> stream_size = 1'000'000u;
     WithDefault<unsigned> block_timeout = 30'000u;
     WithDefault<unsigned> entries_per_read = 1'000u;
-    WithDefault<bool> read_enabled = true;
-    WithDefault<bool> write_enabled = true;
     WithDefault<string> instance_id = "_";
     WithDefault<string> persistent_prefix = "__radapter";
+    WithDefault<CacheMode> mode = rw;
 };
+
 DESCRIBE("redis::StreamConfig", StreamConfig, void) {
     PARENT(Config);
-    MEMBER("stream_key", &_::stream_key);
-    MEMBER("start_from", &_::start_from);
-    MEMBER("stream_size", &_::stream_size);
-    MEMBER("block_timeout", &_::block_timeout);
-    MEMBER("entries_per_read", &_::entries_per_read);
-    MEMBER("read_enabled", &_::read_enabled);
-    MEMBER("write_enabled", &_::write_enabled);
-    MEMBER("instance_id", &_::instance_id);
-    MEMBER("persistent_prefix", &_::persistent_prefix);
+    RAD_MEMBER(stream_key);
+    RAD_MEMBER(start_from);
+    RAD_MEMBER(stream_size);
+    RAD_MEMBER(block_timeout);
+    RAD_MEMBER(entries_per_read);
+    RAD_MEMBER(instance_id);
+    RAD_MEMBER(persistent_prefix);
+    RAD_MEMBER(mode);
 }
 
 class Cache : public Worker
@@ -87,9 +104,11 @@ public:
             }
         };
         connect(client, &Client::ConnectedChanged, this, onConnected);
-        connect(sub_client, &Client::ConnectedChanged, this, onConnected);
         client->Start();
-        sub_client->Start();
+        if (config.mode & r) {
+            connect(sub_client, &Client::ConnectedChanged, this, onConnected);
+            sub_client->Start();
+        }
     }
     void subscribeToHash() {
         client->Execute({"CONFIG", "GET", "notify-keyspace-events"})
@@ -152,6 +171,10 @@ public:
 
     }
     void OnMsg(QVariant const& msg) override {
+        if (!(config.mode & w)) {
+            Error("{}: write disabled", objectName());
+            return;
+        }
         if (!config.hash_key) {
             Error("{}: cannot handle msg: hash_key not set!", objectName());
             return;
@@ -249,7 +272,7 @@ public:
         client->setObjectName(client->objectName() + QString("_stream(%1)").arg(config.stream_key.c_str()));
         setObjectName(client->objectName());
         client->Start();
-        if (config.read_enabled) {
+        if (config.mode & r) {
             read_client = new Client(config, this);
             read_client->setObjectName(objectName()+"_read");
             read_client->Start();
@@ -310,7 +333,7 @@ public:
         saveLastId();
     }
     void OnMsg(QVariant const& msg) override {
-        if (!config.write_enabled) {
+        if (!(config.mode & w)) {
             Warn("{}: writing is disabled", objectName());
             return;
         }
