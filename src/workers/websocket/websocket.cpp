@@ -191,9 +191,18 @@ public:
             }
         });
     }
+
     void OnMsg(QVariant const& msg) override {
-        broadcast(msg);
+        if (!msg.isValid()) return;
+        auto toSend = prepareMsg(config, msg);
+        if (isBinary(config)) {
+            for (auto& cli: socks) {cli->sendBinaryMessage(toSend);}
+        } else {
+            auto str = QString::fromUtf8(toSend);
+            for (auto& cli: socks) {cli->sendTextMessage(str);}
+        }
     }
+
     void accept(QWebSocket* sock) {
         sock->setParent(this);
         sock->setObjectName(QString("%1:%2").arg(sock->peerAddress().toString()).arg(sock->peerPort()));
@@ -214,17 +223,6 @@ public:
             socks.erase(sock);
         });
         socks.insert(sock);
-    }
-
-    void broadcast(QVariant const& _state) {
-        if (!_state.isValid()) return;
-        auto toSend = prepareMsg(config, _state);
-        if (isBinary(config)) {
-            for (auto& cli: socks) {cli->sendBinaryMessage(toSend);}
-        } else {
-            auto str = QString::fromUtf8(toSend);
-            for (auto& cli: socks) {cli->sendTextMessage(str);}
-        }
     }
 };
 
