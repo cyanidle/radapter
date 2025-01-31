@@ -226,12 +226,14 @@ public:
             socks.erase(sock);
         });
         socks.insert(sock);
-        auto toSend = prepareMsg(config, state);
-        if (isBinary(config)) {
-            sock->sendBinaryMessage(toSend);
-        } else {
-            auto str = QString::fromUtf8(toSend);
-            sock->sendTextMessage(str);
+        if (state.isValid()) {
+            auto toSend = prepareMsg(config, state);
+            if (isBinary(config)) {
+                sock->sendBinaryMessage(toSend);
+            } else {
+                auto str = QString::fromUtf8(toSend);
+                sock->sendTextMessage(str);
+            }
         }
     }
 
