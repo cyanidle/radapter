@@ -27,16 +27,20 @@ CPMAddPackage(NAME hiredis
 
 include(../cmake/SystemLink.cmake)
 
-if (RADAPTER_JIT) #libluajit2-5.1-dev
+if (RADAPTER_JIT OR RADAPTER_JIT_STATIC) #libluajit2-5.1-dev
   include(FindPkgConfig)
-  pkg_check_modules(LUA_JIT luajit)
-  if (NOT LUA_JIT_FOUND)
+  pkg_check_modules(LJIT luajit)
+  if (NOT LJIT_FOUND)
     message(FATAL_ERROR "Could not find luajit using pkgconfig")
   endif()
-  add_library(radapter-lua INTERFACE)
-  target_include_system_directories(radapter-lua INTERFACE ${LUA_JIT_INCLUDE_DIRS})
-  target_link_libraries(radapter-lua INTERFACE ${LUA_JIT_STATIC_LIBRARIES})
-  target_link_directories(radapter-lua INTERFACE ${LUA_JIT_LIBRARY_DIRS})
+  add_library(radapter-lua INTERFACE)         
+  target_include_system_directories(radapter-lua INTERFACE ${LJIT_INCLUDE_DIRS})
+  target_link_directories(radapter-lua INTERFACE ${LJIT_LIBRARY_DIRS})
+  if (RADAPTER_JIT_STATIC)
+    target_link_libraries(radapter-lua INTERFACE ${LJIT_STATIC_LIBRARIES})
+  else() #RADAPTER_JIT
+    target_link_libraries(radapter-lua INTERFACE ${LJIT_LIBRARIES})
+  endif()
 else()
   CPMAddPackage(NAME lua
     URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
@@ -102,7 +106,6 @@ target_compile_definitions(radapter-luasock PRIVATE LUASOCKET_DEBUG)
 if (WIN32)
     target_link_libraries(radapter-luasock PUBLIC ws2_32)
 endif()
-
 
 
 CPMAddPackage(NAME luafilesystem

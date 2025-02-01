@@ -14,7 +14,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
+option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
 option(RADAPTER_GUI "Enable GUI capabilities" ON)
+option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
 # RADAPTER_EXTRA_SCRIPTS may be a list of extra embedded scripts directories
 
 set(RADAPTER_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
@@ -91,12 +93,13 @@ endfunction()
 
 radapter_scripts(RADAPTER_SCRIPTS)
 
-add_library(radapter-sdk SHARED
-    ${RADAPTER_SRC}
-    ${RADAPTER_TOPLEVEL_SRC}
-    ${RADAPTER_HEADERS}
-    ${RADAPTER_QRC}
-)
+set(RADAPTER_ALL_SRC ${RADAPTER_SRC} ${RADAPTER_TOPLEVEL_SRC} ${RADAPTER_HEADERS} ${RADAPTER_QRC})
+
+if (RADAPTER_STATIC)
+    add_library(radapter-sdk STATIC ${RADAPTER_ALL_SRC})
+else()
+    add_library(radapter-sdk SHARED ${RADAPTER_ALL_SRC})
+endif()
 set_target_warnings(radapter-sdk PRIVATE OFF)
 target_compile_definitions(radapter-sdk PRIVATE RADAPTER_API=Q_DECL_EXPORT)
 target_compile_definitions(radapter-sdk INTERFACE RADAPTER_API=Q_DECL_IMPORT)
@@ -122,8 +125,8 @@ endif()
 
 target_link_libraries(radapter-sdk PUBLIC 
     radapter-qt
-    radapter-lua
     glua
+    radapter-lua
     describe
     fmt)
 
