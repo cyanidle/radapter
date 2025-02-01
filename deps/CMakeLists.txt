@@ -25,6 +25,12 @@ CPMAddPackage(NAME hiredis
     ./hiredis-cert_null.patch
 )
 
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+
+target_link_libraries(efsw-static PUBLIC Threads::Threads)
+
 include(../cmake/SystemLink.cmake)
 
 if (RADAPTER_JIT OR RADAPTER_JIT_STATIC) #libluajit2-5.1-dev
@@ -59,12 +65,10 @@ else()
   endif()
   target_link_libraries(radapter-lua PUBLIC dl)
   if (UNIX)
+      target_link_libraries(radapter-lua PUBLIC m)
       target_compile_definitions(radapter-lua PRIVATE LUA_USE_POSIX)
   endif()
   add_executable(radapter-luac EXCLUDE_FROM_ALL ${lua_SOURCE_DIR}/src/luac.c)
-  if (UNIX)
-    target_link_libraries(radapter-luac PRIVATE m)
-  endif()
   target_link_libraries(radapter-luac PRIVATE radapter-lua)
 endif()
 

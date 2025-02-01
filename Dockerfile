@@ -9,7 +9,9 @@ RUN apt update && apt install -y \
 COPY . /src
 WORKDIR /src
 RUN cmake \
+    -D CMAKE_BUILD_TYPE=RelWithDebInfo \
     -D RADAPTER_GUI=OFF \
+    -D RADAPTER_STATIC=ON \
     -G Ninja -B /build
 RUN cmake --build /build -j$(nproc)
 

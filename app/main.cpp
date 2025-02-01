@@ -70,10 +70,10 @@ public:
             shutdown();
         });
 
-
-        if (config->cli["gui"] == true) {
+        if (radapter::GUI && config->cli["gui"] == true) {
             inst->EnableGui();
         }
+
         if (config->cli["schema"] == true) {
             std::cerr << QJsonDocument::fromVariant(inst->GetSchemas()).toJson().toStdString() << std::endl;
             std::exit(0);
@@ -132,16 +132,16 @@ public:
 
 int main (int argc, char **argv) try {
     std::unique_ptr<QCoreApplication> app;
-    if constexpr (radapter::GUI) {
-        for (auto it = argv; it != argv + argc; ++it) {
-            if (strcmp(*it, "--gui") == 0) {
-                auto gapp = new QGuiApplication(argc, argv);
-                gapp->setQuitOnLastWindowClosed(false);
-                app.reset(gapp);
-                break;
-            }
+#ifdef RADAPTER_GUI
+    for (auto it = argv; it != argv + argc; ++it) {
+        if (strcmp(*it, "--gui") == 0) {
+            auto gapp = new QGuiApplication(argc, argv);
+            gapp->setQuitOnLastWindowClosed(false);
+            app.reset(gapp);
+            break;
         }
     }
+#endif
     if (!app) {
         app.reset(new QCoreApplication(argc, argv));
     }
