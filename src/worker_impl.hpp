@@ -12,10 +12,10 @@ struct WorkerImpl {
     QPointer<radapter::Worker> self{};
     QMetaObject::Connection conn{};
     QVariant currentSender = {};
-    int listenersRef = LUA_NOREF;
+    LuaValue listeners = {};
+    LuaValue evListeners = {};
 
     ~WorkerImpl() {
-        luaL_unref(L, LUA_REGISTRYINDEX, listenersRef);
         if (self) {
             QObject::disconnect(conn);
             self->deleteLater();

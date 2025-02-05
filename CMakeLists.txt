@@ -15,6 +15,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
 option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
+
+if (RADAPTER_JIT_STATIC)
+    set(RADAPTER_JIT ON)
+endif()
+
 option(RADAPTER_GUI "Enable GUI capabilities" ON)
 option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
 # RADAPTER_EXTRA_SCRIPTS may be a list of extra embedded scripts directories

@@ -42,6 +42,12 @@ LuaValue::LuaValue(lua_State *L, int idx)
     _ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
+LuaValue::LuaValue(lua_State *L, ConsumeTopTag)
+{
+    this->_L = L;
+    _ref = luaL_ref(L, LUA_REGISTRYINDEX);
+}
+
 LuaValue::operator bool() const noexcept
 {
     return _L && _ref != LUA_NOREF;
@@ -73,6 +79,17 @@ void *LuaUserData::Data(const char *tname)
     auto* d = luaL_testudata(_L, -1, tname);
     lua_pop(_L, 1);
     return d;
+}
+
+void *LuaUserData::UnsafeData()
+{
+    if (!lua_checkstack(_L, 1)) {
+        throw Err("Could not reserve stack for call");
+    }
+    lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
+    void* res = lua_touserdata(_L, -1);;
+    lua_pop(_L, 1);
+    return res;
 }
 
 void* LuaUserData::init(lua_State *L, size_t sz)

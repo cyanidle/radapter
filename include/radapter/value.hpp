@@ -12,8 +12,11 @@ namespace radapter {
 
 class Instance;
 
+enum ConsumeTopTag {ConsumeTop};
+
 struct RADAPTER_API LuaValue {
     LuaValue(lua_State* L, int idx);
+    LuaValue(lua_State* L, ConsumeTopTag);
 
     LuaValue();
     LuaValue(const LuaValue& o);
@@ -55,6 +58,7 @@ struct RADAPTER_API LuaUserData : LuaValue {
     }
 
     void* Data(const char* tname);
+    void* UnsafeData();
 
 private:
     static void* init(lua_State* L, size_t sz);

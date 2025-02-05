@@ -146,6 +146,14 @@ namespace glua {
 void Push(lua_State* L, QVariant const& val);
 }
 
+namespace radapter {
+
+inline void Push(lua_State* L, radapter::LuaValue const& val) {
+    lua_rawgeti(L, LUA_REGISTRYINDEX, val._ref);
+}
+
+}
+
 #ifdef RADAPTER_JIT
 #define lua_udata(L, ...) lua_newuserdata(L, (__VA_ARGS__))
 #else

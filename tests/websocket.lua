@@ -10,6 +10,10 @@ local client = WebsocketClient{
     compression = "zlib",
 }
 
+pipe(client.events, function (msg)
+    log.info("Client event: {}", msg)
+end)
+
 pipe(server, function(msg)
     log.info("SERVER <= {}", msg)
 end)

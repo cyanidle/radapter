@@ -39,15 +39,12 @@ struct FactoryContext {
     Factory factory;
     ExtraMethods methods;
 };
-DESCRIBE("radapter::FactoryContext", FactoryContext, void) {
-
-
-}
+DESCRIBE("radapter::FactoryContext", FactoryContext, void) {}
 
 static int get_listeners(lua_State* L) {
     auto* cls = lua_tostring(L, lua_upvalueindex(1));
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
-    lua_rawgeti(L, LUA_REGISTRYINDEX, ud->listenersRef);
+    Push(L, ud->listeners);
     return 1;
 };
 
@@ -79,6 +76,48 @@ static int call_extra(lua_State* L) {
     return 1;
 }
 
+struct radWorkerEvents {
+    LuaUserData worker;
+
+    LuaValue get_listeners() {
+        return static_cast<WorkerImpl*>(worker.UnsafeData())->evListeners;
+    }
+};
+
+RAD_DESCRIBE(radWorkerEvents) {
+    RAD_MEMBER(get_listeners);
+}
+
+static int worker_index(lua_State* L) {
+    constexpr string_view events = "events";
+    if (lua_type(L, 2) == LUA_TSTRING && lua_tostring(L, 2) == events) {
+        glua::Push(L, radWorkerEvents{LuaUserData(L, 1)});
+    } else {
+        lua_rawget(L, lua_upvalueindex(1));
+    }
+    return 1;
+}
+
+static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool ev) {
+    auto* L = impl->L;
+    auto* w = impl->self.data();
+    if (!lua_checkstack(L, 4)) {
+        w->Error("Could not reserve stack to send {}", ev ? "msg" : "event");
+        return;
+    }
+    lua_pushcfunction(L, builtin::help::traceback);
+    auto msgh = lua_gettop(L);
+    lua_getglobal(L, "call_all");
+    Push(L, ev ? impl->evListeners : impl->listeners);
+    glua::Push(L, msg);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, workerSelfRef);
+    auto ok = lua_pcall(L, 3, 0, msgh);
+    if (ok != LUA_OK) {
+        w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
+    }
+    lua_settop(L, msgh - 1);
+}
+
 void impl::push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
 {
     auto L = inst->LuaState();
@@ -99,24 +138,15 @@ void impl::push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMeth
     });
 
     lua_createtable(L, 0, 0); //subs
-    impl->listenersRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    impl->listeners = LuaValue(L, ConsumeTop);
+    lua_createtable(L, 0, 0); //evSubs
+    impl->evListeners = LuaValue(L, ConsumeTop);
 
+    impl->conn = QObject::connect(w, &Worker::SendEvent, w, [=](QVariant const& msg){
+        worker_notify(impl, msg, workerSelfRef, true);
+    });
     impl->conn = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
-        if (!lua_checkstack(L, 4)) {
-            w->Error("Could not reserve stack to send msg");
-            return;
-        }
-        lua_pushcfunction(L, builtin::help::traceback);
-        auto msgh = lua_gettop(L);
-        lua_getglobal(L, "call_all");
-        lua_rawgeti(L, LUA_REGISTRYINDEX, impl->listenersRef);
-        glua::Push(L, msg);
-        lua_rawgeti(L, LUA_REGISTRYINDEX, workerSelfRef);
-        auto ok = lua_pcall(L, 3, 0, msgh);
-        if (ok != LUA_OK) {
-            w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
-        }
-        lua_settop(L, msgh - 1);
+        worker_notify(impl, msg, workerSelfRef, false);
     });
     if (luaL_newmetatable(L, clsname)) {
 
@@ -147,6 +177,7 @@ void impl::push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMeth
         lua_pushcfunction(L, glua::dtor_for<WorkerImpl>);
         lua_setfield(L, -2, "__gc");
         lua_pushvalue(L, -1);
+        lua_pushcclosure(L, glua::protect<worker_index>, 1);
         lua_setfield(L, -2, "__index");
     }
     lua_setmetatable(L, -2);

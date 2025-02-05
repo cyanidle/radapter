@@ -52,6 +52,7 @@ protected:
 signals:
     void ShutdownDone();
     void SendMsg(QVariant const& msg);
+    void SendEvent(QVariant const& msg);
 private:
     const char *_category;
 };

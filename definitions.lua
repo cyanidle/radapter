@@ -174,19 +174,21 @@ log = {
     set_level = function (level) end,
 }
 
----@alias MsgHandler fun(msg: any, source: Worker): any
----@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker): any
+---@alias MsgHandler fun(msg: any, source: Worker)
+---@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker)
 
-
----@class Pipable
+---@class Events
 ---@field get_listeners fun(self: Pipable): MsgHandler[]
+
+---@class Pipable: Events
 ---@field call MsgHandlerEx
 
 
 ---@class Worker: Pipable
 ---@overload fun(msg: any, source: Worker)
+---@field events Events
 
----@alias pipeInput (Worker | Pipable | MsgHandler)
+---@alias pipeInput (Events | MsgHandler)
 
 ---@generic T1 : pipeInput
 ---@param first T1

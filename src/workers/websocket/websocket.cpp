@@ -246,9 +246,9 @@ public:
             sock->setSslConfiguration(*ssl);
         }
         connect(sock, &QWebSocket::stateChanged, this, [=](auto state){
-            Info("{}: New state: {}",
-                 objectName(),
-                 QMetaEnum::fromType<decltype(state)>().valueToKey(state));
+            const auto st = QMetaEnum::fromType<decltype(state)>().valueToKey(state);
+            Info("{}: New state: {}", objectName(), st);
+            emit SendEvent(QVariantMap{{"state", st}});
             if (state == QAbstractSocket::UnconnectedState) {
                 QTimer::singleShot(config.reconnect_timeout, this, [=]{
                     sock->open(QUrl(config.url));
@@ -279,9 +279,9 @@ public:
 
 void radapter::builtin::workers::websocket(radapter::Instance* inst) {
     inst->RegisterWorker<ws::Server>("WebsocketServer");
-    inst->RegisterSchema("WebsocketServer", SchemaFor<ws::WsServerConfig>);
+    inst->RegisterSchema<ws::WsServerConfig>("WebsocketServer");
     inst->RegisterWorker<ws::Client>("WebsocketClient");
-    inst->RegisterSchema("WebsocketClient", SchemaFor<ws::WsClientConfig>);
+    inst->RegisterSchema<ws::WsClientConfig>("WebsocketClient");
 }
 
 #include "websocket.moc"
