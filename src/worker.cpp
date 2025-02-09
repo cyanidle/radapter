@@ -118,7 +118,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     lua_settop(L, msgh - 1);
 }
 
-void impl::push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
+static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
 {
     auto L = inst->LuaState();
 
@@ -191,7 +191,7 @@ static int workerFactory(lua_State* L) {
     auto ctorArgs = builtin::help::toArgs(L, 1);
     auto* inst = Instance::FromLua(L);
     auto* w = ctx->factory(ctorArgs, inst);
-    impl::push_worker(inst, ctx->name.c_str(), w, ctx->methods);
+    push_worker(inst, ctx->name.c_str(), w, ctx->methods);
     return 1;
 }
 

@@ -30,11 +30,13 @@ public:
     }
     void OnMsg(QVariant const& msg) override {
         Info("Msg: {}", msg.toString());
+        emit SendEvent(QVariantMap{{"msg", "received"}});
     }
 };
 
-RADAPTER_PLUGIN(TestPlugin, "radapter.plugins.Test") {
+RADAPTER_PLUGIN("radapter.plugins.Test") {
     radapter->Info("global!", "Log on plugin load!");
+    radapter->RegisterWorker<TestPlugin>("TestPlugin");
 }
 
 #include "test.moc"

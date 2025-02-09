@@ -564,23 +564,6 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
     }
 }
 
-struct RadInternalPlugin {
-    std::unique_ptr<WorkerPlugin> ptr;
-
-};
-
-static int callPlugin(lua_State* L) {
-    auto* plug = glua::TestUData<RadInternalPlugin>(L, 1)->ptr.get();
-    auto ctorArgs = builtin::help::toArgs(L, 2);
-    auto* inst = Instance::FromLua(L);
-    auto* w = plug->Create(ctorArgs, inst);
-    auto* extra = plug->GetExtraMethods();
-    impl::push_worker(inst, plug->ClassName(), w, extra ? *extra : ExtraMethods{});
-    return 1;
-}
-
-RAD_DESCRIBE(RadInternalPlugin) {}
-
 int builtin::api::LoadPlugin(lua_State *L)
 {
     size_t len;
@@ -593,17 +576,12 @@ int builtin::api::LoadPlugin(lua_State *L)
             throw Err("Could not load {} => {}", path, loader->errorString());
         }
         auto* inst = loader->instance();
-        RadInternalPlugin plug{std::unique_ptr<WorkerPlugin>{qobject_cast<WorkerPlugin*>(inst)}};
-        if (!plug.ptr) {
+        auto* plug = qobject_cast<WorkerPlugin*>(inst);
+        if (!plug) {
             throw Err("Loaded plugin does not implement: {}", qobject_interface_iid<WorkerPlugin*>());
         }
-        glua::PushMetaTable<RadInternalPlugin>(L);
-        lua_pushcfunction(L, glua::protect<callPlugin>);
-        lua_setfield(L, -2, "__call");
-        lua_pop(L, 1);
-        plug.ptr->RegisterGlobals(self);
-        glua::Push(L, std::move(plug));
-        return 1;
+        plug->Initialize(self);
+        return 0;
     } catch (...) {
         delete loader;
         throw;
