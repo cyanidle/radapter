@@ -12,10 +12,10 @@ CPMAddPackage(NAME rpcxx
 )
 
 CPMAddPackage(NAME hiredis
-  GITHUB_REPOSITORY redis/hiredis
+  GITHUB_REPOSITORY cyanidle/hiredis
   GIT_SHALLOW YES
   VERSION 1.2.5
-  GIT_TAG 8d8703e
+  GIT_TAG 77bcc73
   OPTIONS
     "DISABLE_TESTS ON"
     "ENABLE_SSL ON"
