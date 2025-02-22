@@ -134,7 +134,7 @@ int builtin::api::Get(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TSTRING);
     string_view sep = ":";
-    if (lua_gettop(L) > 2) {
+    if (lua_gettop(L) > 2 && lua_type(L, 3) != LUA_TNIL) {
         luaL_checktype(L, 3, LUA_TSTRING);
         sep = builtin::help::toSV(L, 3);
         if (sep.empty()) {
@@ -173,7 +173,7 @@ int builtin::api::Set(lua_State* L) {
     luaL_checktype(L, 2, LUA_TSTRING);
     luaL_checkany(L, 3);
     string_view sep = ":";
-    if (lua_gettop(L) > 3) {
+    if (lua_gettop(L) > 3 && lua_type(L, 4) != LUA_TNIL) {
         luaL_checktype(L, 4, LUA_TSTRING);
         sep = help::toSV(L, 4);
         if (sep.empty()) {
