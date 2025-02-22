@@ -5,17 +5,17 @@ function call_all(table, ...)
     end
 end
 
-function wrap(key)
+function wrap(key, sep)
     assert(type(key) == "string", "string expected as first arg")
     return function(msg)
-        return set({}, key, msg)
+        return set({}, key, msg, sep)
     end
 end
 
-function unwrap(key)
+function unwrap(key, sep)
     assert(type(key) == "string", "string expected as first arg")
     return function(msg)
-        return get(msg, key)
+        return get(msg, key, sep)
     end
 end
 
@@ -85,6 +85,10 @@ function pipe(first, ...)
     end
     assert(res ~= nil, "expected at least on param")
     return res
+end
+
+function on(worker, part, handler)
+    return pipe(worker, unwrap(part), handler)
 end
 
 -- Cross-version compatability

@@ -21,12 +21,14 @@ function set(table, key, value, sep) end
 function shutdown(timeout) end
 
 ---@param key string
+---@param sep string?
 ---@return fun(object: any): any
-function wrap(key) end
+function wrap(key, sep) end
 
 ---@param key string
+---@param sep string?
 ---@return fun(object: any): any
-function unwrap(key) end
+function unwrap(key, sep) end
 
 ---@param table any[]
 function call_all(table, ...) end
@@ -195,6 +197,13 @@ log = {
 ---@vararg pipeInput
 ---@return T1
 function pipe(first, ...) end
+
+---@generic T1 : pipeInput
+---@param source T1
+---@param part string
+---@param handler pipeInput
+---@return T1
+function on(source, part, handler) end
 
 ---@param worker Worker
 ---@param msg any
