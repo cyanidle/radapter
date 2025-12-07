@@ -1,6 +1,6 @@
 #include "qtadapter.hpp"
 #include <QSocketNotifier>
-#include "async.h"
+#include "redis_inc.h"
 
 QtRedisAdapter::QtRedisAdapter(QObject* parent) :
     QObject{parent}

@@ -11,10 +11,10 @@ namespace slipa
 {
 
 enum Special : char {
-    ESC = char(0xDB),
-    END = char(0xC0),
-    ESC_ESC = char(0xDD),
-    ESC_END = char(0xDC),
+    ESC = static_cast<char>(0xDB),
+    END = static_cast<char>(0xC0),
+    ESC_ESC = static_cast<char>(0xDD),
+    ESC_END = static_cast<char>(0xDC),
 };
 
 template<typename Fn>

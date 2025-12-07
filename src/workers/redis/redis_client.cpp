@@ -2,16 +2,7 @@
 #include "fmt/compile.h"
 #include "qtadapter.hpp"
 #include <QTimer>
-#ifndef _WIN32
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#endif
-#include "async.h"
-#ifndef _WIN32
-#pragma GCC diagnostic pop
-#endif
+#include "redis_inc.h"
 
 using namespace radapter;
 using namespace radapter::redis;
@@ -93,7 +84,7 @@ struct Client::Impl {
         try {
             if (!cast) throw Err("null reply");
             promise(parseReply(cast));
-        } catch (std::exception& e) {
+        } catch (...) {
             promise(std::current_exception());
         }
     } catch (std::exception& e) {
@@ -174,7 +165,7 @@ Future<QVariant> Client::Execute(const string_view *argv, size_t argc)
     string prep;
     try {
         prep = redisFormat(argv, argc);
-    } catch (std::exception& e) {
+    } catch (...) {
         return fut::Rejected<QVariant>(std::current_exception());
     }
     auto promise = Promise<QVariant>{};

@@ -23,6 +23,7 @@ CPMAddPackage(NAME hiredis
   PATCHES
     ./hiredis-min_cmake.patch
     ./hiredis-cert_null.patch
+    ./hiredis-install.patch
 )
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
@@ -34,18 +35,21 @@ target_link_libraries(efsw-static PUBLIC Threads::Threads)
 include(../cmake/SystemLink.cmake)
 
 if (RADAPTER_JIT OR RADAPTER_JIT_STATIC) #libluajit2-5.1-dev
-  include(FindPkgConfig)
-  pkg_check_modules(LJIT luajit)
-  if (NOT LJIT_FOUND)
-    message(FATAL_ERROR "Could not find luajit using pkgconfig")
-  endif()
-  add_library(radapter-lua INTERFACE)         
-  target_include_system_directories(radapter-lua INTERFACE ${LJIT_INCLUDE_DIRS})
-  target_link_directories(radapter-lua INTERFACE ${LJIT_LIBRARY_DIRS})
-  if (RADAPTER_JIT_STATIC)
-    target_link_libraries(radapter-lua INTERFACE ${LJIT_STATIC_LIBRARIES})
-  else() #RADAPTER_JIT
-    target_link_libraries(radapter-lua INTERFACE ${LJIT_LIBRARIES})
+  find_package(luajit)
+  if (luajit_FOUND)
+    add_library(radapter-lua INTERFACE)
+    target_link_libraries(radapter-lua INTERFACE luajit::luajit)
+  else()
+    find_package(PkgConfig REQUIRED QUIET)
+    pkg_check_modules(LJIT luajit REQUIRED)
+    add_library(radapter-lua INTERFACE)
+    target_include_system_directories(radapter-lua INTERFACE ${LJIT_INCLUDE_DIRS})
+    target_link_directories(radapter-lua INTERFACE ${LJIT_LIBRARY_DIRS})
+    if (RADAPTER_JIT_STATIC)
+      target_link_libraries(radapter-lua INTERFACE ${LJIT_STATIC_LIBRARIES})
+    else() #RADAPTER_JIT
+      target_link_libraries(radapter-lua INTERFACE ${LJIT_LIBRARIES})
+    endif()
   endif()
 else()
   CPMAddPackage(NAME lua

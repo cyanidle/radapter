@@ -5,7 +5,8 @@
     "qt5-websockets",
     "qt5-serialport",
     "qt5-serialbus",
-    "qt5-quickcontrols2"
+    "qt5-quickcontrols2",
+    "luajit"
   ],
   "builtin-baseline": "b322364f06308bdd24823f9d8f03fe0cc86fd46f"
 }

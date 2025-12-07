@@ -12,6 +12,10 @@ include(cmake/Versioning.cmake)
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
 option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
@@ -139,27 +143,46 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)
 endif()
 
-add_executable(radapter ./app/main.cpp)
-target_link_libraries(radapter PRIVATE
-    qctrl
-    argparse
-    efsw-static
-    radapter-sdk)
+install(TARGETS radapter-sdk EXPORT radapter-config)
+install(DIRECTORY include/radapter DESTINATION include)
 
-function(create_radapter_plugin name)
-    set(options)
-    set(args)
-    set(multi_args FILES)
-    cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
+if (NOT RADAPTER_SDK_ONLY)
+    add_executable(radapter ./app/main.cpp)
+    target_link_libraries(radapter PRIVATE
+        qctrl
+        argparse
+        efsw-static
+        radapter-sdk)
 
-    add_library(${name} SHARED ${ARG_FILES})
-    target_link_libraries(${name} PUBLIC radapter-sdk)
-endfunction()
+    function(create_radapter_plugin name)
+        set(options)
+        set(args)
+        set(multi_args FILES)
+        cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
+
+        add_library(${name} SHARED ${ARG_FILES})
+        target_link_libraries(${name} PUBLIC radapter-sdk)
+    endfunction()
 
 
-create_radapter_plugin(radapter_test_plugin
-    FILES plugins/test.cpp
-)
+    create_radapter_plugin(radapter_test_plugin
+        FILES plugins/test.cpp
+    )
 
+    install(TARGETS radapter EXPORT radapter-config)
+endif()
 
-install(TARGETS radapter radapter-sdk EXPORT radapter-config)
+if (CONAN_RUNTIME_LIB_DIRS)
+    install(RUNTIME_DEPENDENCY_SET radapter_bin_deps
+        PRE_EXCLUDE_REGEXES
+            [[api-ms-win-.*]]
+            [[ext-ms-.*]]
+            [[kernel32\.dll]]
+            [[libc\.so\..*]] [[libgcc_s\.so\..*]] [[libm\.so\..*]] [[libstdc\+\+\.so\..*]]
+        POST_EXCLUDE_REGEXES
+            [[.*/system32/.*\.dll]]
+            [[^/lib.*]]
+            [[^/usr/lib.*]]
+        DIRECTORIES ${CONAN_RUNTIME_LIB_DIRS}
+    )
+endif()
