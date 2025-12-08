@@ -51,8 +51,9 @@ int builtin::api::Format(lua_State* L) {
         idx--;
     } else {
         size_t len;
-        auto s = lua_tolstring(L, 1, &len);
+        auto s = luaL_tolstring(L, 1, &len);
         fmt = {s, len};
+        lua_pop(L, 1);
     }
     fmt::dynamic_format_arg_store<fmt::format_context> args;
     args.reserve(size_t(top - idx + 1), 0);
@@ -276,7 +277,8 @@ int builtin::api::After(lua_State* L) {
 
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
     size_t len;
-    auto s = lua_tolstring(L, idx, &len);
+    auto s = luaL_tolstring(L, idx, &len);
+    lua_pop(L, 1);
     return {s, len};
 }
 
@@ -449,7 +451,8 @@ void glua::Push(lua_State* L, QVariant const& val) {
 
 QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
     size_t len;
-    auto s = lua_tolstring(L, idx, &len);
+    auto s = luaL_tolstring(L, idx, &len);
+    lua_pop(L, 1);
     auto res = QString::fromUtf8(s, int(len));
     if (!res.isEmpty()) {
         return res;

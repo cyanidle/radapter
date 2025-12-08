@@ -6,7 +6,8 @@ int radapter::Instance::Impl::luaLog(lua_State *L) {
     builtin::api::Format(L);
     auto lvl = LogLevel(lua_tointeger(L, lua_upvalueindex(1)));
     size_t len;
-    auto s = lua_tolstring(L, -1, &len);
+    auto s = luaL_tolstring(L, -1, &len);
+    lua_pop(L, 1);
     auto sv = string_view{s, len};
     string category = "lua";
     lua_Debug ar;
