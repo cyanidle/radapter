@@ -137,7 +137,8 @@ target_link_libraries(radapter-sdk PUBLIC
     glua
     radapter-lua
     describe
-    fmt)
+    fmt
+    libcanard)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)

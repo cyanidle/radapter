@@ -4,7 +4,7 @@ index d613f81..695c7d8 100644
 +++ b/CMakeLists.txt
 @@ -1,4 +1,4 @@
 -CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
-+CMAKE_MINIMUM_REQUIRED(VERSION 3.5.0)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.5.0...3.16.0)
  
  MACRO(getVersionBit name)
    SET(VERSION_REGEX "^#define ${name} (.+)$")

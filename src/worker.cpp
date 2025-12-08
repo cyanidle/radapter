@@ -6,14 +6,16 @@
 namespace radapter
 {
 
-Worker::Worker(Instance *parent, const char *category) : QObject(parent), _category(category)
+Worker::Worker(Instance *parent, const char *category) :
+    QObject(parent),
+    _Category(category)
 {
     _Inst = parent;
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
 {
-    _Inst->Log(lvl, _category, fmt, args);
+    _Inst->Log(lvl, _Category, fmt, args);
 }
 
 lua_State *Worker::LuaState() const
@@ -98,17 +100,17 @@ static int worker_index(lua_State* L) {
     return 1;
 }
 
-static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool ev) {
+static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool is_event) {
     auto* L = impl->L;
     auto* w = impl->self.data();
     if (!lua_checkstack(L, 4)) {
-        w->Error("Could not reserve stack to send {}", ev ? "msg" : "event");
+        w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
         return;
     }
     lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
     lua_getglobal(L, "call_all");
-    Push(L, ev ? impl->evListeners : impl->listeners);
+    Push(L, is_event ? impl->evListeners : impl->listeners);
     glua::Push(L, msg);
     lua_rawgeti(L, LUA_REGISTRYINDEX, workerSelfRef);
     auto ok = lua_pcall(L, 3, 0, msgh);
@@ -142,10 +144,11 @@ static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMet
     lua_createtable(L, 0, 0); //evSubs
     impl->evListeners = LuaValue(L, ConsumeTop);
 
-    impl->conn = QObject::connect(w, &Worker::SendEvent, w, [=](QVariant const& msg){
+    //SendEventField
+    impl->conns.emplace_back() = QObject::connect(w, &Worker::SendEvent, w, [=](QVariant const& msg){
         worker_notify(impl, msg, workerSelfRef, true);
     });
-    impl->conn = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
+    impl->conns.emplace_back() = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
         worker_notify(impl, msg, workerSelfRef, false);
     });
     if (luaL_newmetatable(L, clsname)) {

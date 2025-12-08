@@ -98,7 +98,7 @@ template<typename T, if_numeric<T> = 1>
 void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     CheckCanConvert<T>(conf, frame);
     out = conf.value<T>();
-    if (QVariant(out) != conf) {
+    if (QVariant::fromValue(out) != conf) {
         throw Err("{}: Could not convert to number from: {} ({})",
                   frame, conf.toString().toStdString(), TypeNameOf(conf));
     }

@@ -230,6 +230,9 @@ async = {
     sleep = function (timeout) end,
 }
 
+---@type string[]
+args = {}
+
 ---@class builtinTimer
 builtinTimer = {}
 function builtinTimer:Stop() end
@@ -370,12 +373,33 @@ function WebsocketClient(params) end
 ---@field port string
 ---@field baud number
 
----@type string[]
-args = {}
-
 
 ---@class SerialWorker : Worker
 
 ---@return SerialWorker
 ---@param params SerialParams
 function Serial(params) end
+
+
+
+---@class CanFilter
+
+---@class CanParams
+---@field plugin "socketcan" | "virtualcan" | "vectorcan" | "tinycan" | "peakcan" | "systeccan" | "passthrucan"
+---@field device string
+---@field filters CanFilter[]?
+---@field baudrate number?
+
+
+---@class CanFrame
+---@field frame_id string | number
+---@field payload string | number
+---@field extended_id boolean?
+---@field can_fd boolean?
+
+---@class CanWorker : Worker
+---@overload fun(frame: CanFrame, source: Worker)
+
+---@return CanWorker
+---@param params CanParams
+function CAN(params) end

@@ -416,6 +416,11 @@ void glua::Push(lua_State* L, QVariant const& val) {
         pushQStr(L, val.toString());
         break;
     }
+    case QVariant::Type::ByteArray: {
+        auto arr = val.toByteArray();
+        lua_pushlstring(L, arr.data(), size_t(arr.size()));
+        break;
+    }
     case QVariant::Type::StringList: {
         lua_checkstack(L, 1); //val
         auto arr = val.toStringList();
@@ -442,10 +447,14 @@ void glua::Push(lua_State* L, QVariant const& val) {
     }
 }
 
-QString builtin::help::toQStr(lua_State* L, int idx) {
+QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
     size_t len;
     auto s = lua_tolstring(L, idx, &len);
-    return QString::fromUtf8(s, int(len));
+    auto res = QString::fromUtf8(s, int(len));
+    if (!res.isEmpty()) {
+        return res;
+    }
+    return QByteArray(s, static_cast<int>(len));
 }
 
 QVariant builtin::help::toQVar(lua_State* L, int idx) {
@@ -470,7 +479,7 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
                 QString k;
                 switch (lua_type(L, key)) {
                 case LUA_TSTRING: {
-                    k = toQStr(L, key);
+                    k = toStrOrBinary(L, key).value<QString>();
                     break;
                 }
                 case LUA_TNUMBER: {
@@ -512,7 +521,7 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         }
     }
     case LUA_TSTRING: {
-        return toQStr(L, idx);
+        return toStrOrBinary(L, idx);
     }
     case LUA_TBOOLEAN: {
         return bool(lua_toboolean(L, idx));
@@ -564,6 +573,15 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
     }
 }
 
+#ifdef RADAPTER_STATIC
+
+int builtin::api::LoadPlugin(lua_State *L)
+{
+    throw Err("load_plugin() disabled: radapter-sdk is built as static");
+}
+
+#else
+
 int builtin::api::LoadPlugin(lua_State *L)
 {
     size_t len;
@@ -587,3 +605,5 @@ int builtin::api::LoadPlugin(lua_State *L)
         throw;
     }
 }
+
+#endif

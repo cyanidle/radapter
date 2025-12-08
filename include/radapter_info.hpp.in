@@ -8,6 +8,7 @@ namespace radapter
 #cmakedefine CMAKE_CROSSCOMPILING
 #cmakedefine RADAPTER_JIT
 #cmakedefine RADAPTER_GUI
+#cmakedefine RADAPTER_STATIC
 
 constexpr int VerMajor = @RADAPTER_VERSION_MAJOR@;
 constexpr int VerMinor = @RADAPTER_VERSION_MINOR@;

@@ -30,7 +30,7 @@ public:
     }
     void OnMsg(QVariant const& msg) override {
         Info("Msg: {}", msg.toString());
-        emit SendEvent(QVariantMap{{"msg", "received"}});
+        emit SendEventField("msg", "received");
     }
 };
 

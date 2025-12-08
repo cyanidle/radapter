@@ -166,7 +166,7 @@ namespace help {
 void PrintStack(lua_State* L, string msg = "");
 int traceback(lua_State* L) noexcept;
 QVariant toQVar(lua_State* L, int idx = -1);
-QString toQStr(lua_State* L, int idx = -1);
+QVariant toStrOrBinary(lua_State* L, int idx = -1);
 string_view toSV(lua_State* L, int idx = -1) noexcept;
 QVariantList toArgs(lua_State* L, int from);
 }
@@ -192,13 +192,14 @@ void websocket(Instance* inst);
 void redis(Instance* inst);
 void sql(Instance* inst);
 void serial(Instance* inst);
+void can(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
 // gui is separate
 inline InitSystem all[] = {
-    test, modbus, websocket, 
-    redis, sql, serial,
+    test, modbus, websocket,
+    redis, sql, serial, can
 };
 
 }

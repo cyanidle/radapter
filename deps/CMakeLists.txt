@@ -132,3 +132,14 @@ list(TRANSFORM LUAFS_SRC PREPEND ${luafilesystem_SOURCE_DIR}/)
 add_library(radapter-luafs STATIC ${LUAFS_SRC})
 target_include_directories(radapter-luafs PRIVATE ${luafilesystem_SOURCE_DIR}/src)
 target_link_libraries(radapter-luafs PRIVATE radapter-lua)
+
+CPMAddPackage(NAME libcanard
+  GITHUB_REPOSITORY OpenCyphal/libcanard
+  VERSION 3.2.0
+  GIT_TAG v3.2.0
+  GIT_SHALLOW YES
+  DOWNLOAD_ONLY YES
+)
+
+add_library(libcanard STATIC ${libcanard_SOURCE_DIR}/libcanard/canard.c)
+target_include_directories(libcanard PUBLIC ${libcanard_SOURCE_DIR})

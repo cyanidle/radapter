@@ -23,9 +23,12 @@ class RADAPTER_API Worker : public QObject {
 public:
     Instance* _Inst;
     WorkerImpl* _Impl;
+    const char* _Category;
 
     Worker(Instance* parent, const char* category);
+
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
+
     template<typename...Args>
     void Debug(fmt::format_string<Args...> fmt, Args&&...a) {
         Log(debug, fmt, fmt::make_format_args(a...));
@@ -42,6 +45,7 @@ public:
     void Error(fmt::format_string<Args...> fmt, Args&&...a) {
         Log(error, fmt, fmt::make_format_args(a...));
     }
+
     lua_State* LuaState() const;
 
     virtual void OnMsg(QVariant const& msg) = 0;
@@ -53,8 +57,7 @@ signals:
     void ShutdownDone();
     void SendMsg(QVariant const& msg);
     void SendEvent(QVariant const& msg);
-private:
-    const char *_category;
+    void SendEventField(QString key, QVariant const& data);
 };
 
 struct RADAPTER_API WorkerPlugin {

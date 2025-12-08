@@ -10,14 +10,16 @@ namespace radapter {
 struct WorkerImpl {
     lua_State* L;
     QPointer<radapter::Worker> self{};
-    QMetaObject::Connection conn{};
+    std::vector<QMetaObject::Connection> conns{};
     QVariant currentSender = {};
     LuaValue listeners = {};
     LuaValue evListeners = {};
 
     ~WorkerImpl() {
         if (self) {
-            QObject::disconnect(conn);
+            for (auto& conn: conns) {
+                QObject::disconnect(conn);
+            }
             self->deleteLater();
         }
     }
