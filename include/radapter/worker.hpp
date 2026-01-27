@@ -49,7 +49,7 @@ public:
     lua_State* LuaState() const;
 
     virtual void OnMsg(QVariant const& msg) = 0;
-    virtual void Shutdown();
+    virtual void Destroy();
     virtual ~Worker();
 protected:
     QVariant CurrentSender();

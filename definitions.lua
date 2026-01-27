@@ -383,12 +383,17 @@ function Serial(params) end
 
 
 ---@class CanFilter
+---@field match ("both" | "normal" | "extended")?
+---@field type ("remote" | "data" | "error")?
+---@field id number
+---@field mask number
 
 ---@class CanParams
 ---@field plugin "socketcan" | "virtualcan" | "vectorcan" | "tinycan" | "peakcan" | "systeccan" | "passthrucan"
 ---@field device string
 ---@field filters CanFilter[]?
 ---@field baudrate number?
+---@field can_fd boolean?
 
 
 ---@class CanFrame

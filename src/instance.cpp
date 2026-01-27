@@ -101,7 +101,7 @@ Instance::Instance(QObject *parent) :
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
-        connect(this, &Instance::ShutdownRequest, w, &Worker::Shutdown);
+        connect(this, &Instance::ShutdownRequest, w, &Worker::Destroy);
         connect(w, &QObject::destroyed, this, [this, w]{
             auto it = d->workers.find(w);
             if (it != d->workers.end()) {

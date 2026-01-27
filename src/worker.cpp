@@ -28,7 +28,7 @@ QVariant Worker::CurrentSender()
     return _Impl ? _Impl->currentSender : QVariant{};
 }
 
-void Worker::Shutdown() {
+void Worker::Destroy() {
     emit ShutdownDone();
 }
 
@@ -50,18 +50,32 @@ static int get_listeners(lua_State* L) {
     return 1;
 };
 
+
+static int worker_destroy(lua_State* L) {
+    auto* cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
+    auto w = ud->self.data();
+    if (!w) {
+        throw Err("worker not usable");
+    }
+    w->Destroy();
+    w->deleteLater();
+    w = nullptr;
+    return 0;
+}
+
 static int worker_call(lua_State* L) {
     auto* cls = lua_tostring(L, lua_upvalueindex(1));
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
+    auto w = ud->self.data();
+    if (!w) {
+        throw Err("worker not usable");
+    }
     auto was = ud->currentSender;
     defer revert([&]{
         ud->currentSender = was;
     });
     ud->currentSender = builtin::help::toQVar(L, 3);
-    auto w = ud->self.data();
-    if (!w) {
-        throw Err("worker not usable");
-    }
     w->OnMsg(builtin::help::toQVar(L, 2));
     return 1;
 }
@@ -69,11 +83,11 @@ static int worker_call(lua_State* L) {
 static int call_extra(lua_State* L) {
     auto* cls = lua_tostring(L, lua_upvalueindex(1));
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
-    auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
     auto w = ud->self.data();
     if (!w) {
         throw Err("worker not usable");
     }
+    auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
     glua::Push(L, method(w, builtin::help::toArgs(L, 2)));
     return 1;
 }
@@ -103,6 +117,9 @@ static int worker_index(lua_State* L) {
 static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool is_event) {
     auto* L = impl->L;
     auto* w = impl->self.data();
+    if (!w) {
+        throw Err("worker not usable");
+    }
     if (!lua_checkstack(L, 4)) {
         w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
         return;
@@ -155,6 +172,10 @@ static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMet
 
         lua_pushlightuserdata(L, &builtin::workers::Marker);
         lua_setfield(L, -2, "__marker");
+
+        lua_pushvalue(L, clsIdx);
+        lua_pushcclosure(L, glua::protect<worker_destroy>, 1);
+        lua_setfield(L, -2, "destroy");
 
         lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<get_listeners>, 1);

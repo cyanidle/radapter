@@ -1,6 +1,12 @@
 local can = CAN {
     plugin = "socketcan",
     device = "vcan0",
+    filters = {
+        {
+            id = 3,
+            mask = 0xffffff,
+        }
+    }
 }
 
 

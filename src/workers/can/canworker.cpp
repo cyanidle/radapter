@@ -6,6 +6,8 @@
 #include <QtSerialBus/QCanBusDevice>
 #include <QtSerialBus/QCanBusFactory>
 
+#include "canframe.hpp"
+
 template<>
 struct fmt::formatter<QCanBusDeviceInfo> : fmt::formatter<QString>
 {
@@ -20,16 +22,42 @@ namespace radapter::can
 
 enum class CanFilterMatch
 {
-    NormalID = 1,
-    ExtendedID = 2,
-    Both = 2,
+    normal = QCanBusDevice::Filter::MatchBaseFormat,
+    extended = QCanBusDevice::Filter::MatchExtendedFormat,
+    both = QCanBusDevice::Filter::MatchBaseAndExtendedFormat,
 };
 
-struct CanFilter {
+RAD_DESCRIBE(CanFilterMatch) {
+    RAD_ENUM(both);
+    RAD_ENUM(normal);
+    RAD_ENUM(extended);
+}
 
+enum class CanFrameType
+{
+    data = QCanBusFrame::DataFrame,
+    request = QCanBusFrame::RemoteRequestFrame,
+    error = QCanBusFrame::ErrorFrame,
+};
+
+RAD_DESCRIBE(CanFrameType) {
+    RAD_ENUM(data);
+    RAD_ENUM(request);
+    RAD_ENUM(error);
+}
+
+struct CanFilter {
+    WithDefault<CanFilterMatch> match = CanFilterMatch::both;
+    WithDefault<CanFrameType> type = CanFrameType::data;
+    qlonglong id;
+    qlonglong mask;
 };
 
 RAD_DESCRIBE(CanFilter) {
+    RAD_MEMBER(match);
+    RAD_MEMBER(type);
+    RAD_MEMBER(id);
+    RAD_MEMBER(mask);
 }
 
 struct CanConfig {
@@ -37,6 +65,7 @@ struct CanConfig {
     QString device;
     WithDefault<std::vector<CanFilter>> filters;
     std::optional<uint64_t> baudrate;
+    WithDefault<bool> can_fd = true;
 };
 
 RAD_DESCRIBE(CanConfig) {
@@ -44,19 +73,6 @@ RAD_DESCRIBE(CanConfig) {
     RAD_MEMBER(device);
     RAD_MEMBER(filters);
     RAD_MEMBER(baudrate);
-}
-
-struct CanFrame {
-    QVariant frame_id;
-    QVariant payload;
-    WithDefault<bool> extended_id = false;
-    WithDefault<bool> can_fd = false;
-};
-
-RAD_DESCRIBE(CanFrame) {
-    RAD_MEMBER(frame_id);
-    RAD_MEMBER(payload);
-    RAD_MEMBER(extended_id);
     RAD_MEMBER(can_fd);
 }
 
@@ -83,9 +99,21 @@ public:
         connect(device, &QCanBusDevice::errorOccurred, this, &CanWorker::on_errorOccurred);
         connect(device, &QCanBusDevice::framesWritten, this, &CanWorker::on_framesWritten);
         connect(device, &QCanBusDevice::stateChanged, this, &CanWorker::on_stateChanged);
+        QList<QCanBusDevice::Filter> filterList;
         for (const auto& filter: config.filters.value) {
             QCanBusDevice::Filter f;
-            //todo
+            f.format = static_cast<QCanBusDevice::Filter::FormatFilter>(filter.match.value);
+            f.type = static_cast<QCanBusFrame::FrameType>(filter.type.value);
+            f.frameId = static_cast<quint32>(filter.id);
+            f.frameIdMask = static_cast<quint32>(filter.mask);
+            filterList.append(f);
+        }
+        device->setConfigurationParameter(QCanBusDevice::CanFdKey, config.can_fd.value);
+        if (config.baudrate) {
+            device->setConfigurationParameter(QCanBusDevice::DataBitRateKey, QVariant::fromValue(*config.baudrate));
+        }
+        if (filterList.size()) {
+            device->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
         }
         if (!device->connectDevice()) {
             throw Err("Could not connect CAN device ({}:{}): {}", config.plugin, config.device, device->errorString());
@@ -155,7 +183,7 @@ private:
 namespace radapter::builtin {
 
 
-void workers::can(Instance* inst) 
+void workers::can(Instance* inst)
 {
     inst->RegisterWorker<can::CanWorker>("CAN");
 	inst->RegisterSchema<can::CanConfig>("CAN");
