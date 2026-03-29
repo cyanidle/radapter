@@ -82,7 +82,7 @@ struct Client::Impl {
         data->promises--;
         Unref(data);
         try {
-            if (!cast) throw Err("null reply");
+            if (!cast) Raise("null reply");
             promise(parseReply(cast));
         } catch (...) {
             promise(std::current_exception());
@@ -96,9 +96,9 @@ struct Client::Impl {
         auto cast = static_cast<redisReply*>(reply);
         auto adapter = static_cast<Client*>(ctx->data);
         try {
-            if (!cast) throw Err("null reply");
+            if (!cast) Raise("null reply");
             auto resp = parseReply(cast);
-            if (resp != "OK") throw Err("Could not change db to {}", adapter->config.db.value);
+            if (resp != "OK") Raise("Could not change db to {}", adapter->config.db.value);
             adapter->ok = true;
             emit adapter->ConnectedChanged(true);
         } catch (std::exception& e) {
@@ -187,10 +187,10 @@ static void subCallback(redisAsyncContext* ctx, void *reply, void *_data) noexce
     auto cast = static_cast<redisReply*>(reply);
     auto* data = static_cast<Client::Subscriber*>(_data);
     try {
-        if (!cast) throw Err("null reply");
+        if (!cast) Raise("null reply");
         auto r = parseReply(cast).toStringList();
         if (r.size() < 3) {
-            throw Err("Invalid responce: small list?");
+            Raise("Invalid responce: small list?");
         }
         if (r[0] == "pmessage") {
             (*data)(Client::SubEvent{std::move(r[2]), std::move(r[3])});
@@ -204,12 +204,12 @@ static void subCallback(redisAsyncContext* ctx, void *reply, void *_data) noexce
 void Client::PSubscribe(string_view glob, Subscriber _sub)
 {
     if (!ctx) {
-        throw Err("Not connected");
+        Raise("Not connected");
     }
     auto* sub = new Subscriber(std::move(_sub));
     auto status = redisAsyncCommand(ctx, subCallback, sub, "PSUBSCRIBE %s", string{glob}.c_str());
     if (status != REDIS_OK) {
-        throw Err("Could not psubscribe to: {}", glob);
+        Raise("Could not psubscribe to: {}", glob);
     }
 }
 

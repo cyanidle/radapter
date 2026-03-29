@@ -47,7 +47,7 @@ void radapter::Parse(LuaFunction &out, const QVariant &conf, const TraceFrame &f
 void radapter::CheckCanConvert(int targetTypeId, const QVariant &from, const TraceFrame &frame)
 {
     if (!from.canConvert(targetTypeId)) {
-        throw Err("{}: Could not convert to '{}' from '{}'", frame, QMetaType(targetTypeId).name().data(), TypeNameOf(from));
+        Raise("{}: Could not convert to '{}' from '{}'", frame, QMetaType(targetTypeId).name().data(), TypeNameOf(from));
     }
 }
 

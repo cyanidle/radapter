@@ -32,14 +32,14 @@ int radapter::Instance::Impl::log_level(lua_State *L) {
     if (count == 1) {
         auto lvl = builtin::help::toSV(L, 1);
         if (!describe::name_to_enum(lvl, inst->d->globalLevel)) {
-            throw Err("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::enum_names<LogLevel>(), ", "));
+            Raise("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::enum_names<LogLevel>(), ", "));
         }
     } else {
         luaL_checktype(L, 2, LUA_TSTRING);
         auto cat = builtin::help::toSV(L, 1);
         auto lvl = builtin::help::toSV(L, 2);
         if (!describe::name_to_enum(lvl, inst->d->perCat[string{cat}])) {
-            throw Err("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::enum_names<LogLevel>(), ", "));
+            Raise("Invalid log_level passed: {}, avail: [{}]", lvl, fmt::join(describe::enum_names<LogLevel>(), ", "));
         }
     }
     return 0;

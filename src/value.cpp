@@ -36,7 +36,7 @@ LuaValue::LuaValue(lua_State *L, int idx)
 {
     this->_L = L;
     if (!lua_checkstack(L, 1)) {
-        throw Err("Could not reserve stack space");
+        Raise("Could not reserve stack space");
     }
     lua_pushvalue(L, idx);
     _ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -70,10 +70,10 @@ LuaValue::~LuaValue()
 void *LuaUserData::Data(const char *tname)
 {
     if (!(*this)) {
-        throw Err("Attempt to get data of invalid UserData");
+        Raise("Attempt to get data of invalid UserData");
     }
     if (!lua_checkstack(_L, 1)) {
-        throw Err("Could not reserve stack for call");
+        Raise("Could not reserve stack for call");
     }
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
     auto* d = luaL_testudata(_L, -1, tname);
@@ -84,7 +84,7 @@ void *LuaUserData::Data(const char *tname)
 void *LuaUserData::UnsafeData()
 {
     if (!lua_checkstack(_L, 1)) {
-        throw Err("Could not reserve stack for call");
+        Raise("Could not reserve stack for call");
     }
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
     void* res = lua_touserdata(_L, -1);;

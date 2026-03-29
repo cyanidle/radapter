@@ -35,12 +35,6 @@ namespace detail {
 template<typename Cls, typename T> Cls* getcls(QVariant(Cls::*)(T));
 }
 
-template<typename T>
-using if_valid_worker = std::enable_if_t<
-    std::is_constructible_v<T, QVariantList, Instance*>
-    && std::is_base_of_v<Worker, T>, 
-    int>;
-
 class Instance;
 using Factory = Worker*(*)(QVariantList const&, Instance*);
 using ExtraSchema = QVariant(*)();
@@ -52,9 +46,27 @@ QVariant SchemaFor() {
     PopulateSchema(val, res);
     return res;
 }
+
+struct WorkerArguments
+{
+    QVariantList args;
+
+    operator QVariantList() { return std::move(args); }
+    operator QVariant();
+
+    template<typename T>
+    operator T() { return ParseAs<T>(*this); }
+};
+
+template<typename T>
+using if_valid_worker = std::enable_if_t<
+    std::is_constructible_v<T, WorkerArguments, Instance*>
+    && std::is_base_of_v<Worker, T>,
+    int>;
+
 template<typename T>
 Worker* FactoryFor(QVariantList const& args, Instance* parent) {
-    return new T{args, parent};
+    return new T{WorkerArguments{args}, parent};
 }
 
 template<auto f>

@@ -39,7 +39,7 @@ QVariant makeLuaPromise(Worker* worker, Future<T>& future) {
     return MakeFunction([worker, _state = future.TakeState()](Instance*, QVariantList args) mutable -> QVariant {
         auto cb = args.value(0).value<LuaFunction>();
         if (!cb) {
-            throw Err("Expected function as single argument");
+            Raise("Expected function as single argument");
         }
         auto fut = Future(_state);
         resolveLuaCallback(worker, fut, cb);

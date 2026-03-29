@@ -392,8 +392,9 @@ function Serial(params) end
 ---@field plugin "socketcan" | "virtualcan" | "vectorcan" | "tinycan" | "peakcan" | "systeccan" | "passthrucan"
 ---@field device string
 ---@field filters CanFilter[]?
----@field baudrate number?
+---@field bitrate number?
 ---@field can_fd boolean?
+---@field data_bitrate number?
 
 
 ---@class CanFrame

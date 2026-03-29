@@ -46,13 +46,13 @@ static bool compareByIndex(T const& lhs, T const& rhs) noexcept {
 
 static void validateReadOnly(string_view key, Register& reg, string_view type) {
     if (reg.mode == write || reg.mode == read_write) {
-        throw Err("Register {}: {} registers cannot be writable", key, type);
+        Raise("Register {}: {} registers cannot be writable", key, type);
     }
 }
 
 static void validateSingleBit(string_view key, Register& reg, string_view type) {
     if (reg.mode == write || reg.mode == read_write) {
-        throw Err("Register {}: {} registers cannot have a type (single bit only)", key, type);
+        Raise("Register {}: {} registers cannot have a type (single bit only)", key, type);
     }
 }
 
@@ -106,10 +106,10 @@ static vector<PreparedRegister> prepareReadableSorted(SingleTypeMap const& map) 
         if (it == sorted.end()) {
             sorted.push_back(std::move(meta));
         } else if (it->index == meta.index) {
-            throw Err("Index collision for registers '{}' and '{}' @ index {}",
+            Raise("Index collision for registers '{}' and '{}' @ index {}",
                       it->key, k, it->index);
         } else if (meta.index + meta.sizeOf/2 > it->index) {
-            throw Err("Register overlap of '{}' and '{}' @ index {} (+ {} > {})",
+            Raise("Register overlap of '{}' and '{}' @ index {} (+ {} > {})",
                       k, it->key, meta.index, meta.sizeOf / 2, it->index);
         } else {
             sorted.insert(it, std::move(meta));
@@ -177,7 +177,7 @@ static MergedRead prepareSingleManual(
             if (regEnd > int(end)) {
                 string_view name;
                 (void)describe::enum_to_name(q.type, name);
-                throw Err("Register {}: Manual query ({} {}-{}) would split register (it is in range of {}-{})",
+                Raise("Register {}: Manual query ({} {}-{}) would split register (it is in range of {}-{})",
                           r.key, name, q.index, end, r.index, regEnd);
             }
             read.regs.push_back(r);
@@ -237,7 +237,7 @@ static PreparedWrites prepareWrites(RegistersMap const& map) {
             if (it == regs.end()) {
                 regs.push_back(std::move(reg));
             } else if (reg.index + reg.sizeOf/2 > it->index) {
-                throw Err("Register overlap of '{}' and '{}' @ index {} (+ {} > {})",
+                Raise("Register overlap of '{}' and '{}' @ index {} (+ {} > {})",
                           reg.key, it->key, reg.index,
                           reg.sizeOf/2, it->index);
             } else {

@@ -56,7 +56,7 @@ static int worker_destroy(lua_State* L) {
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     auto w = ud->self.data();
     if (!w) {
-        throw Err("worker not usable");
+        Raise("worker not usable");
     }
     w->Destroy();
     w->deleteLater();
@@ -69,7 +69,7 @@ static int worker_call(lua_State* L) {
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     auto w = ud->self.data();
     if (!w) {
-        throw Err("worker not usable");
+        Raise("worker not usable");
     }
     auto was = ud->currentSender;
     defer revert([&]{
@@ -85,7 +85,7 @@ static int call_extra(lua_State* L) {
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     auto w = ud->self.data();
     if (!w) {
-        throw Err("worker not usable");
+        Raise("worker not usable");
     }
     auto* method = reinterpret_cast<ExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
     glua::Push(L, method(w, builtin::help::toArgs(L, 2)));
@@ -118,7 +118,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     auto* L = impl->L;
     auto* w = impl->self.data();
     if (!w) {
-        throw Err("worker not usable");
+        Raise("worker not usable");
     }
     if (!lua_checkstack(L, 4)) {
         w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");

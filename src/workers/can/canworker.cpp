@@ -20,76 +20,20 @@ struct fmt::formatter<QCanBusDeviceInfo> : fmt::formatter<QString>
 namespace radapter::can
 {
 
-enum class CanFilterMatch
-{
-    normal = QCanBusDevice::Filter::MatchBaseFormat,
-    extended = QCanBusDevice::Filter::MatchExtendedFormat,
-    both = QCanBusDevice::Filter::MatchBaseAndExtendedFormat,
-};
-
-RAD_DESCRIBE(CanFilterMatch) {
-    RAD_ENUM(both);
-    RAD_ENUM(normal);
-    RAD_ENUM(extended);
-}
-
-enum class CanFrameType
-{
-    data = QCanBusFrame::DataFrame,
-    request = QCanBusFrame::RemoteRequestFrame,
-    error = QCanBusFrame::ErrorFrame,
-};
-
-RAD_DESCRIBE(CanFrameType) {
-    RAD_ENUM(data);
-    RAD_ENUM(request);
-    RAD_ENUM(error);
-}
-
-struct CanFilter {
-    WithDefault<CanFilterMatch> match = CanFilterMatch::both;
-    WithDefault<CanFrameType> type = CanFrameType::data;
-    qlonglong id;
-    qlonglong mask;
-};
-
-RAD_DESCRIBE(CanFilter) {
-    RAD_MEMBER(match);
-    RAD_MEMBER(type);
-    RAD_MEMBER(id);
-    RAD_MEMBER(mask);
-}
-
-struct CanConfig {
-    QString plugin;
-    QString device;
-    WithDefault<std::vector<CanFilter>> filters;
-    std::optional<uint64_t> baudrate;
-    WithDefault<bool> can_fd = true;
-};
-
-RAD_DESCRIBE(CanConfig) {
-    RAD_MEMBER(plugin);
-    RAD_MEMBER(device);
-    RAD_MEMBER(filters);
-    RAD_MEMBER(baudrate);
-    RAD_MEMBER(can_fd);
-}
-
-class CanWorker final : public radapter::Worker
+class CanWorker final : public ICanWorker
 {
     Q_OBJECT
 
     CanConfig config;
     QCanBusDevice *device = nullptr;
 public:
-    CanWorker(QVariantList const& args, radapter::Instance* inst) : radapter::Worker(inst, "can") {
-        Parse(config, args.at(0));
+    CanWorker(CanConfig conf, radapter::Instance* inst) : ICanWorker(inst, "can") {
+        config = std::move(conf);
         QString errorString;
         QCanBus* bus = QCanBus::instance();
         device = bus->createDevice(config.plugin, config.device, &errorString);
         if (!device) {
-            throw Err("Could not create CAN worker: {}.\nAvailable plugins: [{}].\nDevices for current plugin({}): [{}]",
+            Raise("Could not create CAN worker: {}.\nAvailable plugins: [{}].\nDevices for current plugin({}): [{}]",
                 errorString,
                 fmt::join(bus->plugins(), ", "),
                 config.plugin,
@@ -109,15 +53,22 @@ public:
             filterList.append(f);
         }
         device->setConfigurationParameter(QCanBusDevice::CanFdKey, config.can_fd.value);
-        if (config.baudrate) {
-            device->setConfigurationParameter(QCanBusDevice::DataBitRateKey, QVariant::fromValue(*config.baudrate));
+        if (config.bitrate) {
+            device->setConfigurationParameter(QCanBusDevice::BitRateKey, QVariant::fromValue(*config.bitrate));
+        }
+        if (config.data_bitrate) {
+            device->setConfigurationParameter(QCanBusDevice::DataBitRateKey, QVariant::fromValue(*config.data_bitrate));
         }
         if (filterList.size()) {
             device->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
         }
         if (!device->connectDevice()) {
-            throw Err("Could not connect CAN device ({}:{}): {}", config.plugin, config.device, device->errorString());
+            Raise("Could not connect CAN device ({}:{}): {}", config.plugin, config.device, device->errorString());
         }
+    }
+    QCanBusDevice* get_device() override
+    {
+        return device;
     }
 	void OnMsg(QVariant const& _msg) override {
         QCanBusFrame frame;
@@ -136,13 +87,13 @@ public:
             id = msg.frame_id.toUInt(&ok);
         }
         if (!ok) {
-            throw Err("frame_id should be a string (hex base16) or number");
+            Raise("frame_id should be a string (hex base16) or number");
         }
         frame.setFrameId(id);
         frame.setFrameType(QCanBusFrame::DataFrame);
         frame.setPayload(msg.payload.value<QByteArray>());
         if (!device->writeFrame(frame)) {
-            throw Err("Could not write frame: {}", device->errorString());
+            Raise("Could not write frame: {}", device->errorString());
         }
     }
 private:
@@ -156,6 +107,7 @@ private:
     {
         while(device->framesAvailable()) {
             QCanBusFrame frame = device->readFrame();
+            emit gotFrame(frame);
             QVariantMap msg;
             msg["extended_id"] = frame.hasExtendedFrameFormat();
             msg["can_fd"] = frame.hasFlexibleDataRateFormat();

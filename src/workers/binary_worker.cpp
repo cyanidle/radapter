@@ -26,7 +26,7 @@ static QVariantList parseSlipFrames(Worker* w, QByteArray& buffer, ProtoParser f
 				recv.Append(part);
 			});
 			if (err != slipa::NoError) {
-				throw Err("Error unpacking SLIP frame: {}",
+				Raise("Error unpacking SLIP frame: {}",
 					err == slipa::UnterminatedEscape ? "Unterminated ESC" : "Invalid ESC");
 			}
 			result.append(fromProto(alloc, recv));
@@ -43,7 +43,7 @@ static QVariantList parseSlipFrames(Worker* w, QByteArray& buffer, ProtoParser f
 static QVariant parseMsgpackProto(Arena& alloc, string_view frame) {
 	auto res = jv::ParseMsgPackInPlace(frame, alloc);
 	if (res.consumed != frame.size()) {
-		throw Err("Not whole msgpack consumed");
+		Raise("Not whole msgpack consumed");
 	}
 	return res.result.Get<QVariant>();
 }

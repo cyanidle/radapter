@@ -302,7 +302,7 @@ inline void iterateTable(lua_State* L, Fn&& f) {
         }
         auto now = lua_gettop(L);
         if (was != now) {
-            throw Err("After calling an iterator function =>"
+            Raise("After calling an iterator function =>"
                       " stack is not of the same size (was: {} != now: {})",
                       was, now);
         }
@@ -580,7 +580,7 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
 
 int builtin::api::LoadPlugin(lua_State *L)
 {
-    throw Err("load_plugin() disabled: radapter-sdk is built as static");
+    Raise("load_plugin() disabled: radapter-sdk is built as static");
 }
 
 #else
@@ -594,12 +594,12 @@ int builtin::api::LoadPlugin(lua_State *L)
     auto* loader = new QPluginLoader(path, self);
     try {
         if (!loader->load()) {
-            throw Err("Could not load {} => {}", path, loader->errorString());
+            Raise("Could not load {} => {}", path, loader->errorString());
         }
         auto* inst = loader->instance();
         auto* plug = qobject_cast<WorkerPlugin*>(inst);
         if (!plug) {
-            throw Err("Loaded plugin does not implement: {}", qobject_interface_iid<WorkerPlugin*>());
+            Raise("Loaded plugin does not implement: {}", qobject_interface_iid<WorkerPlugin*>());
         }
         plug->Initialize(self);
         return 0;
@@ -607,6 +607,20 @@ int builtin::api::LoadPlugin(lua_State *L)
         delete loader;
         throw;
     }
+}
+
+namespace radapter::builtin::workers
+{
+
+static InitSystem _all[] = {
+    test, modbus, websocket,
+    redis, sql, serial, can,
+    cyphal
+};
+
+InitSystem* all = _all;
+size_t count = std::size(_all);
+
 }
 
 #endif

@@ -25,7 +25,7 @@ void Instance::EnableGui() {
     if constexpr (GUI) {
         builtin::workers::gui(this);
     } else {
-        throw Err("GUI support was not enabled during build");
+        Raise("GUI support was not enabled during build");
     }
 }
 
@@ -115,15 +115,15 @@ Instance::Instance(QObject *parent) :
         });
         connect(w, &Worker::ShutdownDone, w, &QObject::deleteLater);
     });
-    for (auto system: builtin::workers::all) {
-        system(this);
+    for (size_t i{}; i < builtin::workers::count; ++i) {
+        builtin::workers::all[i](this);
     }
 }
 
 static string load_builtin(QString name) {
     QFile f(name);
     if (!f.open(QIODevice::ReadOnly)) {
-        throw Err("Could not open builtin file: {}", name);
+        Raise("Could not open builtin file: {}", name);
     }
     string s(size_t(f.size()), ' ');
     f.read(s.data(), f.size());
@@ -135,11 +135,11 @@ static void load_mod(lua_State* L, const char* name, string_view src) {
     auto msgh = lua_gettop(L);
     auto status = luaL_loadbufferx(L, src.data(), src.size(), name, radapter::JIT || radapter::Cross ? "t" : "b");
     if (status != LUA_OK) {
-        throw Err("Could not compile {}: {}", name, builtin::help::toSV(L));
+        Raise("Could not compile {}: {}", name, builtin::help::toSV(L));
     }
     status = lua_pcall(L, 0, 1, msgh);
     if (status != LUA_OK) {
-        throw Err("Could not load {}: {}", name, builtin::help::toSV(L));
+        Raise("Could not load {}: {}", name, builtin::help::toSV(L));
     }
 }
 
@@ -190,6 +190,11 @@ std::runtime_error detail::doErr(fmt::string_view fmt, fmt::format_args args)
     return std::runtime_error(fmt::vformat(fmt, args));
 }
 
+void detail::doRaise(fmt::string_view fmt, fmt::format_args args)
+{
+    throw doErr(fmt, args);
+}
+
 void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args) try
 {
     if (d->globalLevel > lvl) return;
@@ -221,7 +226,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
             lua_settop(L, msgh - 1);
         });
         if (!lua_checkstack(L, 3)) {
-            throw Err("Could not reserve stack for log handler");
+            Raise("Could not reserve stack for log handler");
         }
         lua_rawgeti(L, LUA_REGISTRYINDEX, d->luaHandler);
         lua_createtable(L, 0, 4);
@@ -238,7 +243,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         lua_pushstring(L, cat);
         lua_rawset(L, -3);
         if (lua_pcall(L, 1, 0, msgh) != LUA_OK) {
-            throw Err("Error in lua log handler: {}", lua_tostring(L, -1));
+            Raise("Error in lua log handler: {}", lua_tostring(L, -1));
         }
     }
 } catch (std::exception& e) {
@@ -262,7 +267,7 @@ void Instance::EvalFile(fs::path path)
     auto msgh = lua_gettop(L);
     auto load = luaL_loadfile(L, path.string().c_str());
     if (load != LUA_OK) {
-        throw Err("Error loading file {}: {}", path.string(), builtin::help::toSV(L));
+        Raise("Error loading file {}: {}", path.string(), builtin::help::toSV(L));
     }
 
     auto dir = path.parent_path();
@@ -276,7 +281,7 @@ void Instance::EvalFile(fs::path path)
     }
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        throw Err("EvalFile error: \n{}", e);
+        Raise("EvalFile error: \n{}", e);
     }
 }
 
@@ -287,12 +292,12 @@ void Instance::Eval(string_view code, string_view chunk)
     auto msgh = lua_gettop(L);
     auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {
-        throw Err("Error loading code: {}", builtin::help::toSV(L));
+        Raise("Error loading code: {}", builtin::help::toSV(L));
     }
     auto res = lua_pcall(L, 0, 0, msgh);
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        throw Err("Eval error: \n{}", e);
+        Raise("Eval error: \n{}", e);
     }
 }
 
@@ -341,6 +346,14 @@ void Instance::RegisterFunc(const char *name, ExtraFunction func)
 {
     glua::Push(d->L, MakeFunction(std::move(func)));
     lua_setglobal(d->L, name);
+}
+
+WorkerArguments::operator QVariant()
+{
+    if (args.size() < 1) {
+        Raise("Expected at least 1 argument");
+    }
+    return args[0];
 }
 
 }

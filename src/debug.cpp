@@ -39,10 +39,10 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     lua_pushinteger(L, opts.port);
     auto status = lua_pcall(L, 2, 1, msgh);
     if (status != LUA_OK) {
-        throw Err("debugger: Could not start: {}", builtin::help::toSV(L));
+        Raise("debugger: Could not start: {}", builtin::help::toSV(L));
     }
     if (!lua_toboolean(L, -1)) {
-        throw Err("debugger: Not available");
+        Raise("debugger: Not available");
     }
     lua_pop(L, 1);
 }

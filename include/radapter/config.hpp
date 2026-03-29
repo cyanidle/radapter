@@ -74,7 +74,7 @@ void Parse(T*& out, QVariant const& conf, TraceFrame const& frame = {}) {
     if (auto c = qobject_cast<T*>(o)) {
         out = c;
     } else {
-        throw Err("{}: could not cast {} => {}",
+        Raise("{}: could not cast {} => {}",
                   frame,
                   o ? o->metaObject()->className() : "<nil>",
                   T::staticMetaObject.className());
@@ -85,11 +85,11 @@ template<typename T, if_enum<T> = 1>
 void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     constexpr auto desc = describe::Get<T>();
     if (!conf.canConvert<QString>()) {
-        throw Err("{}: Cannot convert to {} from {}", frame, desc.name, TypeNameOf(conf));
+        Raise("{}: Cannot convert to {} from {}", frame, desc.name, TypeNameOf(conf));
     }
     auto name = conf.toString().toStdString();
     if (!describe::name_to_enum(name, out)) {
-        throw Err("{}: Invalid value for enum ({}): {}. Valid: [{}]",
+        Raise("{}: Invalid value for enum ({}): {}. Valid: [{}]",
                   frame, desc.name, name, fmt::join(describe::enum_names<T>(), ", "));
     }
 }
@@ -99,7 +99,7 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     CheckCanConvert<T>(conf, frame);
     out = conf.value<T>();
     if (QVariant::fromValue(out) != conf) {
-        throw Err("{}: Could not convert to number from: {} ({})",
+        Raise("{}: Could not convert to number from: {} ({})",
                   frame, conf.toString().toStdString(), TypeNameOf(conf));
     }
 }
@@ -110,7 +110,7 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     TraceFrame clsroot = TraceFrame(desc.name, frame);
     TraceFrame const& current = frame.IsRoot() ? clsroot : frame;
     if (conf.type() != conf.Map) {
-        throw Err("{}: Cannot get {} from {}", current, desc.name, TypeNameOf(conf));
+        Raise("{}: Cannot get {} from {}", current, desc.name, TypeNameOf(conf));
     }
     auto asMap = conf.toMap();
     desc.for_each([&](auto f){
@@ -176,14 +176,14 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
         }
         return;
     }
-    throw Err("{}: Non-array config passed ({})", frame, TypeNameOf(conf));
+    Raise("{}: Non-array config passed ({})", frame, TypeNameOf(conf));
 }
 
 template<typename K, typename T>
 void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     static_assert(string_like<K>);
     if (conf.type() != conf.Map) {
-        throw Err("{}: Cannot parse map from {}", frame, TypeNameOf(conf));
+        Raise("{}: Cannot parse map from {}", frame, TypeNameOf(conf));
     }
     out.clear();
     auto asmap = conf.toMap();

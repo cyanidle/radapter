@@ -1,0 +1,166 @@
+﻿#include "canframe.hpp"
+#include "cyphal_includes.h"
+#include "cyphal_helpers.h"
+#include <QTimer>
+
+namespace radapter::can
+{
+
+struct CyphalTopic
+{
+    std::string type;
+    CanardPortID port;
+    std::string name;
+};
+
+RAD_DESCRIBE(CyphalTopic)
+{
+    RAD_MEMBER(type);
+    RAD_MEMBER(port);
+    RAD_MEMBER(name);
+}
+
+struct CyphalConfig
+{
+    QObject* can;
+    CanardNodeID node_id;
+    WithDefault<int> heartbeat_period = 1000;
+    WithDefault<size_t> tx_cap = 100ull;
+    QHash<QString, CyphalTopic> subscribe;
+    QHash<QString, CyphalTopic> publish;
+};
+
+RAD_DESCRIBE(CyphalConfig)
+{
+    RAD_MEMBER(can);
+    RAD_MEMBER(node_id);
+    RAD_MEMBER(tx_cap);
+    RAD_MEMBER(heartbeat_period);
+}
+
+class CyphalWorker final: public Worker
+{
+    Q_OBJECT
+private:
+    CyphalConfig config;
+    CanardInstance canard;
+    CanardTxQueue tx;
+    QSharedPointer<QObject> can;
+    ICanWorker* ican;
+    QTime start;
+    CanardTransferID tid = {};
+    std::list<CanardRxSubscription> subs_storage;
+public:
+    CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
+        config = std::move(conf);
+        can.reset(config.can);
+        canard = canardInit(CANARD_WRAP(memAllocate), CANARD_WRAP(memFree));
+        canard.user_reference = this;
+        canard.node_id = config.node_id;
+        ican = qobject_cast<ICanWorker*>(can.get());
+        bool is_fd = ican->get_device()->configurationParameter(QCanBusDevice::CanFdKey).toBool();
+        tx = canardTxInit(config.tx_cap, is_fd ? CANARD_MTU_CAN_FD : CANARD_MTU_CAN_CLASSIC);
+        QTimer* hb = new QTimer(this);
+        hb->callOnTimeout(this, &CyphalWorker::heartbeat);
+        hb->start(config.heartbeat_period);
+        start = QTime::currentTime();
+        connect(ican, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
+        auto filterList = ican->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
+        for (auto& topic: config.subscribe) {
+            CanardMessageDynamic* msg = lookup_canard_type(topic.type);
+            if (!msg) {
+                Raise("Canard type {} not recognized", topic.type);
+            }
+            CanardRxSubscription* sub = &subs_storage.emplace_back();
+            sub->user_reference = msg;
+            CanardPortID port_id = topic.port;
+            if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, msg->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
+                Raise("Could not subscribe to msgs of type() on port:{}", topic.type, port_id);
+            }
+            CanardFilter current = canardMakeFilterForSubject(port_id);
+            QCanBusDevice::Filter filter;
+            filter.frameId = current.extended_can_id;
+            filter.frameIdMask = current.extended_mask;
+            filter.format = QCanBusDevice::Filter::MatchExtendedFormat;
+            filter.type = QCanBusFrame::DataFrame;
+            filterList.append(filter);
+        }
+        ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
+    }
+    void OnMsg(QVariant const& msg) override {
+        // TODO
+    }
+private:
+    void heartbeat() {
+        auto now = QTime::currentTime();
+        uavcan_node_Heartbeat_1_0 test_heartbeat = {};
+        test_heartbeat.uptime = static_cast<uint32_t>(start.secsTo(now));
+        test_heartbeat.health = {uavcan_node_Health_1_0_NOMINAL};
+        test_heartbeat.mode = {uavcan_node_Mode_1_0_OPERATIONAL};
+        const CanardTransferMetadata transfer_metadata  = {
+			CanardPriorityNominal,
+			CanardTransferKindMessage,
+			uavcan_node_Heartbeat_1_0_FIXED_PORT_ID_,
+			CANARD_NODE_ID_UNSET,
+			tid++,
+		};
+        size_t hbeat_ser_buf_size = uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;
+        uint8_t hbeat_ser_buf[uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_];
+        canardTxPush(&tx, &canard, 0, &transfer_metadata, hbeat_ser_buf_size, hbeat_ser_buf);
+        processTx();
+    }
+    static uint64_t micros() {
+        auto ts = std::chrono::high_resolution_clock::now().time_since_epoch();
+        return std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(ts).count();
+    }
+    void processTx() {
+        for (const CanardTxQueueItem* ti = NULL; (ti = canardTxPeek(&tx)) != NULL;)
+        {
+            if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
+            {
+                QCanBusFrame frame;
+                frame.setExtendedFrameFormat(true);
+                frame.setFrameId(ti->frame.extended_can_id);
+                frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
+                ican->get_device()->writeFrame(frame);
+            }
+            canard.memory_free(&canard, canardTxPop(&tx, ti));
+        }
+    }
+    void on_frame(QCanBusFrame const& frame) {
+        CanardFrame rxf;
+        rxf.extended_can_id = frame.frameId();
+        auto payload = frame.payload();
+        rxf.payload = payload.data();
+        rxf.payload_size = size_t(payload.size());
+	    CanardRxTransfer transfer;
+        CanardRxSubscription* sub;
+        if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, &sub)) {
+            return;
+        }
+        CanardMessageDynamic* msg = static_cast<CanardMessageDynamic*>(sub->user_reference);
+        // TODO
+    }
+    void *memAllocate(const size_t amount) {
+        return malloc(amount);
+    }
+
+    void memFree(void *const pointer) {
+        free(pointer);
+    }
+};
+
+}
+
+namespace radapter::builtin::workers
+{
+
+void cyphal(Instance* inst)
+{
+    inst->RegisterSchema<can::CyphalConfig>("Cyphal");
+    inst->RegisterWorker<can::CyphalWorker>("Cyphal");
+}
+
+}
+
+#include "cyphalworker.moc"

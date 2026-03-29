@@ -83,9 +83,9 @@ class Cache : public Worker
     QVariant state;
     QString preped_hash_key;
 public:
-    Cache(QVariantList args, Instance* inst) : Worker(inst, "redis")
+    Cache(CacheConfig conf, Instance* inst) : Worker(inst, "redis")
     {
-        Parse(config, args.value(0));
+        config = std::move(conf);
         preped_hash_key = QString::fromStdString(config.hash_key.value_or(""));
         client = new Client(config, this);
         sub_client = new Client(config, this);
@@ -130,7 +130,7 @@ public:
                 }
             })
             .ThenSync([this](QVariant res){
-                if (res != "OK") throw Err("Could not enable keyevent notifications");
+                if (res != "OK") Raise("Could not enable keyevent notifications");
                 poll();
                 sub_client->PSubscribe(fmt::format("__keyevent@{}__:*", config.db), [this](Client::SubEvent ev){
                     if (ev.message != preped_hash_key) return;
@@ -260,9 +260,9 @@ public:
                 nextRead();
             });
     }
-    Stream(QVariantList args, Instance* inst) : Worker(inst, "redis")
+    Stream(StreamConfig conf, Instance* inst) : Worker(inst, "redis")
     {
-        Parse(config, args.value(0));
+        config = std::move(conf);
         lastIdKey = fmt::format(
             "{}:{}:{}:last_id",
             config.persistent_prefix.value,

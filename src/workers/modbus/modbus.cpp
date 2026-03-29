@@ -30,8 +30,8 @@ public:
     };
     std::unordered_map<string, InFlight> inFlight;
     QMap<string, QVariant> currentState;
-    Master(QVariantList const& conf, Instance* parent) : Worker(parent, "modbus") {
-        Parse(config, conf.value(0));
+    Master(MasterConfig conf, Instance* parent) : Worker(parent, "modbus") {
+        config = std::move(conf);
         validateRegisters(config.registers);
         if (config.queries) {
             reads = prepareManualReads(config.registers, *config.queries);

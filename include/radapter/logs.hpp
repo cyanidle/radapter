@@ -30,11 +30,17 @@ DESCRIBE("radapter::LogLevel", LogLevel, void) {
 
 namespace detail {
 std::runtime_error RADAPTER_API doErr(fmt::string_view fmt, fmt::format_args args);
+[[noreturn]] void RADAPTER_API doRaise(fmt::string_view fmt, fmt::format_args args);
 }
 
 template<typename...Args>
 std::runtime_error Err(fmt::format_string<Args...> fmt, Args&&...a) {
     return detail::doErr(fmt, fmt::make_format_args(a...));
+}
+
+template<typename...Args>
+[[noreturn]] void Raise(fmt::format_string<Args...> fmt, Args&&...a) {
+    detail::doRaise(fmt, fmt::make_format_args(a...));
 }
 
 }

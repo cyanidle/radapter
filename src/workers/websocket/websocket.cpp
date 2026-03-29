@@ -18,11 +18,11 @@ static QSslConfiguration CreateSslConfiguration(string cert_file, string key_fil
 {
     auto fcert = QFile(QString::fromStdString(cert_file));
     if (!fcert.open(QIODevice::ReadOnly)) {
-        throw Err("could not open certificate file: {}", cert_file);
+        Raise("could not open certificate file: {}", cert_file);
     }
     auto fpkey = QFile(QString::fromStdString(key_file));
     if (!fpkey.open(QIODevice::ReadOnly)) {
-        throw Err("could not open key file: {}", key_file);
+        Raise("could not open key file: {}", key_file);
     }
 
     auto cert = QSslCertificate(&fcert, QSsl::Pem);
@@ -134,11 +134,11 @@ static QVariant recvFrom(QWebSocket* sock, Worker* self, WsConfig const& config,
         DefaultArena alloc;
         JsonView recv;
         try {
-            if (msg.isEmpty()) throw Err("Empty msg");
+            if (msg.isEmpty()) Raise("Empty msg");
             if (config.compression) {
                 if (*config.compression == zlib) {
                     msg = qUncompress(msg);
-                    if (msg.isEmpty()) throw Err("Could not uncompress using zlib");
+                    if (msg.isEmpty()) Raise("Could not uncompress using zlib");
                 }
             }
             if (config.protocol == msgpack) {
@@ -164,10 +164,10 @@ class Server : public Worker {
     QWebSocketServer* server = nullptr;
     std::set<QWebSocket*> socks;
 public:
-    Server(QVariantList args, Instance* inst) :
+    Server(WsServerConfig conf, Instance* inst) :
         Worker(inst, "ws_server")
     {
-        Parse(config, args.value(0));
+        config = std::move(conf);
         setObjectName(QString("Server(%1:%2/%3)")
                       .arg(config.host.value.c_str())
                       .arg(config.port)
@@ -182,7 +182,7 @@ public:
             server->setSslConfiguration(*ssl);
         }
         if (!server->listen(QHostAddress(QString::fromStdString(config.host)), config.port)) {
-            throw Err("{}: could not listen on: {}:{}", objectName(), config.host.value, config.port);
+            Raise("{}: could not listen on: {}:{}", objectName(), config.host.value, config.port);
         }
         Info("{}: listening on {}:{}", objectName(), config.host.value, config.port);
         connect(server, &QWebSocketServer::newConnection, this, [this]{
@@ -232,10 +232,10 @@ class Client : public Worker {
     WsClientConfig config;
     QWebSocket* sock;
 public:
-    Client(QVariantList const& args, Instance* inst) :
+    Client(WsClientConfig conf, Instance* inst) :
         Worker(inst, "ws_client")
     {
-        Parse(config, args.value(0));
+        config = std::move(conf);
         setObjectName(QString("Client(%1:%2/%3)").arg(config.url));
         optional<QSslConfiguration> ssl;
         if (config.cert_file.value.size() || config.key_file.value.size()) {

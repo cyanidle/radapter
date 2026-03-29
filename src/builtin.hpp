@@ -115,7 +115,7 @@ struct jv::Convert<QVariant>
             QVariantList res;
             auto src = json.Array(false);
             if (src.size() > INT_MAX) {
-                throw radapter::Err("List is too big for conversion from json");
+                radapter::Raise("List is too big for conversion from json");
             }
             res.reserve(int(src.size()));
             for (unsigned i = 0; i < src.size(); ++i) {
@@ -193,14 +193,12 @@ void redis(Instance* inst);
 void sql(Instance* inst);
 void serial(Instance* inst);
 void can(Instance* inst);
+void cyphal(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
-// gui is separate
-inline InitSystem all[] = {
-    test, modbus, websocket,
-    redis, sql, serial, can
-};
+extern InitSystem* all;
+extern size_t count;
 
 }
 

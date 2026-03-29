@@ -18,10 +18,10 @@ class TestPlugin final : public radapter::Worker {
 
     TestPluginConfig config;
 public:
-    TestPlugin(QVariantList const& args, Instance* inst) :
-        Worker(inst, "test_plugin")
+    TestPlugin(TestPluginConfig config, Instance* inst) :
+        Worker(inst, "test_plugin"),
+        config(config)
     {
-        Parse(config, args.value(0));
         auto timer = new QTimer(this);
         timer->callOnTimeout(this, [this]{
             emit SendMsg(QVariantMap{{"from_plugin", "Hello!"}});

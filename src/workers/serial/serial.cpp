@@ -76,10 +76,10 @@ private:
 	QSerialPort* port;
 	QByteArray buffer;
 public:
-	SerialWorker(QVariantList const& args, Instance* inst) :
-		BinaryWorker(ParseAs<BinaryConfig>(args.value(0)), inst, "serial")
+	SerialWorker(SerialConfig conf, Instance* inst) :
+		BinaryWorker(conf, inst, "serial")
 	{
-		Parse(config, args.value(0));
+		config = std::move(conf);
 		port = new QSerialPort(config.port, this);
         port->setBaudRate(int(config.baud));
 		port->setDataBits(QSerialPort::DataBits(config.data_bits.value));
@@ -87,7 +87,7 @@ public:
 		port->setStopBits(config.stop_bits);
 		port->setFlowControl(config.flow_control);
 		if (!port->open(config.open_mode.value)) {
-			throw Err("Could not open port {}: {}", config.port, port->errorString());
+			Raise("Could not open port {}: {}", config.port, port->errorString());
 		}
 		connect(port, &QSerialPort::readyRead, this, [this]{
 			buffer += port->readAll();

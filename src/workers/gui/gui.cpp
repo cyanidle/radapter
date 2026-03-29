@@ -113,7 +113,7 @@ public:
         }
         root = creator->create(ctx);
         if (!root) {
-            throw Err("Could not create qml view: {}", creator->errorString());
+            Raise("Could not create qml view: {}", creator->errorString());
         }
         root->setParent(this);
         auto* meta = root->metaObject();

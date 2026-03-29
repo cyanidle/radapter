@@ -44,8 +44,8 @@ public:
         thread->quit();
         thread->wait();
     }
-    SqlWorker(QVariantList args, Instance* inst) : Worker(inst, "sql") {
-        Parse(config, args.value(0));
+    SqlWorker(SqlConfig conf, Instance* inst) : Worker(inst, "sql") {
+        config = std::move(conf);
         thread = new QThread(this);
         std::exception_ptr initException;
         QSemaphore sema;
@@ -64,7 +64,7 @@ public:
                 }
                 if (!db.open()) {
                     auto err = db.lastError();
-                    throw Err("Could not open db '{}:{}' => '{}'",
+                    Raise("Could not open db '{}:{}' => '{}'",
                               config.type, config.db, err.text());
                 }
                 other_thread_context = new QObject();
@@ -86,14 +86,14 @@ public:
         try {
             QSqlQuery q(db);
             if (!q.prepare(raw)) {
-                throw Err("Could not prepare '{}' => '{}'", raw, q.lastError().text());
+                Raise("Could not prepare '{}' => '{}'", raw, q.lastError().text());
             }
             int idx = 0;
             for (auto& a: binds) {
                 q.bindValue(idx++, std::move(a));
             }
             if (!q.exec()) {
-                throw Err("Could not execute '{}' => '{}'", raw, q.lastError().text());
+                Raise("Could not execute '{}' => '{}'", raw, q.lastError().text());
             }
             while(q.next()) {
                 QVariantList nested;
@@ -121,7 +121,7 @@ public:
     QVariant Exec(QVariantList const& args) {
         auto argc = args.size();
         if (argc == 0) {
-            throw Err("Expected at least 2 arguments");
+            Raise("Expected at least 2 arguments");
         }
         QString raw = args.value(0).toString();
         QVariant secondArg = args.value(1);
