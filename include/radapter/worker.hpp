@@ -56,6 +56,7 @@ protected:
 signals:
     void ShutdownDone();
     void SendMsg(QVariant const& msg);
+    void SendMsgField(QString key, QVariant const& msg);
     void SendEvent(QVariant const& msg);
     void SendEventField(QString key, QVariant const& data);
 };

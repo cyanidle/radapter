@@ -270,7 +270,7 @@
 namespace radapter::can
 {
 
-CanardMessageDynamic* lookup_canard_type(std::string_view name)
+CanardMessageDynamic* lookup_canard_type(QStringView name)
 {
     
 }

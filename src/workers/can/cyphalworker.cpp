@@ -3,14 +3,16 @@
 #include "cyphal_helpers.h"
 #include <QTimer>
 
+#include "uavcan/node/Heartbeat_1_0.h"
+
 namespace radapter::can
 {
 
 struct CyphalTopic
 {
-    std::string type;
+    QString type;
     CanardPortID port;
-    std::string name;
+    QString name;
 };
 
 RAD_DESCRIBE(CyphalTopic)
@@ -50,6 +52,13 @@ private:
     QTime start;
     CanardTransferID tid = {};
     std::list<CanardRxSubscription> subs_storage;
+    std::vector<uint8_t> tx_buffer;
+
+    struct SubMeta {
+        CanardMessageDynamic* dyn;
+        QString name;
+    };
+    std::vector<SubMeta> sub_metas;
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
@@ -67,14 +76,17 @@ public:
         connect(ican, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
         auto filterList = ican->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
         for (auto& topic: config.subscribe) {
-            CanardMessageDynamic* msg = lookup_canard_type(topic.type);
-            if (!msg) {
+            CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
+            if (!dyn) {
                 Raise("Canard type {} not recognized", topic.type);
             }
             CanardRxSubscription* sub = &subs_storage.emplace_back();
-            sub->user_reference = msg;
+            SubMeta& meta = sub_metas.emplace_back();
+            meta.dyn = dyn;
+            meta.name = topic.name;
+            sub->user_reference = reinterpret_cast<void*>(sub_metas.size() - 1);
             CanardPortID port_id = topic.port;
-            if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, msg->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
+            if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, dyn->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
                 Raise("Could not subscribe to msgs of type() on port:{}", topic.type, port_id);
             }
             CanardFilter current = canardMakeFilterForSubject(port_id);
@@ -106,6 +118,7 @@ private:
 		};
         size_t hbeat_ser_buf_size = uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;
         uint8_t hbeat_ser_buf[uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_];
+        uavcan_node_Heartbeat_1_0_serialize_(&test_heartbeat, hbeat_ser_buf, &hbeat_ser_buf_size);
         canardTxPush(&tx, &canard, 0, &transfer_metadata, hbeat_ser_buf_size, hbeat_ser_buf);
         processTx();
     }
@@ -138,8 +151,9 @@ private:
         if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, &sub)) {
             return;
         }
-        CanardMessageDynamic* msg = static_cast<CanardMessageDynamic*>(sub->user_reference);
-        // TODO
+        SubMeta& meta = sub_metas[reinterpret_cast<size_t>(sub->user_reference)];
+        QVariant msg = meta.dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+        emit SendMsgField(meta.name, msg);
     }
     void *memAllocate(const size_t amount) {
         return malloc(amount);
