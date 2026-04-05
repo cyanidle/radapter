@@ -1,5 +1,4 @@
-﻿
-
+﻿//CYPHAL_HEADERS_BEGIN
 #include <reg/udral/physics/acoustics/Note_0_1.h>
 #include <reg/udral/physics/kinematics/geodetic/PointState_0_1.h>
 #include <reg/udral/physics/kinematics/geodetic/PointStateVarTs_0_1.h>
@@ -69,27 +68,6 @@
 #include <reg/udral/service/battery/_0_1.h>
 #include <reg/udral/service/battery/Technology_0_1.h>
 #include <reg/udral/service/sensor/Status_0_1.h>
-// #include <voltbro/echo/echo_service_1_0.h>
-// #include <voltbro/echo/echo_msg_1_0.h>
-// #include <voltbro/foc/command_1_0.h>
-// #include <voltbro/foc/specific_control_1_0.h>
-// #include <voltbro/foc/state_simple_1_0.h>
-// #include <voltbro/battery/buttons_1_0.h>
-// #include <voltbro/battery/state_1_0.h>
-// #include <voltbro/hmi/beeper_service_1_0.h>
-// #include <voltbro/hmi/led_service_1_0.h>
-// #include <voltbro/freeflyer/motion/control_1_0.h>
-// #include <voltbro/config/dc/pid_config_1_0.h>
-// #include <voltbro/config/dc/pid_report_1_0.h>
-// #include <voltbro/config/dc/set_1_0.h>
-// #include <voltbro/config/dc/get_1_0.h>
-// #include <voltbro/config/six_step/values_1_0.h>
-// #include <voltbro/config/six_step/pid_config_1_0.h>
-// #include <voltbro/config/six_step/log_1_0.h>
-// #include <voltbro/config/six_step/pid_report_1_0.h>
-// #include <voltbro/config/six_step/log_item_1_0.h>
-// #include <voltbro/config/six_step/set_1_0.h>
-// #include <voltbro/config/six_step/get_1_0.h>
 #include <uavcan/_register/Value_1_0.h>
 #include <uavcan/_register/Access_1_0.h>
 #include <uavcan/_register/Name_1_0.h>
@@ -197,9 +175,7 @@
 #include <uavcan/node/port/SubjectIDList_1_0.h>
 #include <uavcan/node/port/ID_1_0.h>
 #include <uavcan/node/port/ServiceID_1_0.h>
-#include <uavcan/node/port/ServiceIDList_1_0.h>
 #include <uavcan/node/port/SubjectID_1_0.h>
-#include <uavcan/node/port/ServiceIDList_0_1.h>
 #include <uavcan/node/port/List_1_0.h>
 #include <uavcan/node/Version_1_0.h>
 #include <uavcan/node/ExecuteCommand_1_1.h>
@@ -209,35 +185,6 @@
 #include <uavcan/time/TAIInfo_0_1.h>
 #include <uavcan/time/SynchronizedTimestamp_1_0.h>
 #include <uavcan/time/TimeSystem_0_1.h>
-#include <uavcan/diagnostic/Severity_1_0.h>
-#include <uavcan/diagnostic/Record_1_0.h>
-#include <uavcan/diagnostic/Record_1_1.h>
-#include <uavcan/internet/udp/HandleIncomingPacket_0_2.h>
-#include <uavcan/internet/udp/OutgoingPacket_0_1.h>
-#include <uavcan/internet/udp/OutgoingPacket_0_2.h>
-#include <uavcan/internet/udp/HandleIncomingPacket_0_1.h>
-#include <uavcan/metatransport/can/BaseArbitrationID_0_1.h>
-#include <uavcan/metatransport/can/DataFD_0_1.h>
-#include <uavcan/metatransport/can/ExtendedArbitrationID_0_1.h>
-#include <uavcan/metatransport/can/Frame_0_1.h>
-#include <uavcan/metatransport/can/Error_0_1.h>
-#include <uavcan/metatransport/can/Frame_0_2.h>
-#include <uavcan/metatransport/can/Manifestation_0_1.h>
-#include <uavcan/metatransport/can/DataClassic_0_1.h>
-#include <uavcan/metatransport/can/RTR_0_1.h>
-#include <uavcan/metatransport/can/ArbitrationID_0_1.h>
-#include <uavcan/metatransport/ethernet/Frame_0_1.h>
-#include <uavcan/metatransport/ethernet/EtherType_0_1.h>
-#include <uavcan/metatransport/serial/Fragment_0_2.h>
-#include <uavcan/metatransport/serial/Fragment_0_1.h>
-#include <uavcan/metatransport/udp/Frame_0_1.h>
-#include <uavcan/metatransport/udp/Endpoint_0_1.h>
-#include <uavcan/pnp/NodeIDAllocationData_1_0.h>
-#include <uavcan/pnp/NodeIDAllocationData_2_0.h>
-#include <uavcan/pnp/cluster/AppendEntries_1_0.h>
-#include <uavcan/pnp/cluster/RequestVote_1_0.h>
-#include <uavcan/pnp/cluster/Discovery_1_0.h>
-#include <uavcan/pnp/cluster/Entry_1_0.h>
 #include <uavcan/primitive/scalar/Real64_1_0.h>
 #include <uavcan/primitive/scalar/Natural64_1_0.h>
 #include <uavcan/primitive/scalar/Integer8_1_0.h>
@@ -265,14 +212,276 @@
 #include <uavcan/primitive/array/Natural16_1_0.h>
 #include <uavcan/primitive/String_1_0.h>
 #include <uavcan/primitive/Unstructured_1_0.h>
+//CYPHAL_HEADERS_END
+
+
 #include "cyphal_helpers.h"
+
+#include <QVariant>
+#include "describe/describe.hpp"
+#include "radapter/config.hpp"
+#include "radapter/logs.hpp"
+
+template<typename T>
+using SerializeImpl = int8_t(*)(const T* const obj, uint8_t* const buffer, size_t* const inout_buffer_size_bytes);
+
+template<typename T>
+using DeserializeImpl = int8_t(*)(T* const obj, const uint8_t* buffer, size_t* const inout_buffer_size_bytes);
+
+struct FieldIsFixedString {};
+struct FieldIsDynString {};
+struct FieldIsDynArray {};
+
+template<typename T, SerializeImpl<T> impl>
+static void serialize(QVariant const& data, uint8_t* buffer, size_t size)
+{
+    T value;
+    radapter::Parse(value, data);
+    if (impl(&value, buffer, &size))
+        radapter::Raise("Cyphal: error serializing type: {}", describe::Get<T>::name);
+}
+
+template<typename T, DeserializeImpl<T> impl>
+static QVariant deserialize(const uint8_t* buffer, size_t size)
+{
+    T value;
+    if (impl(&value, buffer, &size))
+        radapter::Raise("Cyphal: error serializing type: {}", describe::Get<T>::name);
+    // TODO: use describe here to convert TO QVariant
+}
+
+template<int I>
+struct DynType {
+    static constexpr const radapter::can::CanardMessageDynamic* value = nullptr;
+};
+
+auto collect_types(...) -> void;
+
+constexpr int _types_begin = __COUNTER__;
+
+#define CYPHAL_TYPE(name, ver, ...) \
+    DESCRIBE(#name, name##_##ver, void) \
+    { \
+        __VA_ARGS__ \
+    } \
+    constexpr radapter::can::CanardMessageDynamic Dyn_##name##_##ver = { \
+        u"" #name, \
+        u"" name##_##ver##_FULL_NAME_, \
+        u"" name##_##ver##_FULL_NAME_AND_VERSION_, \
+        name##_##ver##_EXTENT_BYTES_, \
+        deserialize<name##_##ver, name##_##ver##_deserialize_>, \
+        serialize<name##_##ver, name##_##ver##_serialize_>, \
+    }; \
+    template<>\
+    struct DynType<__COUNTER__ - _types_begin> { static constexpr const radapter::can::CanardMessageDynamic* value = &Dyn_##name##_##ver; };
+
+//CYPHAL_TYPES_BEGIN
+CYPHAL_TYPE(uavcan_si_unit_duration_WideScalar, 1_0,
+    RAD_MEMBER(second);)
+CYPHAL_TYPE(uavcan_si_unit_duration_Scalar, 1_0,
+    RAD_MEMBER(second);)
+CYPHAL_TYPE(uavcan_si_unit_acceleration_Vector3, 1_0,
+    RAD_MEMBER(meter_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_acceleration_Scalar, 1_0,
+    RAD_MEMBER(meter_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_force_Vector3, 1_0,
+    RAD_MEMBER(newton);)
+CYPHAL_TYPE(uavcan_si_unit_force_Scalar, 1_0,
+    RAD_MEMBER(newton);)
+CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Vector3, 1_0,
+    RAD_MEMBER(radian_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Scalar, 1_0,
+    RAD_MEMBER(radian_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_0,
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_1,
+    RAD_MEMBER(ampere_per_meter);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_0,
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_1,
+    RAD_MEMBER(ampere_per_meter);)
+CYPHAL_TYPE(uavcan_si_unit_electric_current_Scalar, 1_0,
+    RAD_MEMBER(ampere);)
+CYPHAL_TYPE(uavcan_si_unit_volume_Scalar, 1_0,
+    RAD_MEMBER(cubic_meter);)
+CYPHAL_TYPE(uavcan_si_unit_mass_Scalar, 1_0,
+    RAD_MEMBER(kilogram);)
+CYPHAL_TYPE(uavcan_si_unit_temperature_Scalar, 1_0,
+    RAD_MEMBER(kelvin);)
+CYPHAL_TYPE(uavcan_si_unit_pressure_Scalar, 1_0,
+    RAD_MEMBER(pascal);)
+CYPHAL_TYPE(uavcan_si_unit_frequency_Scalar, 1_0,
+    RAD_MEMBER(hertz);)
+CYPHAL_TYPE(uavcan_si_unit_energy_Scalar, 1_0,
+    RAD_MEMBER(joule);)
+CYPHAL_TYPE(uavcan_si_unit_angle_Scalar, 1_0,
+    RAD_MEMBER(radian);)
+CYPHAL_TYPE(uavcan_si_unit_angle_Quaternion, 1_0,
+    RAD_MEMBER(wxyz);)
+CYPHAL_TYPE(uavcan_si_unit_torque_Vector3, 1_0,
+    RAD_MEMBER(newton_meter);)
+CYPHAL_TYPE(uavcan_si_unit_torque_Scalar, 1_0,
+    RAD_MEMBER(newton_meter);)
+CYPHAL_TYPE(uavcan_si_unit_electric_charge_Scalar, 1_0,
+    RAD_MEMBER(coulomb);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Vector3, 1_0,
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Scalar, 1_0,
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Vector3, 1_0,
+    RAD_MEMBER(radian_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Scalar, 1_0,
+    RAD_MEMBER(radian_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_power_Scalar, 1_0,
+    RAD_MEMBER(watt);)
+CYPHAL_TYPE(uavcan_si_unit_length_Vector3, 1_0,
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_length_WideScalar, 1_0,
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_length_WideVector3, 1_0,
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_length_Scalar, 1_0,
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_volumetric_flow_rate_Scalar, 1_0,
+    RAD_MEMBER(cubic_meter_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_voltage_Scalar, 1_0,
+    RAD_MEMBER(volt);)
+CYPHAL_TYPE(uavcan_si_unit_luminance_Scalar, 1_0,
+    RAD_MEMBER(candela_per_square_meter);)
+CYPHAL_TYPE(uavcan_si_unit_velocity_Vector3, 1_0,
+    RAD_MEMBER(meter_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_velocity_Scalar, 1_0,
+    RAD_MEMBER(meter_per_second);)
+CYPHAL_TYPE(uavcan_node_IOStatistics, 0_1,
+    RAD_MEMBER(num_emitted);
+    RAD_MEMBER(num_errored);
+    RAD_MEMBER(num_received);)
+CYPHAL_TYPE(uavcan_node_Mode, 1_0,
+    RAD_MEMBER(value);)
+
+CYPHAL_TYPE(uavcan_node_Heartbeat, 1_0,
+    RAD_MEMBER(health);
+    RAD_MEMBER(mode);
+    RAD_MEMBER(uptime);
+    RAD_MEMBER(vendor_specific_status_code);)
+
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_0,
+    RAD_MEMBER(command);
+    MEMBER("parameter", &_::parameter, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_0,
+    RAD_MEMBER(status);)
+CYPHAL_TYPE(uavcan_node_GetInfo_Request, 1_0,)
+CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0,
+    RAD_MEMBER(protocol_version);
+    RAD_MEMBER(hardware_version);
+    RAD_MEMBER(software_version);
+    RAD_MEMBER(software_vcs_revision_id);
+    MEMBER("unique_id", &_::unique_id, FieldIsFixedString);
+    MEMBER("name", &_::name, FieldIsDynString);
+    MEMBER("software_image_crc", &_::software_image_crc, FieldIsDynString);
+    MEMBER("certificate_of_authenticity", &_::certificate_of_authenticity, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Request, 0_1,)
+CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Response, 0_1,
+    RAD_MEMBER(transfer_statistics);
+    MEMBER("network_interface_statistics", &_::network_interface_statistics, FieldIsDynArray);)
+
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_1,
+    RAD_MEMBER(command);
+    MEMBER("parameter", &_::parameter, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_1,
+    RAD_MEMBER(status);)
+
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_2,
+    RAD_MEMBER(command);
+    MEMBER("parameter", &_::parameter, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_2,
+    RAD_MEMBER(status);)
+
+CYPHAL_TYPE(uavcan_node_ID, 1_0,
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_node_port_SubjectIDList, 1_0,)
+CYPHAL_TYPE(uavcan_node_port_ID, 1_0,)
+CYPHAL_TYPE(uavcan_node_port_ServiceID, 1_0,)
+CYPHAL_TYPE(uavcan_node_port_SubjectID, 1_0,)
+CYPHAL_TYPE(uavcan_node_port_List, 1_0,
+    RAD_MEMBER(clients);
+    RAD_MEMBER(publishers);
+    RAD_MEMBER(servers);
+    RAD_MEMBER(subscribers);)
+CYPHAL_TYPE(uavcan_node_Version, 1_0,)
+
+
+CYPHAL_TYPE(uavcan_node_Health, 1_0,)
+CYPHAL_TYPE(uavcan_time_Synchronization, 1_0,)
+
+CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Request, 0_1,)
+CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Response, 0_1,)
+
+CYPHAL_TYPE(uavcan_time_TAIInfo, 0_1,)
+CYPHAL_TYPE(uavcan_time_SynchronizedTimestamp, 1_0,)
+CYPHAL_TYPE(uavcan_time_TimeSystem, 0_1,)
+
+CYPHAL_TYPE(uavcan_primitive_scalar_Real64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer8, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Bit, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Real16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural8, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Real32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_Empty, 1_0,)
+
+CYPHAL_TYPE(uavcan_primitive_array_Real64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Natural64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Integer8, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Integer32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Bit, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Integer16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Integer64, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Real16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Natural8, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Natural32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Real32, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Natural16, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_String, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_Unstructured, 1_0,)
+
+CYPHAL_TYPE(uavcan_register_Value, 1_0,)
+CYPHAL_TYPE(uavcan_register_Access_Request, 1_0,)
+CYPHAL_TYPE(uavcan_register_Access_Response, 1_0,)
+CYPHAL_TYPE(uavcan_register_Name, 1_0,)
+CYPHAL_TYPE(uavcan_register_List_Request, 1_0,)
+CYPHAL_TYPE(uavcan_register_List_Response, 1_0,)
+//CYPHAL_TYPES_END
+
+constexpr int types_end = __COUNTER__ - _types_begin - 1;
 
 namespace radapter::can
 {
 
-CanardMessageDynamic* lookup_canard_type(QStringView name)
+QMap<QStringView, const CanardMessageDynamic*> by_name;
+QMap<QStringView, const CanardMessageDynamic*> by_full_name;
+QMap<QStringView, const CanardMessageDynamic*> by_full_name_and_ver;
+
+template<size_t...Is>
+static bool do_init_msgs(std::index_sequence<Is...>)
 {
-    
+    by_name = {{DynType<Is+1>::value->name, DynType<Is+1>::value}...};
+    by_full_name = {{DynType<Is+1>::value->full_name, DynType<Is+1>::value}...};
+    by_full_name_and_ver = {{DynType<Is+1>::value->full_name_and_ver, DynType<Is+1>::value}...};
+    return true;
+}
+
+const CanardMessageDynamic* lookup_canard_type(QStringView name)
+{
+    static [[maybe_unused]] bool _ = do_init_msgs(std::make_index_sequence<types_end>{});
+    const CanardMessageDynamic* res = nullptr;
+    (void)((res = by_name.find(name)) || (res = by_full_name.find(name)) || (res = by_full_name_and_ver.find(name)));
+    return res;
 }
 
 }

@@ -1,4 +1,5 @@
 ﻿#include <libcanard/canard.h>
+#include <QString>
 #include <qstringview.h>
 #include <string_view>
 
@@ -10,12 +11,14 @@ namespace radapter::can {
 
     struct CanardMessageDynamic
     {
+        QStringView name;
+        QStringView full_name;
+        QStringView full_name_and_ver;
         size_t extent;
         QVariant (*deserialize)(const uint8_t* buffer, size_t size);
         void (*serialize)(QVariant const& data, uint8_t* buffer, size_t size);
     };
-
-    CanardMessageDynamic* lookup_canard_type(QStringView name);
+    const CanardMessageDynamic* lookup_canard_type(QStringView name);
 }
 
 template<auto method, typename R, typename...Args>

@@ -55,7 +55,7 @@ private:
     std::vector<uint8_t> tx_buffer;
 
     struct SubMeta {
-        CanardMessageDynamic* dyn;
+        const CanardMessageDynamic* dyn;
         QString name;
     };
     std::vector<SubMeta> sub_metas;
@@ -76,7 +76,7 @@ public:
         connect(ican, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
         auto filterList = ican->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
         for (auto& topic: config.subscribe) {
-            CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
+            const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
             if (!dyn) {
                 Raise("Canard type {} not recognized", topic.type);
             }
@@ -153,6 +153,7 @@ private:
         }
         SubMeta& meta = sub_metas[reinterpret_cast<size_t>(sub->user_reference)];
         QVariant msg = meta.dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+        canard.memory_free(&canard, transfer.payload);
         emit SendMsgField(meta.name, msg);
     }
     void *memAllocate(const size_t amount) {
