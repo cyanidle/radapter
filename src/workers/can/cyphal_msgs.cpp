@@ -228,150 +228,256 @@ using SerializeImpl = int8_t(*)(const T* const obj, uint8_t* const buffer, size_
 template<typename T>
 using DeserializeImpl = int8_t(*)(T* const obj, const uint8_t* buffer, size_t* const inout_buffer_size_bytes);
 
+
+struct TypeIsUnionBase {}; //will have _tag_ member which selects one of the fields
+
+template<typename Enum> //use Enum for string <-> int translation of tag
+struct TypeIsUnion
+{
+    using type = Enum;
+};
+
+struct FieldIsBitmask {}; // Access via @ref nunavutSetBit(), @ref nunavutGetBit().
 struct FieldIsFixedString {};
 struct FieldIsDynString {};
-struct FieldIsDynArray {};
+struct FieldIsDynArray {}; // elements + count
+struct FieldIsEnumBase {};
 
-template<typename T, SerializeImpl<T> impl>
+template <typename E>
+struct FieldIsEnum {
+    using type = E;
+};
+
+template<typename T> void to_variant(T const& in, QVariant& out);
+
+template<typename T, typename Member>
+void field_to_variant(T const& in, Member info, QVariant& out)
+{
+    auto& field = info.get(in);
+    if constexpr (describe::has_v<FieldIsBitmask, Member>) {
+        
+    } else if constexpr (std::rank_v<typename Member::type>) {
+        size_t count = std::size(field);
+        QVariantList res;
+        res.reserve(int(count));
+        for (size_t i = 0; i < count; ++i) {
+            QVariant item;
+            to_variant(field[i], item);
+            res.push_back(item);
+        }
+        out = std::move(res);
+    } else if constexpr (describe::has_v<FieldIsFixedString, Member>) {
+    
+    }  else if constexpr (describe::has_v<FieldIsDynString, Member>) {
+
+    } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
+        size_t count = field.count;
+        auto& elems = field.elements;
+        QVariantList res;
+        res.reserve(int(count));
+        for (size_t i = 0; i < count; ++i) {
+            QVariant item;
+            to_variant(elems[i], item);
+            res.push_back(item);
+        }
+        out = std::move(res);
+    } else if constexpr (describe::has_v<FieldIsEnumBase, Member>) {
+
+    } else {
+        to_variant(field, out);
+    }
+}
+
+template<typename T>
+void to_variant(T const& in, QVariant& out)
+{
+    if constexpr (!describe::is_described_v<T>)
+    {
+        out = QVariant::fromValue(in);
+    }
+    else
+    {
+        using IsUnion = describe::extract_t<TypeIsUnionBase, T>;
+        if constexpr (!std::is_void_v<IsUnion>)
+        {
+            using UnionEnum = typename IsUnion::type;
+            UnionEnum tag = UnionEnum(in._tag_);
+            int index = 0;
+            bool ok = false;
+            QVariantMap result;
+            describe::Get<T>::for_each([&](auto info){
+                if (UnionEnum(index++) == tag)
+                {
+                    ok = true;
+                    std::string_view tag_name;
+                    (void)describe::enum_to_name(tag, tag_name);
+                    result["tag"] = QString::fromLatin1(tag_name.data(), int(tag_name.size()));
+                    field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))]);
+                }
+            });
+            if (!ok) {
+                radapter::Raise("Invalid (or incorrectly described) _tag_ field in {} -> {}", describe::Get<T>::name, fmt::underlying(tag));
+            }
+            out = std::move(result);
+        }
+        else
+        {
+            QVariantMap result;
+            describe::Get<T>::for_each([&](auto info){
+                field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))]);
+            });
+            out = result;
+        }
+    }
+}
+
+template<typename T>
+void from_variant(QVariant const&, T&)
+{
+
+}
+
+template<typename Dummy, typename T, SerializeImpl<T> impl>
 static void serialize(QVariant const& data, uint8_t* buffer, size_t size)
 {
     T value;
-    radapter::Parse(value, data);
+    from_variant(data, value);
     if (impl(&value, buffer, &size))
         radapter::Raise("Cyphal: error serializing type: {}", describe::Get<T>::name);
 }
 
-template<typename T, DeserializeImpl<T> impl>
+template<typename Dummy, typename T, DeserializeImpl<T> impl>
 static QVariant deserialize(const uint8_t* buffer, size_t size)
 {
     T value;
+    QVariant res;
     if (impl(&value, buffer, &size))
-        radapter::Raise("Cyphal: error serializing type: {}", describe::Get<T>::name);
-    // TODO: use describe here to convert TO QVariant
+        radapter::Raise("Cyphal: error deserializing type: {}", describe::Get<T>::name);
+    to_variant(value, res);
+    return res;
 }
 
-template<int I>
-struct DynType {
-    static constexpr const radapter::can::CanardMessageDynamic* value = nullptr;
-};
+using radapter::can::CanardMessageDynamic;
+
 
 auto collect_types(...) -> void;
 
-constexpr int _types_begin = __COUNTER__;
+constexpr int types_begin = __COUNTER__;
 
-#define CYPHAL_TYPE(name, ver, ...) \
-    DESCRIBE(#name, name##_##ver, void) \
+#define CYPHAL_TYPE(name, ver, attrs, ...) \
+    DESCRIBE(#name, name##_##ver, _OPENVA attrs) \
     { \
         __VA_ARGS__ \
     } \
+    template<typename Dummy> \
     constexpr radapter::can::CanardMessageDynamic Dyn_##name##_##ver = { \
         u"" #name, \
         u"" name##_##ver##_FULL_NAME_, \
         u"" name##_##ver##_FULL_NAME_AND_VERSION_, \
         name##_##ver##_EXTENT_BYTES_, \
-        deserialize<name##_##ver, name##_##ver##_deserialize_>, \
-        serialize<name##_##ver, name##_##ver##_serialize_>, \
+        deserialize<Dummy, name##_##ver, name##_##ver##_deserialize_>, \
+        serialize<Dummy, name##_##ver, name##_##ver##_serialize_>, \
     }; \
-    template<>\
-    struct DynType<__COUNTER__ - _types_begin> { static constexpr const radapter::can::CanardMessageDynamic* value = &Dyn_##name##_##ver; };
+    template<typename Dummy> \
+    constexpr const CanardMessageDynamic* get_type(std::integral_constant<size_t, __COUNTER__ - types_begin>) { return &Dyn_##name##_##ver<Dummy>; }
 
 //CYPHAL_TYPES_BEGIN
-CYPHAL_TYPE(uavcan_si_unit_duration_WideScalar, 1_0,
-    RAD_MEMBER(second);)
-CYPHAL_TYPE(uavcan_si_unit_duration_Scalar, 1_0,
-    RAD_MEMBER(second);)
-CYPHAL_TYPE(uavcan_si_unit_acceleration_Vector3, 1_0,
-    RAD_MEMBER(meter_per_second_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_acceleration_Scalar, 1_0,
-    RAD_MEMBER(meter_per_second_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_force_Vector3, 1_0,
-    RAD_MEMBER(newton);)
-CYPHAL_TYPE(uavcan_si_unit_force_Scalar, 1_0,
-    RAD_MEMBER(newton);)
-CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Vector3, 1_0,
-    RAD_MEMBER(radian_per_second_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Scalar, 1_0,
-    RAD_MEMBER(radian_per_second_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_0,
-    RAD_MEMBER(tesla);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_1,
-    RAD_MEMBER(ampere_per_meter);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_0,
-    RAD_MEMBER(tesla);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_1,
-    RAD_MEMBER(ampere_per_meter);)
-CYPHAL_TYPE(uavcan_si_unit_electric_current_Scalar, 1_0,
-    RAD_MEMBER(ampere);)
-CYPHAL_TYPE(uavcan_si_unit_volume_Scalar, 1_0,
-    RAD_MEMBER(cubic_meter);)
-CYPHAL_TYPE(uavcan_si_unit_mass_Scalar, 1_0,
-    RAD_MEMBER(kilogram);)
-CYPHAL_TYPE(uavcan_si_unit_temperature_Scalar, 1_0,
-    RAD_MEMBER(kelvin);)
-CYPHAL_TYPE(uavcan_si_unit_pressure_Scalar, 1_0,
-    RAD_MEMBER(pascal);)
-CYPHAL_TYPE(uavcan_si_unit_frequency_Scalar, 1_0,
-    RAD_MEMBER(hertz);)
-CYPHAL_TYPE(uavcan_si_unit_energy_Scalar, 1_0,
-    RAD_MEMBER(joule);)
-CYPHAL_TYPE(uavcan_si_unit_angle_Scalar, 1_0,
-    RAD_MEMBER(radian);)
-CYPHAL_TYPE(uavcan_si_unit_angle_Quaternion, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_angle_Quaternion, 1_0, (void),
     RAD_MEMBER(wxyz);)
-CYPHAL_TYPE(uavcan_si_unit_torque_Vector3, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_length_WideScalar, 1_0, (void),
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_length_WideVector3, 1_0, (void),
+    RAD_MEMBER(meter);)
+CYPHAL_TYPE(uavcan_si_unit_duration_WideScalar, 1_0, (void),
+    RAD_MEMBER(second);)
+CYPHAL_TYPE(uavcan_si_unit_duration_Scalar, 1_0, (void),
+    RAD_MEMBER(second);)
+CYPHAL_TYPE(uavcan_si_unit_acceleration_Vector3, 1_0, (void),
+    RAD_MEMBER(meter_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_acceleration_Scalar, 1_0, (void),
+    RAD_MEMBER(meter_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_force_Vector3, 1_0, (void),
+    RAD_MEMBER(newton);)
+CYPHAL_TYPE(uavcan_si_unit_force_Scalar, 1_0, (void),
+    RAD_MEMBER(newton);)
+CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Vector3, 1_0, (void),
+    RAD_MEMBER(radian_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_angular_acceleration_Scalar, 1_0, (void),
+    RAD_MEMBER(radian_per_second_per_second);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_0, (void),
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Vector3, 1_1, (void),
+    RAD_MEMBER(ampere_per_meter);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_0, (void),
+    RAD_MEMBER(tesla);)
+CYPHAL_TYPE(uavcan_si_unit_magnetic_field_strength_Scalar, 1_1, (void),
+    RAD_MEMBER(ampere_per_meter);)
+CYPHAL_TYPE(uavcan_si_unit_electric_current_Scalar, 1_0, (void),
+    RAD_MEMBER(ampere);)
+CYPHAL_TYPE(uavcan_si_unit_volume_Scalar, 1_0, (void),
+    RAD_MEMBER(cubic_meter);)
+CYPHAL_TYPE(uavcan_si_unit_mass_Scalar, 1_0, (void),
+    RAD_MEMBER(kilogram);)
+CYPHAL_TYPE(uavcan_si_unit_temperature_Scalar, 1_0, (void),
+    RAD_MEMBER(kelvin);)
+CYPHAL_TYPE(uavcan_si_unit_pressure_Scalar, 1_0, (void),
+    RAD_MEMBER(pascal);)
+CYPHAL_TYPE(uavcan_si_unit_frequency_Scalar, 1_0, (void),
+    RAD_MEMBER(hertz);)
+CYPHAL_TYPE(uavcan_si_unit_energy_Scalar, 1_0, (void),
+    RAD_MEMBER(joule);)
+CYPHAL_TYPE(uavcan_si_unit_angle_Scalar, 1_0, (void),
+    RAD_MEMBER(radian);)
+CYPHAL_TYPE(uavcan_si_unit_torque_Vector3, 1_0, (void),
     RAD_MEMBER(newton_meter);)
-CYPHAL_TYPE(uavcan_si_unit_torque_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_torque_Scalar, 1_0, (void),
     RAD_MEMBER(newton_meter);)
-CYPHAL_TYPE(uavcan_si_unit_electric_charge_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_electric_charge_Scalar, 1_0, (void),
     RAD_MEMBER(coulomb);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Vector3, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Vector3, 1_0, (void),
     RAD_MEMBER(tesla);)
-CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_magnetic_flux_density_Scalar, 1_0, (void),
     RAD_MEMBER(tesla);)
-CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Vector3, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Vector3, 1_0, (void),
     RAD_MEMBER(radian_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_angular_velocity_Scalar, 1_0, (void),
     RAD_MEMBER(radian_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_power_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_power_Scalar, 1_0, (void),
     RAD_MEMBER(watt);)
-CYPHAL_TYPE(uavcan_si_unit_length_Vector3, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_length_Vector3, 1_0, (void),
     RAD_MEMBER(meter);)
-CYPHAL_TYPE(uavcan_si_unit_length_WideScalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_length_Scalar, 1_0, (void),
     RAD_MEMBER(meter);)
-CYPHAL_TYPE(uavcan_si_unit_length_WideVector3, 1_0,
-    RAD_MEMBER(meter);)
-CYPHAL_TYPE(uavcan_si_unit_length_Scalar, 1_0,
-    RAD_MEMBER(meter);)
-CYPHAL_TYPE(uavcan_si_unit_volumetric_flow_rate_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_volumetric_flow_rate_Scalar, 1_0, (void),
     RAD_MEMBER(cubic_meter_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_voltage_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_voltage_Scalar, 1_0, (void),
     RAD_MEMBER(volt);)
-CYPHAL_TYPE(uavcan_si_unit_luminance_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_luminance_Scalar, 1_0, (void),
     RAD_MEMBER(candela_per_square_meter);)
-CYPHAL_TYPE(uavcan_si_unit_velocity_Vector3, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_velocity_Vector3, 1_0, (void),
     RAD_MEMBER(meter_per_second);)
-CYPHAL_TYPE(uavcan_si_unit_velocity_Scalar, 1_0,
+CYPHAL_TYPE(uavcan_si_unit_velocity_Scalar, 1_0, (void),
     RAD_MEMBER(meter_per_second);)
-CYPHAL_TYPE(uavcan_node_IOStatistics, 0_1,
+CYPHAL_TYPE(uavcan_node_IOStatistics, 0_1, (void),
     RAD_MEMBER(num_emitted);
     RAD_MEMBER(num_errored);
     RAD_MEMBER(num_received);)
-CYPHAL_TYPE(uavcan_node_Mode, 1_0,
+CYPHAL_TYPE(uavcan_node_Mode, 1_0, (void),
     RAD_MEMBER(value);)
 
-CYPHAL_TYPE(uavcan_node_Heartbeat, 1_0,
+CYPHAL_TYPE(uavcan_node_Heartbeat, 1_0, (void),
     RAD_MEMBER(health);
     RAD_MEMBER(mode);
     RAD_MEMBER(uptime);
     RAD_MEMBER(vendor_specific_status_code);)
 
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_0,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_0, (void),
     RAD_MEMBER(command);
     MEMBER("parameter", &_::parameter, FieldIsDynString);)
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_0,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_0, (void),
     RAD_MEMBER(status);)
-CYPHAL_TYPE(uavcan_node_GetInfo_Request, 1_0,)
-CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0,
+CYPHAL_TYPE(uavcan_node_GetInfo_Request, 1_0, (void),)
+CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0, (void),
     RAD_MEMBER(protocol_version);
     RAD_MEMBER(hardware_version);
     RAD_MEMBER(software_version);
@@ -380,107 +486,294 @@ CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0,
     MEMBER("name", &_::name, FieldIsDynString);
     MEMBER("software_image_crc", &_::software_image_crc, FieldIsDynString);
     MEMBER("certificate_of_authenticity", &_::certificate_of_authenticity, FieldIsDynString);)
-CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Request, 0_1,)
-CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Response, 0_1,
+CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Request, 0_1, (void),)
+CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Response, 0_1, (void),
     RAD_MEMBER(transfer_statistics);
     MEMBER("network_interface_statistics", &_::network_interface_statistics, FieldIsDynArray);)
 
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_1,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_1, (void),
     RAD_MEMBER(command);
     MEMBER("parameter", &_::parameter, FieldIsDynString);)
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_1,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_1, (void),
     RAD_MEMBER(status);)
 
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_2,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_2, (void),
     RAD_MEMBER(command);
     MEMBER("parameter", &_::parameter, FieldIsDynString);)
-CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_2,
+CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_2, (void),
     RAD_MEMBER(status);)
 
-CYPHAL_TYPE(uavcan_node_ID, 1_0,
+CYPHAL_TYPE(uavcan_node_ID, 1_0, (void),
     RAD_MEMBER(value);)
-CYPHAL_TYPE(uavcan_node_port_SubjectIDList, 1_0,)
-CYPHAL_TYPE(uavcan_node_port_ID, 1_0,)
-CYPHAL_TYPE(uavcan_node_port_ServiceID, 1_0,)
-CYPHAL_TYPE(uavcan_node_port_SubjectID, 1_0,)
-CYPHAL_TYPE(uavcan_node_port_List, 1_0,
+
+enum SubjectIDListTag
+{
+    mask_bitpacked,
+    sparse_list,
+    total,
+};
+
+CYPHAL_TYPE(uavcan_node_port_ServiceIDList, 1_0, (void),
+    MEMBER("mask_bitpacked", &_::mask_bitpacked_, FieldIsBitmask);)
+
+
+RAD_DESCRIBE(SubjectIDListTag) {
+    RAD_ENUM(mask_bitpacked);
+    RAD_ENUM(sparse_list);
+    RAD_ENUM(total);
+}
+
+CYPHAL_TYPE(uavcan_node_port_SubjectIDList, 1_0, (TypeIsUnion<SubjectIDListTag>),
+    MEMBER("mask_bitpacked", &_::mask_bitpacked_, FieldIsBitmask);
+    MEMBER("sparse_list", &_::sparse_list, FieldIsDynArray);
+    MEMBER("total", &_::_total);)
+
+enum PortIDTag {
+    subject_id,
+    service_id,
+};
+
+RAD_DESCRIBE(PortIDTag) {
+    RAD_ENUM(subject_id);
+    RAD_ENUM(service_id);
+}
+
+CYPHAL_TYPE(uavcan_node_port_ID, 1_0, (TypeIsUnion<PortIDTag>),
+    RAD_MEMBER(subject_id);
+    RAD_MEMBER(service_id);)
+CYPHAL_TYPE(uavcan_node_port_ServiceID, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_node_port_SubjectID, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_node_port_List, 1_0, (void),
     RAD_MEMBER(clients);
     RAD_MEMBER(publishers);
     RAD_MEMBER(servers);
     RAD_MEMBER(subscribers);)
-CYPHAL_TYPE(uavcan_node_Version, 1_0,)
+CYPHAL_TYPE(uavcan_node_Version, 1_0, (void),
+    RAD_MEMBER(major);
+    RAD_MEMBER(minor);)
+
+#define CyphalEnum()
+
+enum NodeHealth {
+    NOMINAL = uavcan_node_Health_1_0_NOMINAL,
+    ADVISORY = uavcan_node_Health_1_0_ADVISORY,
+    CAUTION = uavcan_node_Health_1_0_CAUTION,
+    WARNING = uavcan_node_Health_1_0_WARNING,
+};
+
+RAD_DESCRIBE(NodeHealth) {
+    RAD_ENUM(NOMINAL);
+    RAD_ENUM(ADVISORY);
+    RAD_ENUM(CAUTION);
+    RAD_ENUM(WARNING);
+}
+
+CYPHAL_TYPE(uavcan_node_Health, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsEnum<NodeHealth>);)
+CYPHAL_TYPE(uavcan_time_Synchronization, 1_0, (void),
+    RAD_MEMBER(previous_transmission_timestamp_microsecond);)
+
+CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Request, 0_1, (void),)
+CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Response, 0_1, (void),
+    RAD_MEMBER(tai_info);
+    RAD_MEMBER(time_system);
+    RAD_MEMBER(error_variance);)
+
+CYPHAL_TYPE(uavcan_time_TAIInfo, 0_1, (void),
+    RAD_MEMBER(difference_tai_minus_utc);)
+CYPHAL_TYPE(uavcan_time_SynchronizedTimestamp, 1_0, (void),
+    RAD_MEMBER(microsecond);)
 
 
-CYPHAL_TYPE(uavcan_node_Health, 1_0,)
-CYPHAL_TYPE(uavcan_time_Synchronization, 1_0,)
+enum TimeSystem {
+    MONOTONIC_SINCE_BOOT = uavcan_time_TimeSystem_0_1_MONOTONIC_SINCE_BOOT,
+    TAI = uavcan_time_TimeSystem_0_1_TAI,
+    APPLICATION_SPECIFIC = uavcan_time_TimeSystem_0_1_APPLICATION_SPECIFIC,
+};
 
-CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Request, 0_1,)
-CYPHAL_TYPE(uavcan_time_GetSynchronizationMasterInfo_Response, 0_1,)
+RAD_DESCRIBE(TimeSystem) {
+    RAD_ENUM(MONOTONIC_SINCE_BOOT);
+    RAD_ENUM(TAI);
+    RAD_ENUM(APPLICATION_SPECIFIC);
+}
 
-CYPHAL_TYPE(uavcan_time_TAIInfo, 0_1,)
-CYPHAL_TYPE(uavcan_time_SynchronizedTimestamp, 1_0,)
-CYPHAL_TYPE(uavcan_time_TimeSystem, 0_1,)
+CYPHAL_TYPE(uavcan_time_TimeSystem, 0_1, (void),
+    MEMBER("value", &_::value, FieldIsEnum<TimeSystem>);)
 
-CYPHAL_TYPE(uavcan_primitive_scalar_Real64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Natural64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Integer8, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Integer32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Bit, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Integer16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Integer64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Real16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Natural8, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Natural32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Real32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_scalar_Natural16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_Empty, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_scalar_Real64, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural64, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer8, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer32, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Bit, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer16, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Integer64, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Real16, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural8, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural32, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Real32, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_scalar_Natural16, 1_0, (void),
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_primitive_Empty, 1_0, (void),)
 
-CYPHAL_TYPE(uavcan_primitive_array_Real64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Natural64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Integer8, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Integer32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Bit, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Integer16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Integer64, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Real16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Natural8, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Natural32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Real32, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_array_Natural16, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_String, 1_0,)
-CYPHAL_TYPE(uavcan_primitive_Unstructured, 1_0,)
+CYPHAL_TYPE(uavcan_primitive_array_Real64, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Natural64, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Integer8, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Integer32, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Bit, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsBitmask);)
+CYPHAL_TYPE(uavcan_primitive_array_Integer16, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Integer64, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Real16, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Natural8, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Natural32, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Real32, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_array_Natural16, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
+CYPHAL_TYPE(uavcan_primitive_String, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_primitive_Unstructured, 1_0, (void),
+    MEMBER("value", &_::value, FieldIsDynArray);)
 
-CYPHAL_TYPE(uavcan_register_Value, 1_0,)
-CYPHAL_TYPE(uavcan_register_Access_Request, 1_0,)
-CYPHAL_TYPE(uavcan_register_Access_Response, 1_0,)
-CYPHAL_TYPE(uavcan_register_Name, 1_0,)
-CYPHAL_TYPE(uavcan_register_List_Request, 1_0,)
-CYPHAL_TYPE(uavcan_register_List_Response, 1_0,)
+enum RegisterValueTag
+{
+    empty,
+    string,
+    unstructured,
+    bit,
+    integer64,
+    integer32,
+    integer16,
+    integer8,
+    natural64,
+    natural32,
+    natural16,
+    natural8,
+    real64,
+    real32,
+    real16,
+};
+
+RAD_DESCRIBE(RegisterValueTag) {
+    RAD_ENUM(empty);
+    RAD_ENUM(string);
+    RAD_ENUM(unstructured);
+    RAD_ENUM(bit);
+    RAD_ENUM(integer64);
+    RAD_ENUM(integer32);
+    RAD_ENUM(integer16);
+    RAD_ENUM(integer8);
+    RAD_ENUM(natural64);
+    RAD_ENUM(natural32);
+    RAD_ENUM(natural16);
+    RAD_ENUM(natural8);
+    RAD_ENUM(real64);
+    RAD_ENUM(real32);
+    RAD_ENUM(real16);
+}
+
+CYPHAL_TYPE(uavcan_register_Value, 1_0, (TypeIsUnion<RegisterValueTag>),
+    RAD_MEMBER(empty);
+    MEMBER("string", &_::_string);
+    RAD_MEMBER(unstructured);
+    RAD_MEMBER(bit);
+    RAD_MEMBER(integer64);
+    RAD_MEMBER(integer32);
+    RAD_MEMBER(integer16);
+    RAD_MEMBER(integer8);
+    RAD_MEMBER(natural64);
+    RAD_MEMBER(natural32);
+    RAD_MEMBER(natural16);
+    RAD_MEMBER(natural8);
+    RAD_MEMBER(real64);
+    RAD_MEMBER(real32);
+    RAD_MEMBER(real16);
+)
+CYPHAL_TYPE(uavcan_register_Access_Request, 1_0, (void),
+    RAD_MEMBER(name);
+    RAD_MEMBER(value);)
+CYPHAL_TYPE(uavcan_register_Access_Response, 1_0, (void),)
+CYPHAL_TYPE(uavcan_register_Name, 1_0, (void),
+    MEMBER("name", &_::name, FieldIsDynString);)
+CYPHAL_TYPE(uavcan_register_List_Request, 1_0, (void),
+    RAD_MEMBER(index);)
+CYPHAL_TYPE(uavcan_register_List_Response, 1_0, (void),
+    RAD_MEMBER(name);)
 //CYPHAL_TYPES_END
 
-constexpr int types_end = __COUNTER__ - _types_begin - 1;
+constexpr int types_end = __COUNTER__ - types_begin;
+
+template<size_t I>
+constexpr void add_types(const CanardMessageDynamic** dyns, std::integral_constant<size_t, I>) {
+    if constexpr(I > types_begin + 1) {
+        dyns[I-1] = get_type<void>(std::integral_constant<size_t, I-1>{});
+        add_types(dyns, std::integral_constant<size_t, I-1>{});
+    }
+}
 
 namespace radapter::can
 {
 
-QMap<QStringView, const CanardMessageDynamic*> by_name;
-QMap<QStringView, const CanardMessageDynamic*> by_full_name;
-QMap<QStringView, const CanardMessageDynamic*> by_full_name_and_ver;
-
-template<size_t...Is>
-static bool do_init_msgs(std::index_sequence<Is...>)
+struct CyphalGlobal
 {
-    by_name = {{DynType<Is+1>::value->name, DynType<Is+1>::value}...};
-    by_full_name = {{DynType<Is+1>::value->full_name, DynType<Is+1>::value}...};
-    by_full_name_and_ver = {{DynType<Is+1>::value->full_name_and_ver, DynType<Is+1>::value}...};
+    QMap<QStringView, const CanardMessageDynamic*> by_name;
+    QMap<QStringView, const CanardMessageDynamic*> by_full_name;
+    QMap<QStringView, const CanardMessageDynamic*> by_full_name_and_ver;
+
+    static CyphalGlobal& get() {
+        static CyphalGlobal state;
+        return state;
+    }
+};
+
+constexpr std::array<const CanardMessageDynamic*, types_end> get_all_types() {
+    std::array<const CanardMessageDynamic*, types_end> res{};
+    add_types(res.data(), std::integral_constant<size_t, types_end>{});
+    return res;
+}
+
+constexpr auto all_types = get_all_types();
+
+static bool do_init_msgs(const CanardMessageDynamic* const* dyns, size_t count)
+{
+    auto& state = CyphalGlobal::get();
+    for (size_t i = 0; i < count; ++i) {
+        state.by_name[dyns[i]->name] = dyns[i];
+        state.by_full_name[dyns[i]->full_name] = dyns[i];
+        state.by_full_name_and_ver[dyns[i]->full_name_and_ver] = dyns[i];
+    }
     return true;
 }
 
 const CanardMessageDynamic* lookup_canard_type(QStringView name)
 {
-    static [[maybe_unused]] bool _ = do_init_msgs(std::make_index_sequence<types_end>{});
+    constexpr auto kek =  get_type<void>(std::integral_constant<size_t, 45>{});
+    auto& state = CyphalGlobal::get();
+    [[maybe_unused]] static bool _ = do_init_msgs(all_types.data(), all_types.size());
     const CanardMessageDynamic* res = nullptr;
-    (void)((res = by_name.find(name)) || (res = by_full_name.find(name)) || (res = by_full_name_and_ver.find(name)));
+    (void)((res = state.by_name.value(name)) || (res = state.by_full_name.value(name)) || (res = state.by_full_name_and_ver.value(name)));
     return res;
 }
 
