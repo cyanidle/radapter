@@ -222,6 +222,10 @@
 #include "radapter/config.hpp"
 #include "radapter/logs.hpp"
 
+
+using namespace radapter;
+
+
 template<typename T>
 using SerializeImpl = int8_t(*)(const T* const obj, uint8_t* const buffer, size_t* const inout_buffer_size_bytes);
 
@@ -249,10 +253,11 @@ struct FieldIsEnum : FieldIsEnumBase {
     using type = E;
 };
 
-template<typename T> void to_variant(T const& in, QVariant& out);
+template<typename T> void to_variant(T const& in, QVariant& out, TraceFrame const& frame);
+template<typename T> void from_variant(QVariant const&, T& out, const TraceFrame& frame);
 
 template<typename T, typename Member>
-void field_to_variant(T const& in, Member info, QVariant& out)
+void field_to_variant(T const& in, Member info, QVariant& out, [[maybe_unused]] TraceFrame const& frame)
 {
     auto& field = info.get(in);
     if constexpr (describe::has_v<FieldIsBitArray, Member>) {
@@ -265,15 +270,13 @@ void field_to_variant(T const& in, Member info, QVariant& out)
             res.push_back(bool(bit));
         }
         out = std::move(res);
-        //uavcan_register_List_1_0_FIXED_PORT_ID_;
-        //uavcan_register_Access_1_0_FIXED_PORT_ID_;
     } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
         std::string res;
         for (auto byte: field) {
             res += fmt::format("{:x}", byte);
         }
         out = QString::fromLatin1(res.c_str(), int(res.size()));
-    }  else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
+    } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
         QVariantList res;
         for (size_t i = 0; i < sizeof(field) * 8; ++i) {
             if (nunavutGetBit(field, sizeof(field), i)) {
@@ -292,7 +295,7 @@ void field_to_variant(T const& in, Member info, QVariant& out)
         res.reserve(int(count));
         for (size_t i = 0; i < count; ++i) {
             QVariant item;
-            to_variant(elems[i], item);
+            to_variant(elems[i], item, TraceFrame(uint32_t(i), frame));
             res.push_back(item);
         }
         out = std::move(res);
@@ -300,7 +303,7 @@ void field_to_variant(T const& in, Member info, QVariant& out)
         using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
         std::string_view name;
         if (!describe::enum_to_name(E(field), name)) {
-            radapter::Raise("Invalid value for enum({}) -> 0x{:x}", describe::Get<E>::name, field);
+            radapter::Raise("Invalid value for enum({}) -> 0x{:x}", describe::Get<E>::name, field, frame);
         }
         out = QString::fromLatin1(name.data(), int(name.size()));
     } else if constexpr (std::rank_v<typename Member::type>) {
@@ -309,71 +312,154 @@ void field_to_variant(T const& in, Member info, QVariant& out)
         res.reserve(int(count));
         for (size_t i = 0; i < count; ++i) {
             QVariant item;
-            to_variant(field[i], item);
+            to_variant(field[i], item, TraceFrame(uint32_t(i), frame));
             res.push_back(item);
         }
         out = std::move(res);
     } else {
-        to_variant(field, out);
+        to_variant(field, out, frame);
     }
 }
 
 template<typename T>
-void to_variant(T const& in, QVariant& out)
+void to_variant(T const& in, QVariant& out, [[maybe_unused]] TraceFrame const& frame)
 {
     if constexpr (!describe::is_described_v<T>)
     {
         out = QVariant::fromValue(in);
     }
+    else if constexpr (describe::has_v<TypeIsUnionBase, T>)
+    {
+        using UnionEnum = typename describe::extract_t<TypeIsUnionBase, T>::type;
+        UnionEnum tag = UnionEnum(in._tag_);
+        int index = 0;
+        bool ok = false;
+        QVariantMap result;
+        describe::Get<T>::for_each([&](auto info){
+            if (UnionEnum(index++) == tag)
+            {
+                ok = true;
+                field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))], TraceFrame(info.name, frame));
+            }
+        });
+        if (!ok) {
+            radapter::Raise("{}: Invalid (or incorrectly described) _tag_ field in {} -> 0x{:x}", frame, describe::Get<T>::name, fmt::underlying(tag));
+        }
+        out = std::move(result);
+    }
     else
     {
-        using IsUnion = describe::extract_t<TypeIsUnionBase, T>;
-        if constexpr (!std::is_void_v<IsUnion>)
-        {
-            using UnionEnum = typename IsUnion::type;
-            UnionEnum tag = UnionEnum(in._tag_);
-            int index = 0;
-            bool ok = false;
-            QVariantMap result;
-            describe::Get<T>::for_each([&](auto info){
-                if (UnionEnum(index++) == tag)
-                {
-                    ok = true;
-                    std::string_view tag_name;
-                    (void)describe::enum_to_name(tag, tag_name);
-                    result["tag"] = QString::fromLatin1(tag_name.data(), int(tag_name.size()));
-                    field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))]);
-                }
-            });
-            if (!ok) {
-                radapter::Raise("Invalid (or incorrectly described) _tag_ field in {} -> {}", describe::Get<T>::name, fmt::underlying(tag));
-            }
-            out = std::move(result);
-        }
-        else
-        {
-            QVariantMap result;
-            describe::Get<T>::for_each([&](auto info){
-                field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))]);
-            });
-            out = result;
-        }
+        QVariantMap result;
+        describe::Get<T>::for_each([&](auto info){
+            field_to_variant(in, info, result[QString::fromLatin1(info.name.data(), int(info.name.size()))], TraceFrame(info.name, frame));
+        });
+        out = result;
+    }
+}
+
+
+template<typename T, typename Member>
+void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unused]] TraceFrame const& frame)
+{
+    auto& field = info.get(out);
+    auto it = in.find(QString::fromLatin1(info.name.data(), int(info.name.size())));
+    if (it == in.end())
+        Raise("{}: type: {}: not found", frame, describe::Get<T>::name);
+    const QVariant& val = it.value();
+    if constexpr (describe::has_v<FieldIsBitArray, Member>) {
+    } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
+    } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
+    } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
+    } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
+    } else if constexpr (describe::has_v<FieldIsEnumBase, Member>) {
+        using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
+    } else if constexpr (std::rank_v<typename Member::type>) {
+    } else {
+        from_variant(val, field, frame);
     }
 }
 
 template<typename T>
-void from_variant(QVariant const&, T&)
+void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame& frame)
 {
+    if constexpr (!describe::is_described_v<T>)
+    {
+        out = in.value<T>();
+    }
+    else if constexpr (describe::has_v<TypeIsUnionBase, T>)
+    {
+        using UnionEnum = typename describe::extract_t<TypeIsUnionBase, T>::type;
+        if (in.type() != QVariant::Map) {
+            Raise("{}: type {}: map expected", frame, describe::Get<T>::name);
+        }
+        auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
+        auto tag = map->value(QStringLiteral("tag"));
+        if (!tag.isValid())
+            Raise("{}: type {}: 'tag' field not found for union", frame, describe::Get<T>::name);
+        auto tag_str = tag.toString().toLatin1();
+        UnionEnum etag;
+        if (!describe::name_to_enum({tag_str.data(), size_t(tag_str.size())}, etag))
+            Raise("{}: type {}: tag is invalid value: {}. Valid: [{}]", frame, describe::Get<T>::name, tag, fmt::join(describe::enum_names<T>(), ", "));
+        int idx = 0;
+        bool ok = false;
+        out._tag_ = etag;
+        describe::Get<T>::for_each([&](auto info){
+            if (idx++ == etag)
+            {
+                ok = true;
+                field_from_variant(*map, info, out, TraceFrame(info.name, frame));
+            }
+        });
+        if (!ok)
+            Raise("{}: Error in description of type: {}", frame, describe::Get<T>::name);
+    }
+    else
+    {
+        if (in.type() != QVariant::Map) {
+            Raise("{}: type {}: map expected", frame, describe::Get<T>::name);
+        }
+        auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
+        describe::Get<T>::for_each([&](auto info){
+            field_from_variant(*map, info, out, TraceFrame(info.name, frame));
+        });
+    }
+}
 
+enum NunavutStatus
+{
+    SUCCESS = NUNAVUT_SUCCESS,
+    ERROR_INVALID_ARGUMENT = NUNAVUT_ERROR_INVALID_ARGUMENT,
+    ERROR_SERIALIZATION_BUFFER_TOO_SMALL = NUNAVUT_ERROR_SERIALIZATION_BUFFER_TOO_SMALL,
+    ERROR_REPRESENTATION_BAD_ARRAY_LENGTH = NUNAVUT_ERROR_REPRESENTATION_BAD_ARRAY_LENGTH,
+    ERROR_REPRESENTATION_BAD_UNION_TAG = NUNAVUT_ERROR_REPRESENTATION_BAD_UNION_TAG,
+    ERROR_REPRESENTATION_BAD_DELIMITER_HEADER = NUNAVUT_ERROR_REPRESENTATION_BAD_DELIMITER_HEADER,
+};
+
+RAD_DESCRIBE(NunavutStatus)
+{
+    RAD_ENUM(SUCCESS);
+    RAD_ENUM(ERROR_INVALID_ARGUMENT);
+    RAD_ENUM(ERROR_SERIALIZATION_BUFFER_TOO_SMALL);
+    RAD_ENUM(ERROR_REPRESENTATION_BAD_ARRAY_LENGTH);
+    RAD_ENUM(ERROR_REPRESENTATION_BAD_UNION_TAG);
+    RAD_ENUM(ERROR_REPRESENTATION_BAD_DELIMITER_HEADER);
+}
+
+static std::string_view translate(NunavutStatus status)
+{
+    std::string_view res = "UNKNOWN_ERROR";
+    (void)describe::enum_to_name(status, res);
+    return res;
 }
 
 template<typename Dummy, typename T, SerializeImpl<T> impl>
 static void do_serialize(QVariant const& data, uint8_t* buffer, size_t& size)
 {
     T value;
-    from_variant(data, value);
-    if (impl(&value, buffer, &size))
-        radapter::Raise("Cyphal: error serializing type: {}", describe::Get<T>::name);
+    from_variant(data, value, {});
+    int8_t err;
+    if ((err = impl(&value, buffer, &size)))
+        radapter::Raise("Cyphal: error serializing type: {} -> {}", describe::Get<T>::name, translate(NunavutStatus(err)));
 }
 
 template<typename Dummy, typename T, DeserializeImpl<T> impl>
@@ -381,9 +467,10 @@ static QVariant do_deserialize(const uint8_t* buffer, size_t size)
 {
     T value;
     QVariant res;
-    if (impl(&value, buffer, &size))
-        radapter::Raise("Cyphal: error deserializing type: {}", describe::Get<T>::name);
-    to_variant(value, res);
+    int8_t err;
+    if ((err = impl(&value, buffer, &size)))
+        radapter::Raise("Cyphal: error deserializing type: {} -> {}", describe::Get<T>::name, translate(NunavutStatus(err)));
+    to_variant(value, res, {});
     return res;
 }
 
