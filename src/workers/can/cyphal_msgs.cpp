@@ -237,14 +237,15 @@ struct TypeIsUnion
     using type = Enum;
 };
 
+struct FieldIsBitArray {}; // Access via @ref nunavutSetBit(), @ref nunavutGetBit().
 struct FieldIsBitmask {}; // Access via @ref nunavutSetBit(), @ref nunavutGetBit().
-struct FieldIsFixedString {};
+struct FieldIsUniqueID {};
 struct FieldIsDynString {};
 struct FieldIsDynArray {}; // elements + count
 struct FieldIsEnumBase {};
 
 template <typename E>
-struct FieldIsEnum {
+struct FieldIsEnum : FieldIsEnumBase {
     using type = E;
 };
 
@@ -254,22 +255,36 @@ template<typename T, typename Member>
 void field_to_variant(T const& in, Member info, QVariant& out)
 {
     auto& field = info.get(in);
-    if constexpr (describe::has_v<FieldIsBitmask, Member>) {
-        
-    } else if constexpr (std::rank_v<typename Member::type>) {
-        size_t count = std::size(field);
+    if constexpr (describe::has_v<FieldIsBitArray, Member>) {
+        size_t count = field.count;
+        auto packed = field.bitpacked;
         QVariantList res;
         res.reserve(int(count));
-        for (size_t i = 0; i < count; ++i) {
-            QVariant item;
-            to_variant(field[i], item);
-            res.push_back(item);
+        for(size_t i = 0; i < count; ++i) {
+            bool bit = nunavutGetBit(packed, sizeof(packed), i);
+            res.push_back(bool(bit));
         }
         out = std::move(res);
-    } else if constexpr (describe::has_v<FieldIsFixedString, Member>) {
-    
-    }  else if constexpr (describe::has_v<FieldIsDynString, Member>) {
-
+        //uavcan_register_List_1_0_FIXED_PORT_ID_;
+        //uavcan_register_Access_1_0_FIXED_PORT_ID_;
+    } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
+        std::string res;
+        for (auto byte: field) {
+            res += fmt::format("{:x}", byte);
+        }
+        out = QString::fromLatin1(res.c_str(), int(res.size()));
+    }  else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
+        QVariantList res;
+        for (size_t i = 0; i < sizeof(field) * 8; ++i) {
+            if (nunavutGetBit(field, sizeof(field), i)) {
+                res.append(unsigned(i));
+            }
+        }
+        out = std::move(res);
+    } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
+        size_t count = field.count;
+        auto* chars = reinterpret_cast<const char*>(field.elements);
+        out = QString::fromUtf8(chars, int(count));
     } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
         size_t count = field.count;
         auto& elems = field.elements;
@@ -282,7 +297,22 @@ void field_to_variant(T const& in, Member info, QVariant& out)
         }
         out = std::move(res);
     } else if constexpr (describe::has_v<FieldIsEnumBase, Member>) {
-
+        using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
+        std::string_view name;
+        if (!describe::enum_to_name(E(field), name)) {
+            radapter::Raise("Invalid value for enum({}) -> 0x{:x}", describe::Get<E>::name, field);
+        }
+        out = QString::fromLatin1(name.data(), int(name.size()));
+    } else if constexpr (std::rank_v<typename Member::type>) {
+        size_t count = std::size(field);
+        QVariantList res;
+        res.reserve(int(count));
+        for (size_t i = 0; i < count; ++i) {
+            QVariant item;
+            to_variant(field[i], item);
+            res.push_back(item);
+        }
+        out = std::move(res);
     } else {
         to_variant(field, out);
     }
@@ -338,7 +368,7 @@ void from_variant(QVariant const&, T&)
 }
 
 template<typename Dummy, typename T, SerializeImpl<T> impl>
-static void serialize(QVariant const& data, uint8_t* buffer, size_t size)
+static void do_serialize(QVariant const& data, uint8_t* buffer, size_t& size)
 {
     T value;
     from_variant(data, value);
@@ -347,7 +377,7 @@ static void serialize(QVariant const& data, uint8_t* buffer, size_t size)
 }
 
 template<typename Dummy, typename T, DeserializeImpl<T> impl>
-static QVariant deserialize(const uint8_t* buffer, size_t size)
+static QVariant do_deserialize(const uint8_t* buffer, size_t size)
 {
     T value;
     QVariant res;
@@ -371,15 +401,16 @@ constexpr int types_begin = __COUNTER__;
     } \
     template<typename Dummy> \
     constexpr radapter::can::CanardMessageDynamic Dyn_##name##_##ver = { \
-        u"" #name, \
         u"" name##_##ver##_FULL_NAME_, \
         u"" name##_##ver##_FULL_NAME_AND_VERSION_, \
         name##_##ver##_EXTENT_BYTES_, \
-        deserialize<Dummy, name##_##ver, name##_##ver##_deserialize_>, \
-        serialize<Dummy, name##_##ver, name##_##ver##_serialize_>, \
+        name##_##ver##_SERIALIZATION_BUFFER_SIZE_BYTES_, \
+        static_cast<CanardMessageDynamic::Deserialize>(do_deserialize<Dummy, name##_##ver, name##_##ver##_deserialize_>), \
+        static_cast<CanardMessageDynamic::Serialize>(do_serialize<Dummy, name##_##ver, name##_##ver##_serialize_>), \
     }; \
     template<typename Dummy> \
-    constexpr const CanardMessageDynamic* get_type(std::integral_constant<size_t, __COUNTER__ - types_begin>) { return &Dyn_##name##_##ver<Dummy>; }
+    constexpr const CanardMessageDynamic* get_type(std::integral_constant<size_t, __COUNTER__ - types_begin - 1>) { return &Dyn_##name##_##ver<Dummy>; }
+
 
 //CYPHAL_TYPES_BEGIN
 CYPHAL_TYPE(uavcan_si_unit_angle_Quaternion, 1_0, (void),
@@ -462,8 +493,24 @@ CYPHAL_TYPE(uavcan_node_IOStatistics, 0_1, (void),
     RAD_MEMBER(num_emitted);
     RAD_MEMBER(num_errored);
     RAD_MEMBER(num_received);)
+
+enum NodeMode
+{
+    OPERATIONAL = uavcan_node_Mode_1_0_OPERATIONAL,
+    INITIALIZATION = uavcan_node_Mode_1_0_INITIALIZATION,
+    MAINTENANCE = uavcan_node_Mode_1_0_MAINTENANCE,
+    SOFTWARE_UPDATE = uavcan_node_Mode_1_0_SOFTWARE_UPDATE,
+};
+
+RAD_DESCRIBE(NodeMode) {
+    RAD_ENUM(OPERATIONAL);
+    RAD_ENUM(INITIALIZATION);
+    RAD_ENUM(MAINTENANCE);
+    RAD_ENUM(SOFTWARE_UPDATE);
+}
+
 CYPHAL_TYPE(uavcan_node_Mode, 1_0, (void),
-    RAD_MEMBER(value);)
+    MEMBER("value", &_::value, FieldIsEnum<NodeMode>);)
 
 CYPHAL_TYPE(uavcan_node_Heartbeat, 1_0, (void),
     RAD_MEMBER(health);
@@ -477,15 +524,17 @@ CYPHAL_TYPE(uavcan_node_ExecuteCommand_Request, 1_0, (void),
 CYPHAL_TYPE(uavcan_node_ExecuteCommand_Response, 1_0, (void),
     RAD_MEMBER(status);)
 CYPHAL_TYPE(uavcan_node_GetInfo_Request, 1_0, (void),)
+
 CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0, (void),
     RAD_MEMBER(protocol_version);
     RAD_MEMBER(hardware_version);
     RAD_MEMBER(software_version);
     RAD_MEMBER(software_vcs_revision_id);
-    MEMBER("unique_id", &_::unique_id, FieldIsFixedString);
+    MEMBER("unique_id", &_::unique_id, FieldIsUniqueID);
     MEMBER("name", &_::name, FieldIsDynString);
     MEMBER("software_image_crc", &_::software_image_crc, FieldIsDynString);
     MEMBER("certificate_of_authenticity", &_::certificate_of_authenticity, FieldIsDynString);)
+
 CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Request, 0_1, (void),)
 CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Response, 0_1, (void),
     RAD_MEMBER(transfer_statistics);
@@ -637,7 +686,7 @@ CYPHAL_TYPE(uavcan_primitive_array_Integer8, 1_0, (void),
 CYPHAL_TYPE(uavcan_primitive_array_Integer32, 1_0, (void),
     MEMBER("value", &_::value, FieldIsDynArray);)
 CYPHAL_TYPE(uavcan_primitive_array_Bit, 1_0, (void),
-    MEMBER("value", &_::value, FieldIsBitmask);)
+    MEMBER("value", &_::value, FieldIsBitArray);)
 CYPHAL_TYPE(uavcan_primitive_array_Integer16, 1_0, (void),
     MEMBER("value", &_::value, FieldIsDynArray);)
 CYPHAL_TYPE(uavcan_primitive_array_Integer64, 1_0, (void),
@@ -723,13 +772,13 @@ CYPHAL_TYPE(uavcan_register_List_Response, 1_0, (void),
     RAD_MEMBER(name);)
 //CYPHAL_TYPES_END
 
-constexpr int types_end = __COUNTER__ - types_begin;
+constexpr int types_end = __COUNTER__ - types_begin - 1;
 
 template<size_t I>
 constexpr void add_types(const CanardMessageDynamic** dyns, std::integral_constant<size_t, I>) {
-    if constexpr(I > types_begin + 1) {
-        dyns[I-1] = get_type<void>(std::integral_constant<size_t, I-1>{});
-        add_types(dyns, std::integral_constant<size_t, I-1>{});
+    if constexpr(I < types_end) {
+        dyns[I] = get_type<void>(std::integral_constant<size_t, I>{});
+        add_types(dyns, std::integral_constant<size_t, I + 1>{});
     }
 }
 
@@ -739,8 +788,7 @@ namespace radapter::can
 struct CyphalGlobal
 {
     QMap<QStringView, const CanardMessageDynamic*> by_name;
-    QMap<QStringView, const CanardMessageDynamic*> by_full_name;
-    QMap<QStringView, const CanardMessageDynamic*> by_full_name_and_ver;
+    QMap<QStringView, const CanardMessageDynamic*> by_name_and_ver;
 
     static CyphalGlobal& get() {
         static CyphalGlobal state;
@@ -750,7 +798,7 @@ struct CyphalGlobal
 
 constexpr std::array<const CanardMessageDynamic*, types_end> get_all_types() {
     std::array<const CanardMessageDynamic*, types_end> res{};
-    add_types(res.data(), std::integral_constant<size_t, types_end>{});
+    add_types(res.data(), std::integral_constant<size_t, 0>{});
     return res;
 }
 
@@ -760,20 +808,19 @@ static bool do_init_msgs(const CanardMessageDynamic* const* dyns, size_t count)
 {
     auto& state = CyphalGlobal::get();
     for (size_t i = 0; i < count; ++i) {
-        state.by_name[dyns[i]->name] = dyns[i];
-        state.by_full_name[dyns[i]->full_name] = dyns[i];
-        state.by_full_name_and_ver[dyns[i]->full_name_and_ver] = dyns[i];
+        auto* dyn = dyns[i];
+        state.by_name[dyn->name] = dyn;
+        state.by_name_and_ver[dyn->name_and_ver] = dyn;
     }
     return true;
 }
 
 const CanardMessageDynamic* lookup_canard_type(QStringView name)
 {
-    constexpr auto kek =  get_type<void>(std::integral_constant<size_t, 45>{});
     auto& state = CyphalGlobal::get();
     [[maybe_unused]] static bool _ = do_init_msgs(all_types.data(), all_types.size());
     const CanardMessageDynamic* res = nullptr;
-    (void)((res = state.by_name.value(name)) || (res = state.by_full_name.value(name)) || (res = state.by_full_name_and_ver.value(name)));
+    (void)((res = state.by_name.value(name)) || (res = state.by_name_and_ver.value(name)));
     return res;
 }
 

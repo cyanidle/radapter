@@ -116,6 +116,10 @@ target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info
 target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 
+if (NOT MSVC)
+    target_compile_options(radapter-sdk PRIVATE -Wno-old-style-cast -Wno-nested-anon-types)
+endif()
+
 target_link_libraries(radapter-sdk PRIVATE
     rpcxx-future
     rpcxx-json

@@ -1,5 +1,4 @@
 ﻿#include "canframe.hpp"
-#include "cyphal_includes.h"
 #include "cyphal_helpers.h"
 #include <QTimer>
 
@@ -12,14 +11,12 @@ struct CyphalTopic
 {
     QString type;
     CanardPortID port;
-    QString name;
 };
 
 RAD_DESCRIBE(CyphalTopic)
 {
     RAD_MEMBER(type);
     RAD_MEMBER(port);
-    RAD_MEMBER(name);
 }
 
 struct CyphalConfig
@@ -28,8 +25,8 @@ struct CyphalConfig
     CanardNodeID node_id;
     WithDefault<int> heartbeat_period = 1000;
     WithDefault<size_t> tx_cap = 100ull;
-    QHash<QString, CyphalTopic> subscribe;
-    QHash<QString, CyphalTopic> publish;
+    WithDefault<std::map<QString, CyphalTopic>> subscribe;
+    WithDefault<std::map<QString, CyphalTopic>> publish;
 };
 
 RAD_DESCRIBE(CyphalConfig)
@@ -38,6 +35,8 @@ RAD_DESCRIBE(CyphalConfig)
     RAD_MEMBER(node_id);
     RAD_MEMBER(tx_cap);
     RAD_MEMBER(heartbeat_period);
+    RAD_MEMBER(subscribe);
+    RAD_MEMBER(publish);
 }
 
 class CyphalWorker final: public Worker
@@ -59,6 +58,13 @@ private:
         QString name;
     };
     std::vector<SubMeta> sub_metas;
+
+    struct PubMeta {
+        const CanardMessageDynamic* dyn;
+        CanardPortID port;
+    };
+    std::unordered_map<QString, PubMeta> pubs;
+    std::vector<uint8_t> send_buffer;
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
@@ -75,19 +81,26 @@ public:
         start = QTime::currentTime();
         connect(ican, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
         auto filterList = ican->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
-        for (auto& topic: config.subscribe) {
+        for (auto& [name, topic]: config.publish.value) {
             const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
             if (!dyn) {
-                Raise("Canard type {} not recognized", topic.type);
+                Raise("Pub {}: Canard type '{}' not recognized", name, topic.type);
+            }
+            pubs[name] = PubMeta{dyn, topic.port};
+        }
+        for (auto& [name, topic]: config.subscribe.value) {
+            const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
+            if (!dyn) {
+                Raise("Sub {}: Canard type '{}' not recognized", name, topic.type);
             }
             CanardRxSubscription* sub = &subs_storage.emplace_back();
             SubMeta& meta = sub_metas.emplace_back();
             meta.dyn = dyn;
-            meta.name = topic.name;
+            meta.name = name;
             sub->user_reference = reinterpret_cast<void*>(sub_metas.size() - 1);
             CanardPortID port_id = topic.port;
             if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, dyn->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
-                Raise("Could not subscribe to msgs of type() on port:{}", topic.type, port_id);
+                Raise("Could not subscribe to msgs of type({}) on port:{}", topic.type, port_id);
             }
             CanardFilter current = canardMakeFilterForSubject(port_id);
             QCanBusDevice::Filter filter;
@@ -100,7 +113,28 @@ public:
         ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
     }
     void OnMsg(QVariant const& msg) override {
-        // TODO
+        auto map = msg.toMap();
+        for (auto it = map.constKeyValueBegin(); it != map.constKeyValueEnd(); ++it) {
+            const auto& [k, v] = *it;
+            auto pit = pubs.find(k);
+            if (pit == pubs.end()) {
+                Warn("Publisher topic with name {} not registered", k);
+                continue;
+            }
+            auto [dyn, port] = pit->second;
+            const CanardTransferMetadata transfer_metadata  = {
+                CanardPriorityNominal,
+                CanardTransferKindMessage,
+                port,
+                CANARD_NODE_ID_UNSET,
+                tid++,
+            };
+            size_t ser_buf_size = dyn->extent;
+            send_buffer.resize(dyn->send_buffer_size);
+            dyn->serialize(v, send_buffer.data(), ser_buf_size);
+            canardTxPush(&tx, &canard, 0, &transfer_metadata, ser_buf_size, send_buffer.data());
+            processTx();
+        }
     }
 private:
     void heartbeat() {

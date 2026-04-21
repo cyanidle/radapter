@@ -12,11 +12,15 @@ namespace radapter::can {
     struct CanardMessageDynamic
     {
         QStringView name;
-        QStringView full_name;
-        QStringView full_name_and_ver;
+        QStringView name_and_ver;
         size_t extent;
-        QVariant (*deserialize)(const uint8_t* buffer, size_t size);
-        void (*serialize)(QVariant const& data, uint8_t* buffer, size_t size);
+        size_t send_buffer_size;
+
+        using Deserialize = QVariant (*)(const uint8_t* buffer, size_t size);
+        using Serialize = void (*)(QVariant const& data, uint8_t* buffer, size_t& size);
+
+        Deserialize deserialize;
+        Serialize serialize;
     };
     const CanardMessageDynamic* lookup_canard_type(QStringView name);
 }
