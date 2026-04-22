@@ -1,7 +1,6 @@
 local can = CAN {
     plugin = "socketcan",
-    device = "vcan0",
-    can_fd = false
+    device = "vcan0"
 }
 
 

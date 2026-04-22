@@ -2,6 +2,9 @@
 #include "cyphal_helpers.h"
 #include <QTimer>
 #include "json_view/alloc.hpp"
+
+#include "radapter_info.hpp"
+#include "uavcan/node/GetInfo_1_0.h"
 #include "uavcan/node/Heartbeat_1_0.h"
 
 namespace radapter::can
@@ -19,6 +22,54 @@ RAD_DESCRIBE(CyphalTopic)
     RAD_MEMBER(port);
 }
 
+struct CyphalService : CyphalTopic
+{
+    LuaFunction handler;
+};
+
+RAD_DESCRIBE(CyphalService)
+{
+    PARENT(CyphalTopic);
+    RAD_MEMBER(type);
+    RAD_MEMBER(port);
+}
+
+struct CyphalNodeInfoVersion
+{
+    uint8_t major;
+    uint8_t minor;
+};
+
+RAD_DESCRIBE(CyphalNodeInfoVersion)
+{
+    RAD_MEMBER(major);
+    RAD_MEMBER(minor);
+}
+
+struct CyphalNodeInfo
+{
+    WithDefault<CyphalNodeInfoVersion> protocol_version = CyphalNodeInfoVersion{1, 0};
+    WithDefault<CyphalNodeInfoVersion> hardware_version = CyphalNodeInfoVersion{VerMajor, VerMinor};
+    WithDefault<CyphalNodeInfoVersion> software_version = CyphalNodeInfoVersion{1, 0};
+    WithDefault<uint64_t> software_vcs_revision_id = QString(BuildId).toULongLong(nullptr, 16);
+    WithDefault<QString> unique_id;
+    WithDefault<QString> name = QString("org.radapter");
+    WithDefault<std::vector<uint64_t>> software_image_crc;
+    WithDefault<QString> certificate_of_authenticity;
+};
+
+RAD_DESCRIBE(CyphalNodeInfo)
+{
+    RAD_MEMBER(protocol_version);
+    RAD_MEMBER(hardware_version);
+    RAD_MEMBER(software_version);
+    RAD_MEMBER(software_vcs_revision_id);
+    RAD_MEMBER(unique_id);
+    RAD_MEMBER(name);
+    RAD_MEMBER(software_image_crc);
+    RAD_MEMBER(certificate_of_authenticity);
+}
+
 struct CyphalConfig
 {
     QObject* can;
@@ -27,6 +78,9 @@ struct CyphalConfig
     WithDefault<size_t> tx_cap = 100ull;
     WithDefault<std::map<QString, CyphalTopic>> subscribe;
     WithDefault<std::map<QString, CyphalTopic>> publish;
+    WithDefault<CyphalNodeInfo> node_info;
+    // TODO
+    WithDefault<std::vector<CyphalService>> services;
 };
 
 RAD_DESCRIBE(CyphalConfig)
@@ -37,6 +91,7 @@ RAD_DESCRIBE(CyphalConfig)
     RAD_MEMBER(heartbeat_period);
     RAD_MEMBER(subscribe);
     RAD_MEMBER(publish);
+    RAD_MEMBER(node_info);
 }
 
 class CyphalWorker final: public Worker
@@ -65,6 +120,7 @@ private:
     };
     std::unordered_map<QString, PubMeta> pubs;
     jv::DefaultArena<> send_arena;
+    QVariant node_info_resp;
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
@@ -88,6 +144,15 @@ public:
             }
             pubs[name] = PubMeta{dyn, topic.port};
         }
+        auto add_port = [&](CanardPortID port) {
+            CanardFilter current = canardMakeFilterForSubject(port);
+            QCanBusDevice::Filter filter;
+            filter.frameId = current.extended_can_id;
+            filter.frameIdMask = current.extended_mask;
+            filter.format = QCanBusDevice::Filter::MatchExtendedFormat;
+            filter.type = QCanBusFrame::DataFrame;
+            filterList.append(filter);
+        };
         for (auto& [name, topic]: config.subscribe.value) {
             const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
             if (!dyn) {
@@ -102,15 +167,17 @@ public:
             if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, dyn->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
                 Raise("Could not subscribe to msgs of type({}) on port:{}", topic.type, port_id);
             }
-            CanardFilter current = canardMakeFilterForSubject(port_id);
-            QCanBusDevice::Filter filter;
-            filter.frameId = current.extended_can_id;
-            filter.frameIdMask = current.extended_mask;
-            filter.format = QCanBusDevice::Filter::MatchExtendedFormat;
-            filter.type = QCanBusFrame::DataFrame;
-            filterList.append(filter);
+            add_port(port_id);
         }
-        ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
+        { // NodeInfo handler
+            Dump(config.node_info, node_info_resp);
+            auto* info_sub = &subs_storage.emplace_back();
+            info_sub->user_reference = (void*)lookup_canard_type(u"uavcan.node.GetInfo.Response.1.0");
+            assert(info_sub->user_reference);
+            canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub);
+            add_port(uavcan_node_GetInfo_1_0_FIXED_PORT_ID_);
+        }
+        //ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
     }
     void pushMsg(const CanardTransferMetadata* meta, const CanardMessageDynamic* dyn, QVariant const& msg) {
         size_t buf_size = dyn->extent;
@@ -118,10 +185,10 @@ public:
         dyn->serialize(msg, buf, buf_size);
         auto err = canardTxPush(&tx, &canard, 0, meta, buf_size, buf);
         if (err == CANARD_ERROR_INVALID_ARGUMENT) {
-            Raise("Could not push msg of type: {}: Invalid Argument", dyn->name_and_ver);
+            Raise("Could not push msg of type: {}: Invalid Argument", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
         if (err == CANARD_ERROR_OUT_OF_MEMORY) {
-            Raise("Could not push msg of type: {}: Out of memory", dyn->name_and_ver);
+            Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
     }
     void OnMsg(QVariant const& msg) override {
@@ -195,10 +262,18 @@ private:
         if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, &sub)) {
             return;
         }
-        SubMeta& meta = sub_metas[reinterpret_cast<size_t>(sub->user_reference)];
-        QVariant msg = meta.dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
-        canard.memory_free(&canard, transfer.payload);
-        emit SendMsgField(meta.name, msg);
+        if (transfer.metadata.port_id == uavcan_node_GetInfo_1_0_FIXED_PORT_ID_) {
+            auto* resp_dyn = static_cast<const CanardMessageDynamic*>(sub->user_reference);
+            auto meta = transfer.metadata;
+            meta.transfer_kind = CanardTransferKindResponse;
+            pushMsg(&meta, resp_dyn, node_info_resp);
+            processTx();
+        } else {
+            SubMeta& meta = sub_metas[reinterpret_cast<size_t>(sub->user_reference)];
+            QVariant msg = meta.dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+            canard.memory_free(&canard, transfer.payload);
+            emit SendMsgField(meta.name, msg);
+        }
     }
     void *memAllocate(const size_t amount) {
         return malloc(amount);

@@ -369,7 +369,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
     if constexpr (describe::has_v<FieldIsBitArray, Member>) {
         size_t max_sz = std::size(field.bitpacked);
         if (val.type() != QVariant::List) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) > max_sz)
@@ -386,7 +386,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         field.count = size_t(list.size());
     } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
         if (val.type() != QVariant::String) {
-            Raise("{}: {}: Expected a unique_id (string), got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a unique_id (string), got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         ::memset(field, 0, sizeof(field));
         const auto str = val.toString();
@@ -397,7 +397,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         }
     } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
         if (val.type() != QVariant::List) {
-            Raise("{}: {}: Expected a list of bits, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a list of bits, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         const auto list = val.toList();
         size_t max_bit = sizeof(field) * 8;
@@ -408,13 +408,13 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
             bool ok;
             auto u = v.toUInt(&ok);
             if (!ok || u > max_bit)
-                Raise("{}: {}: could not cast item#{} (type: {}) to bit index (max index: {})", frame, describe::Get<T>::name, i, v.typeName(), max_bit);
+                Raise("{}: {}: could not cast item#{} (type: {}) to bit index (max index: {})", frame, describe::Get<T>::name, i, TypeNameOf(v), max_bit);
             nunavutSetBit(field, sizeof(field), u, true);
         }
     } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
         auto max_sz = std::size(field.elements) - 1;
         if (val.type() != QVariant::String) {
-            Raise("{}: {}: Expected a string, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a string, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         const auto str = val.toString().toStdString();
         if (size_t(str.size()) > max_sz)
@@ -425,7 +425,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
     } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
         auto max_sz = std::size(field.elements);
         if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) > max_sz)
@@ -440,7 +440,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
         const auto str = val.toString();
         if (str.isEmpty())
-            Raise("{}: {}: expected string, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: expected string, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         const auto l1 = str.toLatin1();
         E res;
         if (!describe::name_to_enum({l1.constData(), size_t(l1.size())}, res))
@@ -448,7 +448,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         field = res;
     } else if constexpr (std::rank_v<typename Member::type>) {
         if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) != std::size(field))
@@ -702,7 +702,7 @@ CYPHAL_TYPE(uavcan_node_GetInfo_Response, 1_0, (void),
     RAD_MEMBER(software_vcs_revision_id);
     MEMBER("unique_id", &_::unique_id, FieldIsUniqueID);
     MEMBER("name", &_::name, FieldIsDynString);
-    MEMBER("software_image_crc", &_::software_image_crc, FieldIsDynString);
+    MEMBER("software_image_crc", &_::software_image_crc, FieldIsDynArray);
     MEMBER("certificate_of_authenticity", &_::certificate_of_authenticity, FieldIsDynString);)
 
 CYPHAL_TYPE(uavcan_node_GetTransportStatistics_Request, 0_1, (void),)

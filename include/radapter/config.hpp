@@ -19,7 +19,7 @@ namespace radapter {
 template<typename T>
 struct WithDefault {
     template<typename...Args>
-    WithDefault(Args&&...a) : value{std::forward<Args>(a)...} {}
+    WithDefault(Args&&...a) : value(std::forward<Args>(a)...) {}
 
     operator T const&() const noexcept {
         return value;
@@ -57,6 +57,8 @@ template<typename T>
 using if_numeric = std::enable_if_t<std::is_arithmetic_v<T>, int>;
 template<typename T>
 using if_custom_object = std::enable_if_t<std::is_base_of_v<QObject, T>, int>;
+
+/// Parse
 
 void RADAPTER_API Parse(bool& out, QVariant const& conf, const TraceFrame &frame = {});
 void RADAPTER_API Parse(string& out, QVariant const& conf, const TraceFrame &frame = {});
@@ -222,6 +224,105 @@ T ParseAs(QVariant const& conf) {
     return res;
 }
 
+/// Dump
+
+void RADAPTER_API Dump(const bool&, QVariant& out);
+void RADAPTER_API Dump(const string&, QVariant& out);
+void RADAPTER_API Dump(const QString&, QVariant& out);
+void RADAPTER_API Dump(const QVariant&, QVariant& out);
+void RADAPTER_API Dump(const QVariantMap&, QVariant& out);
+void RADAPTER_API Dump(const QVariantList&, QVariant& out);
+void RADAPTER_API Dump(QObject *, QVariant& out);
+void RADAPTER_API Dump(const LuaFunction&, QVariant& out);
+
+template<typename T, if_custom_object<T> = 1>
+void Dump(const T*& in, QVariant& out) {
+    out = QVariant::fromValue(in);
+}
+
+template<typename T, if_enum<T> = 1>
+void Dump(T in, QVariant& out) {
+    std::string_view name;
+    if (!describe::enum_to_name(in, name)) {
+        Raise("Invalid enum value: {}", fmt::underlying(in));
+    }
+    out = QString::fromUtf8(name.data(), int(name.size()));
+}
+
+template<typename T, if_numeric<T> = 1>
+void Dump(const T& in, QVariant& out) {
+    out = QVariant::fromValue(in);
+}
+
+template<typename T> void Dump(const WithDefault<T>& in, QVariant& out);
+template<typename T> void Dump(const std::optional<T>& in, QVariant& out);
+template<typename T> void Dump(const std::optional<T>& in, QVariant& out);
+template<typename K, typename T> void Dump(const map<K, T>& in, QVariant& out);
+template<typename T> void Dump(const vector<T>& in, QVariant& out);
+
+template<typename T, if_struct<T> = 1>
+void Dump(const T& in, QVariant& out) {
+    constexpr auto desc = describe::Get<T>();
+    QVariantMap map;
+    desc.for_each([&](auto f){
+        if constexpr (f.is_field) {
+            QVariant nested;
+            Dump(f.get(in), nested);
+            map[QString::fromLatin1(f.name.data(), int(f.name.size()))] = nested;
+        }
+    });
+    out = map;
+}
+
+template<typename T>
+void Dump(const WithDefault<T>& in, QVariant& out) {
+    Dump(in.value, out);
+}
+
+template<typename T>
+void Dump(const std::optional<T>& in, QVariant& out) {
+    if (in) {
+        Dump(*in, out);
+    } else {
+        out = {};
+    }
+}
+
+template<typename T>
+void Dump(const OptionalPtr<T>& in, QVariant& out) {
+    if (in) {
+        Dump(*in.value, out);
+    }
+}
+
+template<typename T>
+void Dump(const vector<T>& in, QVariant& out) {
+    QVariantList res;
+    res.reserve(int(in.size()));
+    for (auto& v: in) {
+        QVariant item;
+        Dump(v, item);
+        res.append(std::move(item));
+    }
+    out = std::move(res);
+}
+
+template<typename K, typename T>
+void Dump(const map<K, T>& in, QVariant& out) {
+    QVariantMap res;
+    for (auto& [k, v]: in) {
+        if constexpr (std::is_constructible_v<QString, K>) {
+            Dump(v, res[QString(k)]);
+        } else {
+            auto view = std::string_view(k);
+            Dump(v, res[QString::fromUtf8(view.data(), int(view.size()))]);
+        }
+    }
+    out = std::move(res);
+}
+
+/// Populate Schema
+
 void RADAPTER_API PopulateSchema(bool&, QVariant& schema);
 void RADAPTER_API PopulateSchema(string&, QVariant& schema);
 void RADAPTER_API PopulateSchema(QString&, QVariant& schema);
@@ -250,20 +351,20 @@ void PopulateSchema(T&, QVariant& schema) {
     schema = QMetaType::fromType<T>().name();
 }
 
-template<typename T> void PopulateSchema(WithDefault<T>& out, QVariant& schema);
-template<typename T> void PopulateSchema(std::optional<T>& out, QVariant& schema);
-template<typename T> void PopulateSchema(std::optional<T>& out, QVariant& schema);
-template<typename K, typename T> void PopulateSchema(map<K, T>& out, QVariant& schema);
-template<typename T> void PopulateSchema(vector<T>& out, QVariant& schema);
+template<typename T> void PopulateSchema(WithDefault<T>&, QVariant& schema);
+template<typename T> void PopulateSchema(std::optional<T>& in, QVariant& schema);
+template<typename T> void PopulateSchema(std::optional<T>& in, QVariant& schema);
+template<typename K, typename T> void PopulateSchema(map<K, T>& in, QVariant& schema);
+template<typename T> void PopulateSchema(vector<T>& in, QVariant& schema);
 
 template<typename T, if_struct<T> = 1>
-void PopulateSchema(T& out, QVariant& schema) {
+void PopulateSchema(T& in, QVariant& schema) {
     constexpr auto desc = describe::Get<T>();
     QVariantMap map;
     desc.for_each([&](auto f){
         if constexpr (f.is_field) {
             QVariant nested;
-            PopulateSchema(f.get(out), nested);
+            PopulateSchema(f.get(in), nested);
             map[QString::fromLatin1(f.name.data(), int(f.name.size()))] = nested;
         }
     });
@@ -271,9 +372,9 @@ void PopulateSchema(T& out, QVariant& schema) {
 }
 
 template<typename T>
-void PopulateSchema(WithDefault<T>& out, QVariant& schema) {
+void PopulateSchema(WithDefault<T>& in, QVariant& schema) {
     QVariant nested;
-    PopulateSchema(out.value, nested);
+    PopulateSchema(in.value, nested);
     if (nested.canConvert<QString>()) {
         schema = nested.toString() + " [has_default]";
     } else {
@@ -282,9 +383,9 @@ void PopulateSchema(WithDefault<T>& out, QVariant& schema) {
 }
 
 template<typename T>
-void PopulateSchema(std::optional<T>& out, QVariant& schema) {
+void PopulateSchema(std::optional<T>& in, QVariant& schema) {
     QVariant nested;
-    PopulateSchema(out.emplace(), nested);
+    PopulateSchema(in.emplace(), nested);
     if (nested.canConvert<QString>()) {
         schema = nested.toString() + " [optional]";
     } else {
@@ -299,16 +400,16 @@ void PopulateSchema(OptionalPtr<T>&, QVariant& schema) {
 }
 
 template<typename T>
-void PopulateSchema(vector<T>& out, QVariant& schema) {
+void PopulateSchema(vector<T>& in, QVariant& schema) {
     QVariant nested;
-    PopulateSchema(out.emplace_back(), nested);
+    PopulateSchema(in.emplace_back(), nested);
     schema = QVariantList{nested};
 }
 
 template<typename K, typename T>
-void PopulateSchema(map<K, T>& out, QVariant& schema) {
+void PopulateSchema(map<K, T>& in, QVariant& schema) {
     QVariant nested;
-    PopulateSchema(out[K{}], nested);
+    PopulateSchema(in[K{}], nested);
     schema = QVariantMap{{"<key>", nested}};
 }
 

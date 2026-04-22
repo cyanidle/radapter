@@ -57,6 +57,47 @@ std::string radapter::TypeNameOf(const QVariant &conf)
     return p ? string{p} : "<nil>";
 }
 
+
+void radapter::Dump(const bool& in, QVariant& out)
+{
+    out = in;
+}
+
+void radapter::Dump(const string& in, QVariant& out)
+{
+    out = QString::fromStdString(in);
+}
+
+void radapter::Dump(const QString& in, QVariant& out)
+{
+    out = in;
+}
+
+void radapter::Dump(const QVariant& in, QVariant& out)
+{
+    out = in;
+}
+
+void radapter::Dump(const QVariantMap& in, QVariant& out)
+{
+    out = in;
+}
+
+void radapter::Dump(const QVariantList& in, QVariant& out)
+{
+    out = in;
+}
+
+void radapter::Dump(QObject* in, QVariant& out)
+{
+    out = QVariant::fromValue(in);
+}
+
+void radapter::Dump(const LuaFunction& in, QVariant& out)
+{
+    out = QVariant::fromValue(in);
+}
+
 void radapter::PopulateSchema(bool &, QVariant &schema) {
     schema = "bool";
 }
