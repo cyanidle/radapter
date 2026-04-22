@@ -37,7 +37,7 @@ class Radapter(ConanFile):
             "shared": bool(self.options.shared)
         })
         if self.options.jit != "off":
-            self.requires("luajit/2.1.0-beta3", options={"shared": self.options == "shared"})
+            self.requires("luajit/2.1.0-beta3", options={"shared": self.options.jit == "shared"})
 
     def generate(self):
         deps = CMakeDeps(self)
