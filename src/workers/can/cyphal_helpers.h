@@ -14,7 +14,6 @@ namespace radapter::can {
         QStringView name;
         QStringView name_and_ver;
         size_t extent;
-        size_t send_buffer_size;
 
         using Deserialize = QVariant (*)(const uint8_t* buffer, size_t size);
         using Serialize = void (*)(QVariant const& data, uint8_t* buffer, size_t& size);

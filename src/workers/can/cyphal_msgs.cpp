@@ -367,13 +367,97 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         Raise("{}: type: {}: not found", frame, describe::Get<T>::name);
     const QVariant& val = it.value();
     if constexpr (describe::has_v<FieldIsBitArray, Member>) {
+        size_t max_sz = std::size(field.bitpacked);
+        if (val.type() != QVariant::List) {
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        const auto list = val.toList();
+        if (size_t(list.size()) > max_sz)
+            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, list.size());
+        uint32_t idx = 0;
+        for(auto& v: list) {
+            auto i = idx++;
+            if (v.toBool()) {
+                nunavutSetBit(field.bitpacked, sizeof(field.bitpacked), i, true);
+            } else {
+                nunavutSetBit(field.bitpacked, sizeof(field.bitpacked), i, false);
+            }
+        }
+        field.count = size_t(list.size());
     } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
+        if (val.type() != QVariant::String) {
+            Raise("{}: {}: Expected a unique_id (string), got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        ::memset(field, 0, sizeof(field));
+        const auto str = val.toString();
+        if (size_t(str.size()) > sizeof(field))
+            Raise("{}: {}: Expected a unique_id (string), string too long: {}, max: {}", frame, describe::Get<T>::name, str.size(), sizeof(field));
+        for (int i = 0; i < str.size(); ++i) {
+            field[i] = static_cast<uint8_t>(str[i].digitValue());
+        }
     } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
+        if (val.type() != QVariant::List) {
+            Raise("{}: {}: Expected a list of bits, got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        const auto list = val.toList();
+        size_t max_bit = sizeof(field) * 8;
+        size_t idx = 0;
+        ::memset(field, 0, sizeof(field));
+        for (auto& v: list) {
+            auto i = idx++;
+            bool ok;
+            auto u = v.toUInt(&ok);
+            if (!ok || u > max_bit)
+                Raise("{}: {}: could not cast item#{} (type: {}) to bit index (max index: {})", frame, describe::Get<T>::name, i, v.typeName(), max_bit);
+            nunavutSetBit(field, sizeof(field), u, true);
+        }
     } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
+        auto max_sz = std::size(field.elements) - 1;
+        if (val.type() != QVariant::String) {
+            Raise("{}: {}: Expected a string, got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        const auto str = val.toString().toStdString();
+        if (size_t(str.size()) > max_sz)
+            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, str.size());
+
+        ::memcpy(field.elements, str.c_str(), str.size() + 1);
+        field.count = str.size();
     } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
+        auto max_sz = std::size(field.elements);
+        if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        const auto list = val.toList();
+        if (size_t(list.size()) > max_sz)
+            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, list.size());
+        uint32_t idx = 0;
+        for(auto& v: list) {
+            auto i = idx++;
+            from_variant(v, field.elements[i], TraceFrame(i, frame));
+        }
+        field.count = size_t(list.size());
     } else if constexpr (describe::has_v<FieldIsEnumBase, Member>) {
         using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
+        const auto str = val.toString();
+        if (str.isEmpty())
+            Raise("{}: {}: expected string, got: {}", frame, describe::Get<T>::name, val.typeName());
+        const auto l1 = str.toLatin1();
+        E res;
+        if (!describe::name_to_enum({l1.constData(), size_t(l1.size())}, res))
+            Raise("{}: {}: invalid enum value: {}. Valid: [{}]", frame, describe::Get<T>::name, str, fmt::join(describe::enum_names<E>(), ", "));
+        field = res;
     } else if constexpr (std::rank_v<typename Member::type>) {
+        if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
+            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, val.typeName());
+        }
+        const auto list = val.toList();
+        if (size_t(list.size()) != std::size(field))
+            Raise("{}: {}: Expected a list of size {}, got: {}", frame, describe::Get<T>::name, std::size(field), list.size());
+        uint32_t idx = 0;
+        for (auto& v: list) {
+            auto i = idx++;
+            from_variant(v, field[i], TraceFrame(i, frame));
+        }
     } else {
         from_variant(val, field, frame);
     }
@@ -393,10 +477,10 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
             Raise("{}: type {}: map expected", frame, describe::Get<T>::name);
         }
         auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
-        auto tag = map->value(QStringLiteral("tag"));
-        if (!tag.isValid())
-            Raise("{}: type {}: 'tag' field not found for union", frame, describe::Get<T>::name);
-        auto tag_str = tag.toString().toLatin1();
+        if (map->size() != 1)
+            Raise("{}: type {}: expected union (map with single item). Map has {} elems", frame, describe::Get<T>::name, map->size());
+        auto tag = map->constBegin().key();
+        auto tag_str = tag.toLatin1();
         UnionEnum etag;
         if (!describe::name_to_enum({tag_str.data(), size_t(tag_str.size())}, etag))
             Raise("{}: type {}: tag is invalid value: {}. Valid: [{}]", frame, describe::Get<T>::name, tag, fmt::join(describe::enum_names<T>(), ", "));
@@ -491,7 +575,6 @@ constexpr int types_begin = __COUNTER__;
         u"" name##_##ver##_FULL_NAME_, \
         u"" name##_##ver##_FULL_NAME_AND_VERSION_, \
         name##_##ver##_EXTENT_BYTES_, \
-        name##_##ver##_SERIALIZATION_BUFFER_SIZE_BYTES_, \
         static_cast<CanardMessageDynamic::Deserialize>(do_deserialize<Dummy, name##_##ver, name##_##ver##_deserialize_>), \
         static_cast<CanardMessageDynamic::Serialize>(do_serialize<Dummy, name##_##ver, name##_##ver##_serialize_>), \
     }; \

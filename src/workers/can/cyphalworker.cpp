@@ -1,7 +1,7 @@
 ﻿#include "canframe.hpp"
 #include "cyphal_helpers.h"
 #include <QTimer>
-
+#include "json_view/alloc.hpp"
 #include "uavcan/node/Heartbeat_1_0.h"
 
 namespace radapter::can
@@ -64,7 +64,7 @@ private:
         CanardPortID port;
     };
     std::unordered_map<QString, PubMeta> pubs;
-    std::vector<uint8_t> send_buffer;
+    jv::DefaultArena<> send_arena;
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
@@ -112,6 +112,18 @@ public:
         }
         ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
     }
+    void pushMsg(const CanardTransferMetadata* meta, const CanardMessageDynamic* dyn, QVariant const& msg) {
+        size_t buf_size = dyn->extent;
+        auto* buf = static_cast<uint8_t*>(send_arena.Allocate(buf_size, 1));
+        dyn->serialize(msg, buf, buf_size);
+        auto err = canardTxPush(&tx, &canard, 0, meta, buf_size, buf);
+        if (err == CANARD_ERROR_INVALID_ARGUMENT) {
+            Raise("Could not push msg of type: {}: Invalid Argument", dyn->name_and_ver);
+        }
+        if (err == CANARD_ERROR_OUT_OF_MEMORY) {
+            Raise("Could not push msg of type: {}: Out of memory", dyn->name_and_ver);
+        }
+    }
     void OnMsg(QVariant const& msg) override {
         auto map = msg.toMap();
         for (auto it = map.constKeyValueBegin(); it != map.constKeyValueEnd(); ++it) {
@@ -129,12 +141,9 @@ public:
                 CANARD_NODE_ID_UNSET,
                 tid++,
             };
-            size_t ser_buf_size = dyn->extent;
-            send_buffer.resize(dyn->send_buffer_size);
-            dyn->serialize(v, send_buffer.data(), ser_buf_size);
-            canardTxPush(&tx, &canard, 0, &transfer_metadata, ser_buf_size, send_buffer.data());
-            processTx();
+            pushMsg(&transfer_metadata, dyn, v);
         }
+        processTx();
     }
 private:
     void heartbeat() {
@@ -173,6 +182,7 @@ private:
             }
             canard.memory_free(&canard, canardTxPop(&tx, ti));
         }
+        send_arena.Clear();
     }
     void on_frame(QCanBusFrame const& frame) {
         CanardFrame rxf;
