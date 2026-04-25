@@ -126,7 +126,7 @@ public:
             auto& reg = it->second;
             if (reg.validator) {
                 try {
-                    auto res = (*reg.validator)({});
+                    auto res = reg.validator->Call({});
                     if (!res.value<bool>()) {
                         Debug("Writing {} with => {} failed validation", k, v.toString());
                         continue;

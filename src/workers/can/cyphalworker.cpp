@@ -17,6 +17,8 @@
 #pragma warning( pop )
 #endif
 
+#include "async_helpers.hpp"
+
 namespace radapter::can
 {
 
@@ -62,7 +64,7 @@ struct CyphalNodeInfo
     WithDefault<CyphalNodeInfoVersion> hardware_version = CyphalNodeInfoVersion{VerMajor, VerMinor};
     WithDefault<CyphalNodeInfoVersion> software_version = CyphalNodeInfoVersion{1, 0};
     WithDefault<uint64_t> software_vcs_revision_id = QString(BuildId).toULongLong(nullptr, 16);
-    WithDefault<QString> unique_id;
+    WithDefault<QUuid> unique_id = QUuid::createUuid();
     WithDefault<QString> name = QString("org.radapter");
     WithDefault<std::vector<uint64_t>> software_image_crc;
     WithDefault<QString> certificate_of_authenticity;
@@ -111,8 +113,7 @@ private:
     CyphalConfig config;
     CanardInstance canard;
     CanardTxQueue tx;
-    QSharedPointer<QObject> can;
-    ICanWorker* ican;
+    QPointer<ICanWorker> can;
     QTime start;
     CanardTransferID tid = {};
 
@@ -135,19 +136,18 @@ private:
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
-        can.reset(config.can);
+        can = qobject_cast<ICanWorker*>(config.can);
         canard = canardInit(CANARD_WRAP(memAllocate), CANARD_WRAP(memFree));
         canard.user_reference = this;
         canard.node_id = config.node_id;
-        ican = qobject_cast<ICanWorker*>(can.get());
-        bool is_fd = ican->get_device()->configurationParameter(QCanBusDevice::CanFdKey).toBool();
+        bool is_fd = can->get_device()->configurationParameter(QCanBusDevice::CanFdKey).toBool();
         tx = canardTxInit(config.tx_cap, is_fd ? CANARD_MTU_CAN_FD : CANARD_MTU_CAN_CLASSIC);
         QTimer* hb = new QTimer(this);
         hb->callOnTimeout(this, &CyphalWorker::heartbeat);
         hb->start(config.heartbeat_period);
         start = QTime::currentTime();
-        connect(ican, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
-        auto filterList = ican->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
+        connect(can, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
+        auto filterList = can->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
         for (auto& [name, topic]: config.publish.value) {
             const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
             if (!dyn) {
@@ -191,7 +191,7 @@ public:
             canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub);
             add_port(uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, FOR_REQUEST);
         }
-        ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
+        can->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
     }
     void pushMsg(const CanardTransferMetadata* meta, const CanardMessageDynamic* dyn, QVariant const& msg) {
         size_t buf_size = dyn->extent;
@@ -205,7 +205,19 @@ public:
             Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
     }
-    QVariant CallService(QVariantList const& args) {
+    QVariant Call(QVariantList const& args) {
+
+        auto func = args.at(0).value<LuaFunction>();
+
+        auto prom = fromLuaPromise(std::move(func), {});
+
+        prom
+            .ThenSync([this](QVariant ok){
+                Info("Result: {}", ok.toString());
+            }).CatchSync([this](std::exception& e){
+                Info("Error: {}", e.what());
+            });
+
         return 1;
     }
     void OnMsg(QVariant const& msg) override {
@@ -256,19 +268,24 @@ private:
     void processTx() {
         for (const CanardTxQueueItem* ti = NULL; (ti = canardTxPeek(&tx)) != NULL;)
         {
-            if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
-            {
-                QCanBusFrame frame;
-                frame.setExtendedFrameFormat(true);
-                frame.setFrameId(ti->frame.extended_can_id);
-                frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
-                ican->get_device()->writeFrame(frame);
+            auto* ican = can.data();
+            if (ican) {
+                if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
+                {
+                    QCanBusFrame frame;
+                    frame.setExtendedFrameFormat(true);
+                    frame.setFrameId(ti->frame.extended_can_id);
+                    frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
+                    can->get_device()->writeFrame(frame);
+                }
+            } else {
+                Error("Could not send frame: can is dead");
             }
             canard.memory_free(&canard, canardTxPop(&tx, ti));
         }
         send_arena.Clear();
     }
-    void on_frame(QCanBusFrame const& frame) {
+    void on_frame(QCanBusFrame const& frame) try {
         CanardFrame rxf;
         rxf.extended_can_id = frame.frameId();
         auto payload = frame.payload();
@@ -290,7 +307,10 @@ private:
             canard.memory_free(&canard, transfer.payload);
             emit SendMsgField(sub->name, msg);
         }
+    } catch (std::exception& e) {
+        Error("Could not receive frame: {}", e.what());
     }
+
     void *memAllocate(const size_t amount) {
         return malloc(amount);
     }
@@ -309,7 +329,7 @@ void cyphal(Instance* inst)
 {
     inst->RegisterSchema<can::CyphalConfig>("Cyphal");
     inst->RegisterWorker<can::CyphalWorker>("Cyphal", ExtraMethods{
-        {"CallService", AsExtraMethod<&can::CyphalWorker::CallService>}
+        {"Call", AsExtraMethod<&can::CyphalWorker::Call>}
     });
 }
 

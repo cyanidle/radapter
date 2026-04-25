@@ -10,10 +10,13 @@ namespace radapter
 
 struct RADAPTER_API LuaFunction : LuaValue {
     using LuaValue::LuaValue;
-    QVariant Call(const QVariantList &args) const;
-    QVariant operator()(QVariantList const& args) const {
-        return Call(args);
-    }
+
+    enum TracebackMode {
+        NoTraceback = 0,
+        Traceback = 1,
+    };
+
+    QVariant Call(const QVariantList &args, TracebackMode mode = Traceback) const;
 };
 
 using ExtraFunction = std::function<QVariant(Instance*, QVariantList const&)>;

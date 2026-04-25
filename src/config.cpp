@@ -1,4 +1,5 @@
 #include "radapter/config.hpp"
+#include <quuid.h>
 
 void radapter::Parse(bool &out, const QVariant &conf, TraceFrame const& frame) {
     CheckCanConvert<bool>(conf, frame);
@@ -42,6 +43,11 @@ void radapter::Parse(LuaFunction &out, const QVariant &conf, const TraceFrame &f
 {
     CheckCanConvert<LuaFunction>(conf, frame);
     out = conf.value<LuaFunction>();
+}
+
+void radapter::Parse(QUuid &out, const QVariant &conf, const TraceFrame &frame) {
+    CheckCanConvert<QUuid>(conf, frame);
+    out = conf.value<QUuid>();
 }
 
 void radapter::CheckCanConvert(int targetTypeId, const QVariant &from, const TraceFrame &frame)
@@ -128,4 +134,8 @@ void radapter::PopulateSchema(QObject *&, QVariant &schema) {
 
 void radapter::PopulateSchema(LuaFunction &, QVariant &schema) {
     schema = "function";
+}
+
+void radapter::PopulateSchema(QUuid &, QVariant &schema) {
+    schema = "uuid";
 }

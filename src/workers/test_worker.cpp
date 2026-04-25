@@ -45,7 +45,7 @@ public:
     QVariant Call(QVariantList args) {
         Info("Called with {} args", args.size());
         if (auto f = args.value(0).value<LuaFunction>()) {
-            f({1, 2, 3});
+            f.Call({1, 2, 3});
         }
         return {};
     }

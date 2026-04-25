@@ -1,4 +1,5 @@
 ﻿//CYPHAL_HEADERS_BEGIN
+#include <quuid.h>
 #ifdef _WIN32
 #pragma warning( push )
 #pragma warning( disable : 4296 )
@@ -394,15 +395,14 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         }
         field.count = size_t(list.size());
     } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
-        if (val.type() != QVariant::String) {
-            Raise("{}: {}: Expected a unique_id (string), got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+        if (!val.canConvert<QUuid>()) {
+            Raise("{}: {}: Expected a uuid, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
         }
         ::memset(field, 0, sizeof(field));
-        const auto str = val.toString();
-        if (size_t(str.size()) > sizeof(field))
-            Raise("{}: {}: Expected a unique_id (string), string too long: {}, max: {}", frame, describe::Get<T>::name, str.size(), sizeof(field));
-        for (int i = 0; i < str.size(); ++i) {
-            field[i] = static_cast<uint8_t>(str[i].digitValue());
+        const QByteArray bytes = val.value<QUuid>().toRfc4122();
+        auto* out = field;
+        for (char b: bytes) {
+            *out++ = uint8_t(b);
         }
     } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
         if (val.type() != QVariant::List) {
@@ -521,11 +521,11 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
 enum NunavutStatus
 {
     SUCCESS = NUNAVUT_SUCCESS,
-    ERROR_INVALID_ARGUMENT = NUNAVUT_ERROR_INVALID_ARGUMENT,
-    ERROR_SERIALIZATION_BUFFER_TOO_SMALL = NUNAVUT_ERROR_SERIALIZATION_BUFFER_TOO_SMALL,
-    ERROR_REPRESENTATION_BAD_ARRAY_LENGTH = NUNAVUT_ERROR_REPRESENTATION_BAD_ARRAY_LENGTH,
-    ERROR_REPRESENTATION_BAD_UNION_TAG = NUNAVUT_ERROR_REPRESENTATION_BAD_UNION_TAG,
-    ERROR_REPRESENTATION_BAD_DELIMITER_HEADER = NUNAVUT_ERROR_REPRESENTATION_BAD_DELIMITER_HEADER,
+    ERROR_INVALID_ARGUMENT = -NUNAVUT_ERROR_INVALID_ARGUMENT,
+    ERROR_SERIALIZATION_BUFFER_TOO_SMALL = -NUNAVUT_ERROR_SERIALIZATION_BUFFER_TOO_SMALL,
+    ERROR_REPRESENTATION_BAD_ARRAY_LENGTH = -NUNAVUT_ERROR_REPRESENTATION_BAD_ARRAY_LENGTH,
+    ERROR_REPRESENTATION_BAD_UNION_TAG = -NUNAVUT_ERROR_REPRESENTATION_BAD_UNION_TAG,
+    ERROR_REPRESENTATION_BAD_DELIMITER_HEADER = -NUNAVUT_ERROR_REPRESENTATION_BAD_DELIMITER_HEADER,
 };
 
 RAD_DESCRIBE(NunavutStatus)

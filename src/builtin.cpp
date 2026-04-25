@@ -258,7 +258,7 @@ static int timer(lua_State* L, bool oneshot) {
     t->setSingleShot(oneshot);
     t->callOnTimeout([t, f = std::move(func)]() mutable {
         try {
-            f({});
+            f.Call({});
         } catch (std::exception& e) {
             static_cast<Instance*>(t->parent())->Error("timers", "Error calling timer: {}", e.what());
         }
@@ -472,7 +472,8 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         assert(lua_gettop(L) == was && "toQVar unbalanced stack!");
     });
 #endif
-    switch (lua_type(L, idx)) {
+    int t = lua_type(L, idx);
+    switch (t) {
     case LUA_TTABLE: {
         if (!lua_checkstack(L, 3)) // nil + key + val
             return {};

@@ -20,7 +20,7 @@ local pong = function (func, callback)
     local status = pack[1]
     local ret = pack[2]
     if not status then
-      error(debug.traceback(thread, ret, 2))
+      error(debug.traceback(thread, ret, 2), 0)
     end
     if co.status(thread) == "dead" then
         if (callback) then 

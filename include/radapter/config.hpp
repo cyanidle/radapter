@@ -105,6 +105,8 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     }
 }
 
+void Parse(QUuid& out, QVariant const& conf, TraceFrame const& frame = {});
+
 template<typename T, if_struct<T> = 1>
 void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     constexpr auto desc = describe::Get<T>();
@@ -353,6 +355,8 @@ void PopulateSchema(T& in, QVariant& schema) {
     });
     schema = map;
 }
+
+void PopulateSchema(QUuid&, QVariant& schema);
 
 template<typename T>
 void PopulateSchema(WithDefault<T>& in, QVariant& schema) {
