@@ -348,12 +348,4 @@ void Instance::RegisterFunc(const char *name, ExtraFunction func)
     lua_setglobal(d->L, name);
 }
 
-WorkerArguments::operator QVariant()
-{
-    if (args.size() < 1) {
-        Raise("Expected at least 1 argument");
-    }
-    return args[0];
-}
-
 }

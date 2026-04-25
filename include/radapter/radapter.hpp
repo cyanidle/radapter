@@ -52,7 +52,12 @@ struct WorkerArguments
     QVariantList args;
 
     operator QVariantList() { return std::move(args); }
-    operator QVariant();
+
+    operator QVariant() {
+        if (args.size() < 1)
+            Raise("Expected at least 1 argument");
+        return args[0];
+    }
 
     template<typename T>
     operator T() { return ParseAs<T>(*this); }

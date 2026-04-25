@@ -1,5 +1,9 @@
 #include "instance_impl.hpp"
 
+#ifdef RADAPTER_JIT
+#define luaL_tolstring lua_tolstring
+#endif
+
 int radapter::Instance::Impl::luaLog(lua_State *L) {
     auto inst = Instance::FromLua(L);
     if (inst->d->insideLogHandler) return 0;

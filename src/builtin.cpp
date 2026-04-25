@@ -42,6 +42,11 @@ void builtin::help::PrintStack(lua_State* L, string msg) {
     Instance::FromLua(L)->Debug("radapter", "Printing Stack: {}", msg);
 }
 
+#ifdef RADAPTER_JIT
+#define luaL_tolstring lua_tolstring
+#endif
+
+
 int builtin::api::Format(lua_State* L) {
     int idx = 2;
     auto top = lua_gettop(L);
@@ -399,7 +404,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
     }
     case QVariant::Type::ULongLong: {
         auto v = val.toULongLong();
-        if (v > (std::numeric_limits<lua_Integer>::max)()) {
+        if (v > size_t((std::numeric_limits<lua_Integer>::max)())) {
             lua_pushnumber(L, double(v));
         } else {
             lua_pushinteger(L, lua_Integer(v));

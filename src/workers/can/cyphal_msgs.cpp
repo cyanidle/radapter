@@ -1,4 +1,8 @@
 ﻿//CYPHAL_HEADERS_BEGIN
+#ifdef _WIN32
+#pragma warning( push )
+#pragma warning( disable : 4296 )
+#endif
 #include <reg/udral/physics/acoustics/Note_0_1.h>
 #include <reg/udral/physics/kinematics/geodetic/PointState_0_1.h>
 #include <reg/udral/physics/kinematics/geodetic/PointStateVarTs_0_1.h>
@@ -212,6 +216,11 @@
 #include <uavcan/primitive/array/Natural16_1_0.h>
 #include <uavcan/primitive/String_1_0.h>
 #include <uavcan/primitive/Unstructured_1_0.h>
+
+
+#ifdef _WIN32
+#pragma warning( pop )
+#endif
 //CYPHAL_HEADERS_END
 
 

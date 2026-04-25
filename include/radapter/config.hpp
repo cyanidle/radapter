@@ -180,23 +180,6 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     Raise("{}: Non-array config passed ({})", frame, TypeNameOf(conf));
 }
 
-template<typename T, size_t N>
-void Parse(T (&out)[N], QVariant const& conf, TraceFrame const& frame = {}) {
-    auto t = conf.type();
-    if (t == QVariant::List) {
-        auto l = conf.toList();
-        if (l.size() != N)
-            Raise("{}: Expected size of array: {}", frame, N);
-        int idx = 0;
-        for (auto& v: out) {
-            auto i = idx++;
-            Parse(v, l[i], TraceFrame(unsigned(i), frame));
-        }
-        return;
-    }
-    Raise("{}: Non-array passed ({})", frame, TypeNameOf(conf));
-}
-
 
 template<typename K, typename T>
 void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {

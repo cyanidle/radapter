@@ -78,12 +78,11 @@ public:
         frame.setFlexibleDataRateFormat(msg.can_fd);
         frame.setBitrateSwitch(msg.can_fd);
         auto str = msg.frame_id.value<QString>();
-        quint32 id;
         bool ok = false;
+        quint32 id;
         if (!str.isEmpty()) {
-            id = str.toUInt(&ok);
+            id = str.toUInt(&ok, 16);
         } else {
-            bool ok = false;
             id = msg.frame_id.toUInt(&ok);
         }
         if (!ok) {

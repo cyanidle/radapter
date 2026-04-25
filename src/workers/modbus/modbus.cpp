@@ -197,7 +197,7 @@ public:
                 try {
                     std::rethrow_exception(except);
                 } catch (std::exception& e) {
-                    Warn("{}: error writing '{}'", objectName(), reg->key);
+                    Warn("{}: error writing '{}': {}", objectName(), reg->key, e.what());
                     retry(reg, std::move(v));
                 }
             } else {

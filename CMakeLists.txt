@@ -11,6 +11,7 @@ include(cmake/Versioning.cmake)
 
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
@@ -116,7 +117,9 @@ target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info
 target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 
-if (NOT MSVC)
+if (MSVC)
+    target_compile_options(radapter-sdk PRIVATE /Zc:__cplusplus)
+else()
     target_compile_options(radapter-sdk PRIVATE -Wno-old-style-cast -Wno-nested-anon-types)
 endif()
 

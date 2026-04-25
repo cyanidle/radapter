@@ -4,8 +4,18 @@
 #include "json_view/alloc.hpp"
 
 #include "radapter_info.hpp"
+
+#ifdef _WIN32
+#pragma warning( push )
+#pragma warning( disable : 4296 )
+#endif
+
 #include "uavcan/node/GetInfo_1_0.h"
 #include "uavcan/node/Heartbeat_1_0.h"
+
+#ifdef _WIN32
+#pragma warning( pop )
+#endif
 
 namespace radapter::can
 {
