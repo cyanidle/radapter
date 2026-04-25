@@ -1,5 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMakeDeps, CMakeToolchain, CMake, cmake_layout
+from conan.tools.files import copy
 
 class Radapter(ConanFile):
     name = "radapter"
@@ -49,6 +50,8 @@ class Radapter(ConanFile):
         tc.variables["RADAPTER_STATIC"] = not self.options.shared
         tc.generate()
 
+        copy(self, "plugins/*", self.dependencies["qt"].package_folder, self.build_folder)
+
     def build(self):
         cmake = CMake(self)
         cmake.configure()
@@ -59,4 +62,5 @@ class Radapter(ConanFile):
         cmake.install()
 
     def package_info(self):
+        # TODO?
         pass
