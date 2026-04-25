@@ -115,14 +115,15 @@ private:
     ICanWorker* ican;
     QTime start;
     CanardTransferID tid = {};
-    std::list<CanardRxSubscription> subs_storage;
-    std::vector<uint8_t> tx_buffer;
 
-    struct SubMeta {
+    struct RxSub : CanardRxSubscription
+    {
         const CanardMessageDynamic* dyn;
         QString name;
     };
-    std::vector<SubMeta> sub_metas;
+
+    std::list<RxSub> subs_storage;
+    std::vector<uint8_t> tx_buffer;
 
     struct PubMeta {
         const CanardMessageDynamic* dyn;
@@ -154,8 +155,13 @@ public:
             }
             pubs[name] = PubMeta{dyn, topic.port};
         }
-        auto add_port = [&](CanardPortID port) {
-            CanardFilter current = canardMakeFilterForSubject(port);
+        enum ForRequest {
+            FOR_REQUEST,
+            FOR_MESSAGE,
+        };
+
+        auto add_port = [&](CanardPortID port, ForRequest for_req) {
+            CanardFilter current = for_req == FOR_REQUEST ? canardMakeFilterForService(port, config.node_id) : canardMakeFilterForSubject(port);
             QCanBusDevice::Filter filter;
             filter.frameId = current.extended_can_id;
             filter.frameIdMask = current.extended_mask;
@@ -168,16 +174,14 @@ public:
             if (!dyn) {
                 Raise("Sub {}: Canard type '{}' not recognized", name, topic.type);
             }
-            CanardRxSubscription* sub = &subs_storage.emplace_back();
-            SubMeta& meta = sub_metas.emplace_back();
-            meta.dyn = dyn;
-            meta.name = name;
-            sub->user_reference = reinterpret_cast<void*>(sub_metas.size() - 1);
+            RxSub* sub = &subs_storage.emplace_back();
+            sub->dyn = dyn;
+            sub->name = name;
             CanardPortID port_id = topic.port;
             if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, dyn->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
                 Raise("Could not subscribe to msgs of type({}) on port:{}", topic.type, port_id);
             }
-            add_port(port_id);
+            add_port(port_id, FOR_MESSAGE);
         }
         { // NodeInfo handler
             Dump(config.node_info, node_info_resp);
@@ -185,9 +189,9 @@ public:
             info_sub->user_reference = (void*)lookup_canard_type(u"uavcan.node.GetInfo.Response.1.0");
             assert(info_sub->user_reference);
             canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub);
-            add_port(uavcan_node_GetInfo_1_0_FIXED_PORT_ID_);
+            add_port(uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, FOR_REQUEST);
         }
-        //ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
+        ican->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
     }
     void pushMsg(const CanardTransferMetadata* meta, const CanardMessageDynamic* dyn, QVariant const& msg) {
         size_t buf_size = dyn->extent;
@@ -200,6 +204,9 @@ public:
         if (err == CANARD_ERROR_OUT_OF_MEMORY) {
             Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
+    }
+    QVariant CallService(QVariantList const& args) {
+        return 1;
     }
     void OnMsg(QVariant const& msg) override {
         auto map = msg.toMap();
@@ -268,8 +275,8 @@ private:
         rxf.payload = payload.data();
         rxf.payload_size = size_t(payload.size());
 	    CanardRxTransfer transfer;
-        CanardRxSubscription* sub;
-        if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, &sub)) {
+        RxSub* sub;
+        if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, reinterpret_cast<CanardRxSubscription**>(&sub))) {
             return;
         }
         if (transfer.metadata.port_id == uavcan_node_GetInfo_1_0_FIXED_PORT_ID_) {
@@ -279,10 +286,9 @@ private:
             pushMsg(&meta, resp_dyn, node_info_resp);
             processTx();
         } else {
-            SubMeta& meta = sub_metas[reinterpret_cast<size_t>(sub->user_reference)];
-            QVariant msg = meta.dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+            QVariant msg = sub->dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
             canard.memory_free(&canard, transfer.payload);
-            emit SendMsgField(meta.name, msg);
+            emit SendMsgField(sub->name, msg);
         }
     }
     void *memAllocate(const size_t amount) {
@@ -302,7 +308,9 @@ namespace radapter::builtin::workers
 void cyphal(Instance* inst)
 {
     inst->RegisterSchema<can::CyphalConfig>("Cyphal");
-    inst->RegisterWorker<can::CyphalWorker>("Cyphal");
+    inst->RegisterWorker<can::CyphalWorker>("Cyphal", ExtraMethods{
+        {"CallService", AsExtraMethod<&can::CyphalWorker::CallService>}
+    });
 }
 
 }
