@@ -163,8 +163,12 @@ inline void Push(lua_State* L, radapter::LuaValue const& val) {
 namespace radapter::builtin {
 
 namespace help {
-void PrintStack(lua_State* L, string msg = "");
 int traceback(lua_State* L) noexcept;
+int push_thread(lua_State* L) noexcept;
+int pop_thread(lua_State* L) noexcept;
+
+
+void PrintStack(lua_State* L, string msg = "");
 QVariant toQVar(lua_State* L, int idx = -1);
 QVariant toStrOrBinary(lua_State* L, int idx = -1);
 string_view toSV(lua_State* L, int idx = -1) noexcept;

@@ -36,10 +36,9 @@ function call_all(table, ...) end
 -- TODO: docs regarding Service API
 ---@param request Worker
 ---@param responce Worker
----@param id_field string?
 ---@param timeout number?
 ---@return fun(req: any, timeout: number?): asyncThunk
-function make_service(request, responce, id_field, timeout) end
+function make_service(request, responce, timeout) end
 
 ---@enum (key) loggingLevel
 loggingLevel = {
@@ -214,17 +213,31 @@ function notify_all(worker, msg, sender) end
 ---@return Pipable
 function create_worker(on_msg) end
 
----@alias asyncThunk fun(defer: fun(...))
+---@class asyncThunk<R, T1, T2, T3, T4>
+---@overload fun(defer: fun(p1: T1, p2: T2, p3: T3, p4: T4)): R
 
 async = {
-    ---@return asyncThunk
+
+    ---@generic T1
+    ---@generic T2
+    ---@generic T3
+    ---@generic T4
+    ---@generic R
+    ---@param func fun(p1: T1?, p2: T2?, p3: T3?, p4: T4?): R
+    ---@return asyncThunk<R, T1, T2, T3, T4>
     sync = function (func) end,
+
     ---@return fun(...): asyncThunk
     wrap = function (...) end,
-    ---@param thunk asyncThunk
+
+    ---@generic R
+    ---@param thunk asyncThunk<R>
+    ---@return R
     wait = function (thunk) end,
+
     ---@param thunks asyncThunk[]
     wait_all = function (thunks) end,
+
     ---@param timeout number
     ---@return asyncThunk
     sleep = function (timeout) end,

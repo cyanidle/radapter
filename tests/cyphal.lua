@@ -16,12 +16,17 @@ node1:Call(function ()
 end)
 
 node1:Call(a.sync(function ()
-    a.sleep(3)
+    a.sleep(1000)
     return 2
 end))
 
-node1:Call(a.sync(function ()
+local nested = a.sync(function ()
     error("KEK!")
+end)
+
+node1:Call(a.sync(function ()
+    --a.sleep(1)
+    a.wait(nested())
     a.sleep(2)
     return 2
 end))

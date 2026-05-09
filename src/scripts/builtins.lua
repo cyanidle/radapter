@@ -96,8 +96,7 @@ unpack = unpack or table.unpack
 table.unpack = table.unpack or unpack
 
 
-function make_service(request, responce, id_field, timeout)
-    id_field = id_field or "id"
+function make_service(request, responce, timeout)
     timeout = timeout or 3000
     local reqs = {}
     local check_delta = 500
@@ -120,18 +119,20 @@ function make_service(request, responce, id_field, timeout)
         end
     end)
     pipe(responce, function (msg)
-        local id = msg[id_field]
+        local id = msg.id
         local found = reqs[id]
         if found then
             local cb = found.cb
             reqs[id] = nil
             cb(msg)
+        else
+            log.warn("Service response with id:{} -> handler not found (maybe timeout)", id)
         end
     end)
     return function (req, callback)
         assert(type(req) == "table", "table expected for arg#1")
-        local id = __builtin_gen_id() --simpler to make u32 number in C
-        req[id_field] = id
+        local id = __gen_id() --simpler to make u32 number in C
+        req.id = id
         reqs[id] = {
             timeout = timeout,
             cb = callback,

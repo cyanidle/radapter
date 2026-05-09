@@ -150,6 +150,10 @@ public:
 
     lua_State* LuaState();
     static Instance* FromLua(lua_State* L);
+
+    Impl* _GetPrivate() {
+        return d.get();
+    }
 public slots:
     void Shutdown(unsigned timeout = 5000);
 signals:
@@ -157,7 +161,6 @@ signals:
     void WorkerCreated(Worker* worker);
     void ShutdownDone();
 private:
-
     QScopedPointer<Impl> d;
 };
 

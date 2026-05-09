@@ -44,8 +44,8 @@ Instance::Instance(QObject *parent) :
     QObject(parent),
     d(new Impl)
 {
+    auto L = d->L = luaL_newstate();
     init_qrc();
-    auto L = d->L;
     lua_gc(L, LUA_GCSTOP, 0);
     defer _restart([&]{
         lua_gc(L, LUA_GCRESTART, 0);
@@ -83,7 +83,10 @@ Instance::Instance(QObject *parent) :
 
     lua_setglobal(L, "log");
 
-    lua_register(L, "__builtin_gen_id", _gen_id);
+    lua_register(L, "__gen_id", _gen_id);
+    lua_register(L, "__traceback", builtin::help::traceback);
+    lua_register(L, "__push_thread", builtin::help::push_thread);
+    lua_register(L, "__pop_thread", builtin::help::pop_thread);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
@@ -96,7 +99,6 @@ Instance::Instance(QObject *parent) :
     radapter::compat::prequiref(L, "lfs", luaopen_lfs, 0);
     lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
-    LoadEmbeddedFile("coro_patch");
     LoadEmbeddedFile("async", LoadEmbedGlobal);
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
@@ -130,10 +132,13 @@ static string load_builtin(QString name) {
     return s;
 }
 
-static void load_mod(lua_State* L, const char* name, string_view src) {
+static int load_embedded_module(lua_State* L) {
+    const char* mod = lua_tostring(L, 1);
+    std::string name = mod ;//std::string("__builtin_") + mod;
+    auto src = load_builtin(fmt::format(":/scripts/{}.lua", mod).c_str());
     lua_pushcfunction(L, builtin::help::traceback);
     auto msgh = lua_gettop(L);
-    auto status = luaL_loadbufferx(L, src.data(), src.size(), name, radapter::JIT || radapter::Cross ? "t" : "b");
+    auto status = luaL_loadbufferx(L, src.data(), src.size(), name.c_str(), radapter::JIT || radapter::Cross ? "t" : "b");
     if (status != LUA_OK) {
         Raise("Could not compile {}: {}", name, builtin::help::toSV(L));
     }
@@ -141,11 +146,6 @@ static void load_mod(lua_State* L, const char* name, string_view src) {
     if (status != LUA_OK) {
         Raise("Could not load {}: {}", name, builtin::help::toSV(L));
     }
-}
-
-static int load_embedded_module(lua_State* L) {
-    const char* mod = lua_tostring(L, 1);
-    load_mod(L, mod, load_builtin(fmt::format(":/scripts/{}.lua", mod).c_str()));
     return 1;
 }
 
@@ -211,12 +211,14 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
     if (c.size() > d->logCatLen) {
         d->logCatLen = unsigned(c.size());
     }
-    fmt::print(
+
+    fmt::print(stderr,
         FMT_COMPILE("{}.{:0>3}|{}|{:>{}}| {}\n"),
         dt.toString(Qt::DateFormat::ISODate), dt.time().msec(),
         name, cat, d->logCatLen, fmt::vformat(fmt, args));
+    ::fflush(stderr);
 
-    if (d->luaHandler != LUA_NOREF && !d->insideLogHandler) {
+    if (d->luaLogHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
         lua_pushcfunction(L, builtin::help::traceback);
         auto msgh = lua_gettop(L);
@@ -228,7 +230,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         if (!lua_checkstack(L, 3)) {
             Raise("Could not reserve stack for log handler");
         }
-        lua_rawgeti(L, LUA_REGISTRYINDEX, d->luaHandler);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, d->luaLogHandler);
         lua_createtable(L, 0, 4);
         lua_pushliteral(L, "level");
         lua_pushlstring(L, name.data(), name.size());
@@ -281,7 +283,7 @@ void Instance::EvalFile(fs::path path)
     }
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        Raise("EvalFile error: \n{}", e);
+        Raise("EvalFile error:\n\t{}", e);
     }
 }
 
@@ -297,7 +299,7 @@ void Instance::Eval(string_view code, string_view chunk)
     auto res = lua_pcall(L, 0, 0, msgh);
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
-        Raise("Eval error: \n{}", e);
+        Raise("Eval error:\n\t{}", e);
     }
 }
 
@@ -328,6 +330,8 @@ Instance::~Instance()
 {
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
+    luaL_unref(d->L, LUA_REGISTRYINDEX, d->luaLogHandler);
+    lua_close(d->L);
 }
 
 void Instance::RegisterGlobal(const char *name, const QVariant &value)

@@ -1,5 +1,6 @@
 #include "radapter/radapter.hpp"
 #include "worker_impl.hpp"
+#include "instance_impl.hpp"
 #include "utils.hpp"
 #include <fmt/args.h>
 #include <QTimer>
@@ -11,6 +12,7 @@
 #include "builtin.hpp"
 #include "glua/glua.hpp"
 #include <QPluginLoader>
+#include "_embedded_scripts.h"
 
 using namespace radapter;
 using namespace glua;
@@ -260,7 +262,7 @@ static int timer(lua_State* L, bool oneshot) {
         try {
             f.Call({});
         } catch (std::exception& e) {
-            static_cast<Instance*>(t->parent())->Error("timers", "Error calling timer: {}", e.what());
+            static_cast<Instance*>(t->parent())->Error("timers", "Error calling timer:\n\t{}", e.what());
         }
         if (t->isSingleShot()) {
             luaL_unref(f._L, LUA_REGISTRYINDEX, t->objectName().toInt());
@@ -287,9 +289,111 @@ string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
     return {s, len};
 }
 
+/*
+** Search for 'objidx' in table at index -1. ('objidx' must be an
+** absolute index.) Return 1 + string at top if it found a good name.
+*/
+static int findfield (lua_State *L, int objidx, int level) {
+    if (level == 0 || !lua_istable(L, -1))
+        return 0;  /* not found */
+    lua_pushnil(L);  /* start 'next' loop */
+    while (lua_next(L, -2)) {  /* for each pair in table */
+        if (lua_type(L, -2) == LUA_TSTRING) {  /* ignore non-string keys */
+            if (lua_rawequal(L, objidx, -1)) {  /* found object? */
+                lua_pop(L, 1);  /* remove value (but keep name) */
+                return 1;
+            }
+            else if (findfield(L, objidx, level - 1)) {  /* try recursively */
+                /* stack: lib_name, lib_table, field_name (top) */
+                lua_pushliteral(L, ".");  /* place '.' between the two names */
+                lua_replace(L, -3);  /* (in the slot occupied by table) */
+                lua_concat(L, 3);  /* lib_name.field_name */
+                return 1;
+            }
+        }
+        lua_pop(L, 1);  /* remove value */
+    }
+    return 0;  /* not found */
+}
+
+static int pushglobalfuncname (lua_State *L, lua_Debug *ar) {
+    int top = lua_gettop(L);
+    lua_getinfo(L, "f", ar);  /* push function */
+    lua_getfield(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);
+    luaL_checkstack(L, 6, "not enough stack");  /* slots for 'findfield' */
+    if (findfield(L, top + 1, 2)) {
+        const char *name = lua_tostring(L, -1);
+        if (strncmp(name, LUA_GNAME ".", 3) == 0) {  /* name start with '_G.'? */
+            lua_pushstring(L, name + 3);  /* push name without prefix */
+            lua_remove(L, -2);  /* remove original name */
+        }
+        lua_copy(L, -1, top + 1);  /* copy name to proper place */
+        lua_settop(L, top + 1);  /* remove table "loaded" and name copy */
+        return 1;
+    }
+    else {
+        lua_settop(L, top);  /* remove function and global table */
+        return 0;
+    }
+}
+static void pushfuncname (lua_State *L, lua_Debug *ar) {
+    if (pushglobalfuncname(L, ar)) {  /* try first a global name */
+        lua_pushfstring(L, "function '%s'", lua_tostring(L, -1));
+        lua_remove(L, -2);  /* remove name */
+    }
+    else if (*ar->namewhat != '\0')  /* is there a name from code? */
+        lua_pushfstring(L, "%s '%s'", ar->namewhat, ar->name);  /* use it */
+    else if (*ar->what == 'm')  /* main? */
+        lua_pushliteral(L, "main chunk");
+    else if (*ar->what != 'C')  /* for Lua functions, use <file:line> */
+        lua_pushfstring(L, "function <%s:%d>", ar->short_src, ar->linedefined);
+    else  /* nothing left... */
+        lua_pushliteral(L, "?");
+}
+
+int builtin::help::push_thread(lua_State* L) noexcept {
+    Instance::FromLua(L)->_GetPrivate()->threads.push_back(lua_tothread(L, 1));
+    return 0;
+}
+int builtin::help::pop_thread(lua_State* L) noexcept {
+    Instance::FromLua(L)->_GetPrivate()->threads.pop_back();
+    return 0;
+}
+
 int builtin::help::traceback(lua_State* L) noexcept {
-    auto msg = lua_tostring(L, 1);
-    luaL_traceback(L, L, msg, 1);
+    constexpr std::string_view async_prefix = "async stack traceback:";
+    auto msg = toSV(L, 1);
+    if (msg.find(async_prefix) != string_view::npos)
+    {
+        lua_settop(L, 1);
+        return 1;
+    }
+    std::string result;
+    result += std::string(msg);
+    bool is_async = !lua_isnone(L, 2);
+    auto& threads = Instance::FromLua(L)->_GetPrivate()->threads;
+    int level; // begin from caller
+    result += '\n';
+    result += is_async ? async_prefix : "stack traceback:";
+    for (auto it = threads.end() - 1; it != threads.begin() - 1; --it) {
+        auto* L1 = *it;
+        lua_Debug ar;
+        level = 1;
+        while (lua_getstack(L1, level++, &ar)) {
+            lua_getinfo(L1, "Slnt", &ar);
+            pushfuncname(L, &ar);
+            std::string_view src = ar.short_src;
+            if (src.find(_embed_path) == 0 || src.find("__builtin_") != string_view::npos)
+                continue;
+            std::string_view func = toSV(L);
+            lua_pop(L, 1);
+            if (ar.currentline <= 0)
+                result += fmt::format("\n\t{}: in {}", src, func);
+            else
+                result += fmt::format("\n\t{}:{}: in {}", src, ar.currentline, func);
+        }
+    }
+    lua_pushlstring(L, result.c_str(), result.size());
     return 1;
 }
 

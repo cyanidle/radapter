@@ -7,6 +7,11 @@
 
 local co = coroutine
 
+local _push = __push_thread
+local _pop = __pop_thread
+local _trace = __traceback
+
+_push(co.running())
 -- ADor
 -- Updated by me to allow multiple return values
 
@@ -16,12 +21,16 @@ local pong = function (func, callback)
   local thread = co.create(func)
   local step = nil
   step = function (...)
+    _push(thread)
     local pack = {co.resume(thread, ...)}
     local status = pack[1]
     local ret = pack[2]
     if not status then
-      error(debug.traceback(thread, ret, 2), 0)
+      local trace = _trace(ret, 1)
+      _pop()
+      error(trace, 0)
     end
+    _pop()
     if co.status(thread) == "dead" then
         if (callback) then 
           (function (_, ...) callback(...) end)(table.unpack(pack))

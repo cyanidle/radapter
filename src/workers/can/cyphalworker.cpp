@@ -214,8 +214,10 @@ public:
         prom
             .ThenSync([this](QVariant ok){
                 Info("Result: {}", ok.toString());
-            }).CatchSync([this](std::exception& e){
-                Info("Error: {}", e.what());
+            })
+            .CatchSync([ref = QPointer(this)](std::exception& e){
+                if (auto self = ref.data())
+                    self->Info("Error: {}", e.what());
             });
 
         return 1;

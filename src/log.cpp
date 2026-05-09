@@ -8,7 +8,7 @@ int radapter::Instance::Impl::luaLog(lua_State *L) {
     auto inst = Instance::FromLua(L);
     if (inst->d->insideLogHandler) return 0;
     builtin::api::Format(L);
-    auto lvl = LogLevel(lua_tointeger(L, lua_upvalueindex(1)));
+    LogLevel lvl = LogLevel(lua_tointeger(L, lua_upvalueindex(1)));
     size_t len;
     auto s = luaL_tolstring(L, -1, &len);
     lua_pop(L, 1);
@@ -57,13 +57,13 @@ int radapter::Instance::Impl::log__call(lua_State *L) {
 int radapter::Instance::Impl::log_handler(lua_State *L) {
     auto inst = Instance::FromLua(L);
     if (lua_isnil(L, 1)) {
-        luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
-        inst->d->luaHandler = LUA_NOREF;
+        luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaLogHandler);
+        inst->d->luaLogHandler = LUA_NOREF;
     } else {
         luaL_checktype(L, 1, LUA_TFUNCTION);
-        luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaHandler);
+        luaL_unref(L, LUA_REGISTRYINDEX, inst->d->luaLogHandler);
         lua_pushvalue(L, 1);
-        inst->d->luaHandler = luaL_ref(L, LUA_REGISTRYINDEX);
+        inst->d->luaLogHandler = luaL_ref(L, LUA_REGISTRYINDEX);
     }
     return 0;
 }
