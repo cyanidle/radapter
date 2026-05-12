@@ -368,7 +368,7 @@ int builtin::json_decode(lua_State* L) {
     auto* str = luaL_checklstring(L, 1, &len);
     auto bytes = QByteArray::fromRawData(str, int(len));
     QJsonParseError err;
-    auto val = QJsonDocument::fromJson(QByteArray{str, int(len)}, &err);
+    auto val = QJsonDocument::fromJson(bytes, &err);
     if (err.error) {
         Raise("Error parsing json: {}", err.errorString());
     }
