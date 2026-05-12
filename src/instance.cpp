@@ -84,9 +84,11 @@ Instance::Instance(QObject *parent) :
     lua_setglobal(L, "log");
 
     lua_register(L, "__gen_id", _gen_id);
-    lua_register(L, "__traceback", builtin::help::traceback);
-    lua_register(L, "__push_thread", builtin::help::push_thread);
-    lua_register(L, "__pop_thread", builtin::help::pop_thread);
+    lua_register(L, "__traceback", builtin::traceback);
+    lua_register(L, "__push_thread", builtin::push_thread);
+    lua_register(L, "__pop_thread", builtin::pop_thread);
+    lua_register(L, "__json_decode", glua::protect<builtin::json_decode>);
+    lua_register(L, "__json_encode", glua::protect<builtin::json_encode>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
@@ -136,7 +138,7 @@ static int load_embedded_module(lua_State* L) {
     const char* mod = lua_tostring(L, 1);
     std::string name = mod ;//std::string("__builtin_") + mod;
     auto src = load_builtin(fmt::format(":/scripts/{}.lua", mod).c_str());
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto msgh = lua_gettop(L);
     auto status = luaL_loadbufferx(L, src.data(), src.size(), name.c_str(), radapter::JIT || radapter::Cross ? "t" : "b");
     if (status != LUA_OK) {
@@ -220,7 +222,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
 
     if (d->luaLogHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
-        lua_pushcfunction(L, builtin::help::traceback);
+        lua_pushcfunction(L, builtin::traceback);
         auto msgh = lua_gettop(L);
         d->insideLogHandler = true;
         defer reset([&]{
@@ -265,7 +267,7 @@ void Instance::EvalFile(fs::path path)
         d->currentFile = std::move(was);
     });
     d->currentFile = path;
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto msgh = lua_gettop(L);
     auto load = luaL_loadfile(L, path.string().c_str());
     if (load != LUA_OK) {
@@ -290,7 +292,7 @@ void Instance::EvalFile(fs::path path)
 void Instance::Eval(string_view code, string_view chunk)
 {
     auto L = d->L;
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto msgh = lua_gettop(L);
     auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {

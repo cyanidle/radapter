@@ -351,18 +351,41 @@ static void pushfuncname (lua_State *L, lua_Debug *ar) {
         lua_pushliteral(L, "?");
 }
 
-int builtin::help::push_thread(lua_State* L) noexcept {
+int builtin::push_thread(lua_State* L) noexcept {
     Instance::FromLua(L)->_GetPrivate()->threads.push_back(lua_tothread(L, 1));
     return 0;
 }
-int builtin::help::pop_thread(lua_State* L) noexcept {
+
+int builtin::pop_thread(lua_State* L) noexcept {
     Instance::FromLua(L)->_GetPrivate()->threads.pop_back();
     return 0;
 }
 
-int builtin::help::traceback(lua_State* L) noexcept {
+// TODO: port these to jv::
+
+int builtin::json_decode(lua_State* L) {
+    size_t len;
+    auto* str = luaL_checklstring(L, 1, &len);
+    auto bytes = QByteArray::fromRawData(str, int(len));
+    QJsonParseError err;
+    auto val = QJsonDocument::fromJson(QByteArray{str, int(len)}, &err);
+    if (err.error) {
+        Raise("Error parsing json: {}", err.errorString());
+    }
+    glua::Push(L, val.toVariant());
+    return 1;
+}
+
+int builtin::json_encode(lua_State* L) {
+    auto variant = help::toQVar(L, 1);
+    auto enc = QJsonDocument::fromVariant(variant).toJson(QJsonDocument::Compact).toStdString();
+    lua_pushlstring(L, enc.data(), size_t(enc.size()));
+    return 1;
+}
+
+int builtin::traceback(lua_State* L) noexcept {
     constexpr std::string_view async_prefix = "async stack traceback:";
-    auto msg = toSV(L, 1);
+    auto msg = help::toSV(L, 1);
     if (msg.find(async_prefix) != string_view::npos)
     {
         lua_settop(L, 1);
@@ -385,7 +408,7 @@ int builtin::help::traceback(lua_State* L) noexcept {
             std::string_view src = ar.short_src;
             if (src.find(_embed_path) == 0 || src.find("__builtin_") != string_view::npos)
                 continue;
-            std::string_view func = toSV(L);
+            std::string_view func = help::toSV(L);
             lua_pop(L, 1);
             if (ar.currentline <= 0)
                 result += fmt::format("\n\t{}: in {}", src, func);

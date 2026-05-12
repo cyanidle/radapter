@@ -162,11 +162,13 @@ inline void Push(lua_State* L, radapter::LuaValue const& val) {
 
 namespace radapter::builtin {
 
-namespace help {
 int traceback(lua_State* L) noexcept;
 int push_thread(lua_State* L) noexcept;
 int pop_thread(lua_State* L) noexcept;
+int json_decode(lua_State* L);
+int json_encode(lua_State* L);
 
+namespace help {
 
 void PrintStack(lua_State* L, string msg = "");
 QVariant toQVar(lua_State* L, int idx = -1);

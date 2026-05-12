@@ -12,7 +12,7 @@ QVariant LuaFunction::Call(QVariantList const& args, TracebackMode trace) const
         Raise("Could not reserve stack for call");
     }
     if (trace) {
-        lua_pushcfunction(_L, builtin::help::traceback);
+        lua_pushcfunction(_L, builtin::traceback);
     }
     auto msgh = trace ? lua_gettop(_L) : 0;
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);

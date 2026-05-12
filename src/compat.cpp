@@ -52,7 +52,7 @@ static int do_prequiref(lua_State* L) {
 void compat::prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb)
 {
     if (!lua_checkstack(L, 5)) Raise("prequire: no stack left");
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto trace = lua_gettop(L);
     lua_pushcfunction(L, do_prequiref);
     lua_pushstring(L, modname);

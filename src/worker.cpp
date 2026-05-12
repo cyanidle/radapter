@@ -124,7 +124,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
         w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
         return;
     }
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto msgh = lua_gettop(L);
     lua_getglobal(L, "call_all");
     Push(L, is_event ? impl->evListeners : impl->listeners);

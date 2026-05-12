@@ -15,7 +15,7 @@ int luaopen_socket_core(lua_State *L);
 void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
 {
     auto L = LuaState();
-    lua_pushcfunction(L, builtin::help::traceback);
+    lua_pushcfunction(L, builtin::traceback);
     auto msgh = lua_gettop(L);
     lua_gc(L, LUA_GCSTOP, 0);
     defer restart([L]{
@@ -26,7 +26,6 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     LoadEmbeddedFile("socket");
     if (opts.vscode) {
         Warn("debugger", "Using vscode-compatible mobdebug");
-        LoadEmbeddedFile("dkjson");
         LoadEmbeddedFile("mobdebug.vscode", LoadEmbedNoPop);
     } else {
         LoadEmbeddedFile("mobdebug", LoadEmbedNoPop);
