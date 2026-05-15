@@ -1,5 +1,6 @@
 ﻿//CYPHAL_HEADERS_BEGIN
 #include <quuid.h>
+#include <qset.h>
 #ifdef _WIN32
 #pragma warning( push )
 #pragma warning( disable : 4296 )
@@ -353,7 +354,7 @@ void to_variant(T const& in, QVariant& out, [[maybe_unused]] TraceFrame const& f
             }
         });
         if (!ok) {
-            radapter::Raise("{}: Invalid (or incorrectly described) _tag_ field in {} -> 0x{:x}", frame, describe::Get<T>::name, fmt::underlying(tag));
+            radapter::Raise("{}: Invalid (or incorrectly described) _tag_ field in {} -> 0x{:x}", describe::Get<T>::name, frame, fmt::underlying(tag));
         }
         out = std::move(result);
     }
@@ -374,16 +375,16 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
     auto& field = info.get(out);
     auto it = in.find(QString::fromLatin1(info.name.data(), int(info.name.size())));
     if (it == in.end())
-        Raise("{}: type: {}: not found", frame, describe::Get<T>::name);
+        Raise("{}: {}: not found", describe::Get<T>::name, frame);
     const QVariant& val = it.value();
     if constexpr (describe::has_v<FieldIsBitArray, Member>) {
         size_t max_sz = std::size(field.bitpacked);
         if (val.type() != QVariant::List) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) > max_sz)
-            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, list.size());
+            Raise("{}: {}: List exceeds max size of {}, got: {}", describe::Get<T>::name, frame, max_sz, list.size());
         uint32_t idx = 0;
         for(auto& v: list) {
             auto i = idx++;
@@ -396,7 +397,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         field.count = size_t(list.size());
     } else if constexpr (describe::has_v<FieldIsUniqueID, Member>) {
         if (!val.canConvert<QUuid>()) {
-            Raise("{}: {}: Expected a uuid, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a uuid, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         ::memset(field, 0, sizeof(field));
         const QByteArray bytes = val.value<QUuid>().toRfc4122();
@@ -406,7 +407,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         }
     } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
         if (val.type() != QVariant::List) {
-            Raise("{}: {}: Expected a list of bits, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a list of bits, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
         size_t max_bit = sizeof(field) * 8;
@@ -417,28 +418,28 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
             bool ok;
             auto u = v.toUInt(&ok);
             if (!ok || u > max_bit)
-                Raise("{}: {}: could not cast item#{} (type: {}) to bit index (max index: {})", frame, describe::Get<T>::name, i, TypeNameOf(v), max_bit);
+                Raise("{}: {}: could not cast item#{} (type: {}) to bit index (max index: {})", describe::Get<T>::name, frame, i, TypeNameOf(v), max_bit);
             nunavutSetBit(field, sizeof(field), u, true);
         }
     } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
         auto max_sz = std::size(field.elements) - 1;
         if (val.type() != QVariant::String) {
-            Raise("{}: {}: Expected a string, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a string, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto str = val.toString().toStdString();
         if (size_t(str.size()) > max_sz)
-            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, str.size());
+            Raise("{}: {}: List exceeds max size of {}, got: {}", describe::Get<T>::name, frame, max_sz, str.size());
 
         ::memcpy(field.elements, str.c_str(), str.size() + 1);
         field.count = str.size();
     } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
         auto max_sz = std::size(field.elements);
         if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) > max_sz)
-            Raise("{}: {}: List exceeds max size of {}, got: {}", frame, describe::Get<T>::name, max_sz, list.size());
+            Raise("{}: {}: List exceeds max size of {}, got: {}", describe::Get<T>::name, frame, max_sz, list.size());
         uint32_t idx = 0;
         for(auto& v: list) {
             auto i = idx++;
@@ -449,19 +450,19 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         using E = typename describe::extract_t<FieldIsEnumBase, Member>::type;
         const auto str = val.toString();
         if (str.isEmpty())
-            Raise("{}: {}: expected string, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: expected string, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         const auto l1 = str.toLatin1();
         E res;
         if (!describe::name_to_enum({l1.constData(), size_t(l1.size())}, res))
-            Raise("{}: {}: invalid enum value: {}. Valid: [{}]", frame, describe::Get<T>::name, str, fmt::join(describe::enum_names<E>(), ", "));
+            Raise("{}: {}: invalid enum value: {}. Valid: [{}]", describe::Get<T>::name, frame, str, fmt::join(describe::enum_names<E>(), ", "));
         field = res;
     } else if constexpr (std::rank_v<typename Member::type>) {
         if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
-            Raise("{}: {}: Expected a list, got: {}", frame, describe::Get<T>::name, TypeNameOf(val));
+            Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
         if (size_t(list.size()) != std::size(field))
-            Raise("{}: {}: Expected a list of size {}, got: {}", frame, describe::Get<T>::name, std::size(field), list.size());
+            Raise("{}: {}: Expected a list of size {}, got: {}", describe::Get<T>::name, frame, std::size(field), list.size());
         uint32_t idx = 0;
         for (auto& v: list) {
             auto i = idx++;
@@ -483,16 +484,16 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
     {
         using UnionEnum = typename describe::extract_t<TypeIsUnionBase, T>::type;
         if (in.type() != QVariant::Map) {
-            Raise("{}: type {}: map expected", frame, describe::Get<T>::name);
+            Raise("{}: type {}: map expected", describe::Get<T>::name, frame);
         }
         auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
         if (map->size() != 1)
-            Raise("{}: type {}: expected union (map with single item). Map has {} elems", frame, describe::Get<T>::name, map->size());
+            Raise("{}: type {}: expected union (map with single item). Map has {} elems", describe::Get<T>::name, frame, map->size());
         auto tag = map->constBegin().key();
         auto tag_str = tag.toLatin1();
         UnionEnum etag;
         if (!describe::name_to_enum({tag_str.data(), size_t(tag_str.size())}, etag))
-            Raise("{}: type {}: tag is invalid value: {}. Valid: [{}]", frame, describe::Get<T>::name, tag, fmt::join(describe::enum_names<T>(), ", "));
+            Raise("{}: type {}: tag is invalid value: {}. Valid: [{}]", describe::Get<T>::name, frame, tag, fmt::join(describe::enum_names<T>(), ", "));
         int idx = 0;
         bool ok = false;
         out._tag_ = etag;
@@ -504,12 +505,12 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
             }
         });
         if (!ok)
-            Raise("{}: Error in description of type: {}", frame, describe::Get<T>::name);
+            Raise("{}: Error in description of type: {}", describe::Get<T>::name, frame);
     }
     else
     {
         if (in.type() != QVariant::Map) {
-            Raise("{}: type {}: map expected", frame, describe::Get<T>::name);
+            Raise("{}: type {}: map expected", describe::Get<T>::name, frame);
         }
         auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
         describe::Get<T>::for_each([&](auto info){
@@ -953,21 +954,50 @@ CYPHAL_TYPE(uavcan_register_List_Response, 1_0, (void),
 
 constexpr int types_end = __COUNTER__ - types_begin - 1;
 
-template<size_t I>
-constexpr void add_types(const CanardMessageDynamic** dyns, std::integral_constant<size_t, I>) {
-    if constexpr(I < types_end) {
-        dyns[I] = get_type<void>(std::integral_constant<size_t, I>{});
-        add_types(dyns, std::integral_constant<size_t, I + 1>{});
-    }
+template<size_t...Is>
+constexpr void add_types(const CanardMessageDynamic** dyns, std::index_sequence<Is...>) {
+    ((dyns[Is] = get_type<void>(std::integral_constant<size_t, Is>{})), ...);
 }
 
 namespace radapter::can
 {
 
+constexpr std::array<const CanardMessageDynamic*, types_end> get_all_types() {
+    std::array<const CanardMessageDynamic*, types_end> res{};
+    add_types(res.data(), std::make_index_sequence<types_end>{});
+    return res;
+}
+
+constexpr auto all_types = get_all_types();
+
 struct CyphalGlobal
 {
     QMap<QStringView, const CanardMessageDynamic*> by_name;
     QMap<QStringView, const CanardMessageDynamic*> by_name_and_ver;
+    QMap<QStringView, QPair<const CanardMessageDynamic*, const CanardMessageDynamic*>> srv_by_name;
+    QMap<QStringView, QPair<const CanardMessageDynamic*, const CanardMessageDynamic*>> srv_by_name_and_ver;
+    QSet<QString> strStorage;
+
+    CyphalGlobal() {
+        for (auto* dyn: all_types) {
+            constexpr QStringView req = u".Request";
+            constexpr QStringView resp = u".Response";
+            if (dyn->name.endsWith(req)) {
+                auto srvname = dyn->name.chopped(req.size());
+                QStringView withVer = *strStorage.insert(dyn->name_and_ver.toString().replace(req.toString(), ""));
+                srv_by_name[srvname].first = dyn;
+                srv_by_name_and_ver[withVer].first = dyn;
+            }
+            if (dyn->name.endsWith(resp)) {
+                auto srvname = dyn->name.chopped(resp.size());
+                QStringView withVer = *strStorage.insert(dyn->name_and_ver.toString().replace(resp.toString(), ""));
+                srv_by_name[srvname].second = dyn;
+                srv_by_name_and_ver[withVer].second = dyn;
+            }
+            by_name[dyn->name] = dyn;
+            by_name_and_ver[dyn->name_and_ver] = dyn;
+        }
+    }
 
     static CyphalGlobal& get() {
         static CyphalGlobal state;
@@ -975,31 +1005,22 @@ struct CyphalGlobal
     }
 };
 
-constexpr std::array<const CanardMessageDynamic*, types_end> get_all_types() {
-    std::array<const CanardMessageDynamic*, types_end> res{};
-    add_types(res.data(), std::integral_constant<size_t, 0>{});
-    return res;
-}
-
-constexpr auto all_types = get_all_types();
-
-static bool do_init_msgs(const CanardMessageDynamic* const* dyns, size_t count)
-{
-    auto& state = CyphalGlobal::get();
-    for (size_t i = 0; i < count; ++i) {
-        auto* dyn = dyns[i];
-        state.by_name[dyn->name] = dyn;
-        state.by_name_and_ver[dyn->name_and_ver] = dyn;
-    }
-    return true;
-}
-
 const CanardMessageDynamic* lookup_canard_type(QStringView name)
 {
     auto& state = CyphalGlobal::get();
-    [[maybe_unused]] static bool _ = do_init_msgs(all_types.data(), all_types.size());
     const CanardMessageDynamic* res = nullptr;
     (void)((res = state.by_name.value(name)) || (res = state.by_name_and_ver.value(name)));
+    return res;
+}
+
+QPair<const CanardMessageDynamic*, const CanardMessageDynamic*> lookup_service_types(QStringView name)
+{
+    auto& state = CyphalGlobal::get();
+    QPair<const CanardMessageDynamic*, const CanardMessageDynamic*> res;
+    (void)((res = state.srv_by_name.value(name)).first || (res = state.srv_by_name_and_ver.value(name)).first);
+    if (res.first) {
+        assert(res.second);
+    }
     return res;
 }
 

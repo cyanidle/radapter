@@ -1,5 +1,6 @@
 ﻿#include <libcanard/canard.h>
 #include <QString>
+#include <qpair.h>
 #include <qstringview.h>
 #include <string_view>
 
@@ -22,6 +23,7 @@ namespace radapter::can {
         Serialize serialize;
     };
     const CanardMessageDynamic* lookup_canard_type(QStringView name);
+    QPair<const CanardMessageDynamic*, const CanardMessageDynamic*> lookup_service_types(QStringView name);
 }
 
 template<auto method, typename R, typename...Args>

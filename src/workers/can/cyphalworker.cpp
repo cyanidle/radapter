@@ -19,6 +19,8 @@
 
 #include "async_helpers.hpp"
 
+using namespace std::chrono_literals;
+
 namespace radapter::can
 {
 
@@ -34,16 +36,15 @@ RAD_DESCRIBE(CyphalTopic)
     RAD_MEMBER(port);
 }
 
-struct CyphalService : CyphalTopic
+struct LocalCyphalService : CyphalTopic
 {
     LuaFunction handler;
 };
 
-RAD_DESCRIBE(CyphalService)
+RAD_DESCRIBE(LocalCyphalService)
 {
     PARENT(CyphalTopic);
-    RAD_MEMBER(type);
-    RAD_MEMBER(port);
+    RAD_MEMBER(handler);
 }
 
 struct CyphalNodeInfoVersion
@@ -91,19 +92,35 @@ struct CyphalConfig
     WithDefault<std::map<QString, CyphalTopic>> subscribe;
     WithDefault<std::map<QString, CyphalTopic>> publish;
     WithDefault<CyphalNodeInfo> node_info;
-    // TODO
-    WithDefault<std::vector<CyphalService>> services;
+    WithDefault<std::vector<LocalCyphalService>> services;
 };
 
 RAD_DESCRIBE(CyphalConfig)
 {
     RAD_MEMBER(can);
     RAD_MEMBER(node_id);
-    RAD_MEMBER(tx_cap);
     RAD_MEMBER(heartbeat_period);
+    RAD_MEMBER(tx_cap);
     RAD_MEMBER(subscribe);
     RAD_MEMBER(publish);
     RAD_MEMBER(node_info);
+    RAD_MEMBER(services);
+}
+
+struct RequestParams
+{
+    QString type;
+    CanardNodeID server;
+    CanardPortID port;
+    WithDefault<uint32_t> timeout = 5000u;
+};
+
+RAD_DESCRIBE(RequestParams)
+{
+    RAD_MEMBER(type);
+    RAD_MEMBER(server);
+    RAD_MEMBER(port);
+    RAD_MEMBER(timeout);
 }
 
 class CyphalWorker final: public Worker
@@ -115,7 +132,7 @@ private:
     CanardTxQueue tx;
     QPointer<ICanWorker> can;
     QTime start;
-    CanardTransferID tid = {};
+    std::unordered_map<CanardPortID, CanardTransferID> tids;
 
     struct RxSub : CanardRxSubscription
     {
@@ -123,7 +140,15 @@ private:
         QString name;
     };
 
+    struct Service : CanardRxSubscription {
+        QString type_name;
+        const CanardMessageDynamic* req_dyn;
+        const CanardMessageDynamic* resp_dyn;
+        MoveFunc<auto(QVariant) -> Future<QVariant>> handler;
+    };
+
     std::list<RxSub> subs_storage;
+    std::list<Service> srvs_storage;
     std::vector<uint8_t> tx_buffer;
 
     struct PubMeta {
@@ -131,11 +156,24 @@ private:
         CanardPortID port;
     };
     std::unordered_map<QString, PubMeta> pubs;
-    jv::DefaultArena<> send_arena;
     QVariant node_info_resp;
+
+    struct Request {
+        const CanardMessageDynamic* resp_dyn;
+        fut::Promise<QVariant> promise;
+        std::chrono::milliseconds timeout;
+    };
+    struct RequestsState {
+        CanardTransferID tid;
+        std::unordered_map<CanardTransferID, Request> in_flight;
+    };
+
+    std::unordered_map<CanardNodeID, std::unordered_map<CanardPortID, RequestsState>> reqs;
 public:
     CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
         config = std::move(conf);
+        if (conf.node_id > CANARD_NODE_ID_MAX)
+            Raise("Node id is too big: {} (max: {})", conf.node_id, CANARD_NODE_ID_MAX);
         can = qobject_cast<ICanWorker*>(config.can);
         canard = canardInit(CANARD_WRAP(memAllocate), CANARD_WRAP(memFree));
         canard.user_reference = this;
@@ -147,7 +185,6 @@ public:
         hb->start(config.heartbeat_period);
         start = QTime::currentTime();
         connect(can, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
-        auto filterList = can->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
         for (auto& [name, topic]: config.publish.value) {
             const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
             if (!dyn) {
@@ -155,13 +192,9 @@ public:
             }
             pubs[name] = PubMeta{dyn, topic.port};
         }
-        enum ForRequest {
-            FOR_REQUEST,
-            FOR_MESSAGE,
-        };
 
-        auto add_port = [&](CanardPortID port, ForRequest for_req) {
-            CanardFilter current = for_req == FOR_REQUEST ? canardMakeFilterForService(port, config.node_id) : canardMakeFilterForSubject(port);
+        auto filterList = can->get_device()->configurationParameter(QCanBusDevice::RawFilterKey).value<QList<QCanBusDevice::Filter>>();
+        auto add_filter = [&](CanardFilter current) {
             QCanBusDevice::Filter filter;
             filter.frameId = current.extended_can_id;
             filter.frameIdMask = current.extended_mask;
@@ -181,7 +214,23 @@ public:
             if (!canardRxSubscribe(&canard, CanardTransferKindMessage, port_id, dyn->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, sub)) {
                 Raise("Could not subscribe to msgs of type({}) on port:{}", topic.type, port_id);
             }
-            add_port(port_id, FOR_MESSAGE);
+            add_filter(canardMakeFilterForSubject(port_id));
+        }
+        for (auto& service: config.services.value) {
+            auto [req, resp] = lookup_service_types(service.type);
+            if (!req || !resp) {
+                Raise("Service: Canard service type '{}' not recognized", service.type);
+            }
+            Service* srv = &srvs_storage.emplace_back();
+            srv->req_dyn = req;
+            srv->resp_dyn = resp;
+            srv->handler = [func = service.handler](QVariant msg){
+                return func.CallAsync({msg});
+            };
+            CanardPortID port_id = service.port;
+            if (!canardRxSubscribe(&canard, CanardTransferKindRequest, port_id, req->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, srv)) {
+                Raise("Could not subscribe to msgs of type({}) on port:{}", service.type, port_id);
+            }
         }
         { // NodeInfo handler
             Dump(config.node_info, node_info_resp);
@@ -189,13 +238,45 @@ public:
             info_sub->user_reference = (void*)lookup_canard_type(u"uavcan.node.GetInfo.Response.1.0");
             assert(info_sub->user_reference);
             canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub);
-            add_port(uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, FOR_REQUEST);
         }
+        add_filter(canardMakeFilterForServices(config.node_id));
         can->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
+
+        auto checker = new QTimer(this);
+        checker->callOnTimeout(this, &CyphalWorker::checkReqTimeouts);
+        checker->start(500ms);
+    }
+
+    void checkReqTimeouts() {
+        for (auto servers = reqs.begin(); servers != reqs.end();)
+        {
+            for (auto ports = servers->second.begin(); ports != servers->second.end();)
+            {
+                for (auto req = ports->second.in_flight.begin(); req != ports->second.in_flight.end();)
+                {
+                    if (req->second.timeout < 500ms) {
+                        req->second.promise(Err("Timeout"));
+                        req = ports->second.in_flight.erase(req);
+                    } else {
+                        req->second.timeout -= 500ms;
+                        ++req;
+                    }
+                }
+                if (ports->second.in_flight.empty())
+                    ports = servers->second.erase(ports);
+                else
+                    ++ports;
+            }
+            if (servers->second.empty())
+                servers = reqs.erase(servers);
+            else
+                ++servers;
+        }
     }
     void pushMsg(const CanardTransferMetadata* meta, const CanardMessageDynamic* dyn, QVariant const& msg) {
+        jv::DefaultArena<> arena;
         size_t buf_size = dyn->extent;
-        auto* buf = static_cast<uint8_t*>(send_arena.Allocate(buf_size, 1));
+        auto* buf = static_cast<uint8_t*>(arena.Allocate(buf_size, 1));
         dyn->serialize(msg, buf, buf_size);
         auto err = canardTxPush(&tx, &canard, 0, meta, buf_size, buf);
         if (err == CANARD_ERROR_INVALID_ARGUMENT) {
@@ -205,22 +286,42 @@ public:
             Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
     }
-    QVariant Call(QVariantList const& args) {
+    QVariant Request(QVariantList const& args) {
+        RequestParams params;
+        Parse(params, args.value(0));
+        QVariant msg = args.value(1);
+        auto [req, resp] = lookup_service_types(params.type);
+        if (!req || !resp)
+            Raise("Could not find types for service: {}", params.type);
+        CanardTransferMetadata meta;
+        auto& state = reqs[params.server][params.port];
 
-        auto func = args.at(0).value<LuaFunction>();
+        meta.transfer_id = state.tid++;
+        meta.port_id = params.port;
+        meta.priority = CanardPriorityNominal;
+        meta.remote_node_id = params.server;
+        meta.transfer_kind = CanardTransferKindRequest;
 
-        auto prom = fromLuaPromise(std::move(func), {});
+        fut::Future<QVariant> future;
+        auto& rx = state.in_flight[meta.transfer_id];
+        rx.timeout = std::chrono::milliseconds{params.timeout.value};
+        rx.resp_dyn = resp;
+        try {
+            future = rx.promise.GetFuture();
+        } catch (...) {
+            Raise("Too many requests to: {}:{}", params.server, params.port);
+        }
 
-        prom
-            .ThenSync([this](QVariant ok){
-                Info("Result: {}", ok.toString());
-            })
-            .CatchSync([ref = QPointer(this)](std::exception& e){
-                if (auto self = ref.data())
-                    self->Info("Error: {}", e.what());
-            });
+        pushMsg(&meta, req, msg);
+        processTx();
 
-        return 1;
+        if (args.size() > 2) {
+            LuaFunction cb = args.value(2).value<LuaFunction>();
+            resolveLuaCallback(this, future, cb);
+            return {};
+        } else {
+            return makeLuaPromise(this, future);
+        }
     }
     void OnMsg(QVariant const& msg) override {
         auto map = msg.toMap();
@@ -237,7 +338,7 @@ public:
                 CanardTransferKindMessage,
                 port,
                 CANARD_NODE_ID_UNSET,
-                tid++,
+                tids[port]++,
             };
             pushMsg(&transfer_metadata, dyn, v);
         }
@@ -255,7 +356,7 @@ private:
 			CanardTransferKindMessage,
 			uavcan_node_Heartbeat_1_0_FIXED_PORT_ID_,
 			CANARD_NODE_ID_UNSET,
-			tid++,
+            tids[uavcan_node_Heartbeat_1_0_FIXED_PORT_ID_]++,
 		};
         size_t hbeat_ser_buf_size = uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;
         uint8_t hbeat_ser_buf[uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_];
@@ -268,24 +369,22 @@ private:
         return std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(ts).count();
     }
     void processTx() {
+        auto* ican = can.data();
+        if (!ican) {
+            Error("Could not send frame: can is dead");
+        }
         for (const CanardTxQueueItem* ti = NULL; (ti = canardTxPeek(&tx)) != NULL;)
         {
-            auto* ican = can.data();
-            if (ican) {
-                if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
-                {
-                    QCanBusFrame frame;
-                    frame.setExtendedFrameFormat(true);
-                    frame.setFrameId(ti->frame.extended_can_id);
-                    frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
-                    can->get_device()->writeFrame(frame);
-                }
-            } else {
-                Error("Could not send frame: can is dead");
+            if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
+            {
+                QCanBusFrame frame;
+                frame.setExtendedFrameFormat(true);
+                frame.setFrameId(ti->frame.extended_can_id);
+                frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
+                can->get_device()->writeFrame(frame);
             }
             canard.memory_free(&canard, canardTxPop(&tx, ti));
         }
-        send_arena.Clear();
     }
     void on_frame(QCanBusFrame const& frame) try {
         CanardFrame rxf;
@@ -294,7 +393,7 @@ private:
         rxf.payload = payload.data();
         rxf.payload_size = size_t(payload.size());
 	    CanardRxTransfer transfer;
-        RxSub* sub;
+        CanardRxSubscription* sub;
         if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, reinterpret_cast<CanardRxSubscription**>(&sub))) {
             return;
         }
@@ -304,13 +403,55 @@ private:
             meta.transfer_kind = CanardTransferKindResponse;
             pushMsg(&meta, resp_dyn, node_info_resp);
             processTx();
-        } else {
-            QVariant msg = sub->dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+        } else if (transfer.metadata.transfer_kind == CanardTransferKindResponse) {
+            auto& meta = transfer.metadata;
+            auto& in_flight = reqs[meta.remote_node_id][meta.port_id].in_flight;
+            auto it = in_flight.find(meta.transfer_id);
+            if (it == in_flight.end())
+            {
+                Error("Could not match reply: node:{} port:{} transfer_id:{}",
+                      meta.remote_node_id, meta.port_id, meta.transfer_id);
+            }
+            auto& req = it->second;
+            auto res = req.resp_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+            req.promise(std::move(res));
+        }  else if (transfer.metadata.transfer_kind == CanardTransferKindRequest) {
+            auto* service = static_cast<Service*>(sub);
+            auto meta = transfer.metadata;
+            meta.transfer_kind = CanardTransferKindResponse;
+            QVariant req = service->req_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
             canard.memory_free(&canard, transfer.payload);
-            emit SendMsgField(sub->name, msg);
+            service->handler(req).AtLastSync([ref = QPointer(this), service, meta](fut::Result<QVariant> res){
+                auto self = ref.data();
+                if (!self)
+                    return;
+                self->handleLocalResp(meta, service, res);
+            });
+        } else {
+            auto* rx_sub = static_cast<RxSub*>(sub);
+            QVariant msg = rx_sub->dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+            canard.memory_free(&canard, transfer.payload);
+            emit SendMsgField(rx_sub->name, msg);
         }
     } catch (std::exception& e) {
         Error("Could not receive frame: {}", e.what());
+    }
+
+    void handleLocalResp(CanardTransferMetadata meta, Service* srv, fut::Result<QVariant> resp) {
+        if (!resp) {
+            try {
+                std::rethrow_exception(resp.get_exception());
+            } catch (std::exception& e) {
+                Error("Error in service: {} on port: {}. {}", srv->type_name, srv->port_id, e.what());
+            }
+            return;
+        }
+        try {
+            pushMsg(&meta, srv->resp_dyn, resp.get());
+        } catch (std::exception& e) {
+            Error("Invalid response for: {} on port: {}. {}", srv->type_name, srv->port_id, e.what());
+        }
+        processTx();
     }
 
     void *memAllocate(const size_t amount) {
@@ -331,7 +472,7 @@ void cyphal(Instance* inst)
 {
     inst->RegisterSchema<can::CyphalConfig>("Cyphal");
     inst->RegisterWorker<can::CyphalWorker>("Cyphal", ExtraMethods{
-        {"Call", AsExtraMethod<&can::CyphalWorker::Call>}
+        {"Request", AsExtraMethod<&can::CyphalWorker::Request>}
     });
 }
 

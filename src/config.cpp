@@ -29,6 +29,9 @@ void radapter::Parse(QVariant &out, const QVariant &conf, const TraceFrame &)
 
 void radapter::Parse(QVariantList &out, const QVariant &conf, const TraceFrame &frame)
 {
+    if (conf.type() == QVariant::Map && conf.toMap().empty()) {
+        return;
+    }
     CheckCanConvert<QVariantList>(conf, frame);
     out = conf.toList();
 }

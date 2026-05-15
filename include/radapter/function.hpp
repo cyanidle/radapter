@@ -4,6 +4,13 @@
 #include "radapter/value.hpp"
 #include <functional>
 
+namespace fut
+{
+
+template<typename T>
+struct Future;
+
+}
 
 namespace radapter
 {
@@ -17,6 +24,7 @@ struct RADAPTER_API LuaFunction : LuaValue {
     };
 
     QVariant Call(const QVariantList &args, TracebackMode mode = Traceback) const;
+    fut::Future<QVariant> CallAsync(QVariantList args, TracebackMode mode = Traceback) const;
 };
 
 using ExtraFunction = std::function<QVariant(Instance*, QVariantList const&)>;

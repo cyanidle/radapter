@@ -19,7 +19,7 @@ namespace radapter {
 template<typename T>
 struct WithDefault {
     template<typename...Args>
-    WithDefault(Args&&...a) : value(std::forward<Args>(a)...) {}
+    WithDefault(Args&&...a) : value{std::forward<Args>(a)...} {}
 
     operator T const&() const noexcept {
         return value;
@@ -177,6 +177,9 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
             auto i = idx++;
             Parse(v, l[i], TraceFrame(unsigned(i), frame));
         }
+        return;
+    }
+    if (t == QVariant::Map && conf.toMap().empty()) {
         return;
     }
     Raise("{}: Non-array config passed ({})", frame, TypeNameOf(conf));

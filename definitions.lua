@@ -422,3 +422,168 @@ function Serial(params) end
 ---@return CanWorker
 ---@param params CanParams
 function CAN(params) end
+
+---@alias CyphalType
+---| "uavcan.node.ExecuteCommand.Request.1.0"
+---| "uavcan.node.ExecuteCommand.Request.1.1"
+---| "uavcan.node.ExecuteCommand.Request.1.2"
+---| "uavcan.node.ExecuteCommand.Response.1.0"
+---| "uavcan.node.ExecuteCommand.Response.1.1"
+---| "uavcan.node.ExecuteCommand.Response.1.2"
+---| "uavcan.node.GetInfo.Request.1.0"
+---| "uavcan.node.GetInfo.Response.1.0"
+---| "uavcan.node.GetTransportStatistics.Request.0.1"
+---| "uavcan.node.GetTransportStatistics.Response.0.1"
+---| "uavcan.node.Health.1.0"
+---| "uavcan.node.Heartbeat.1.0"
+---| "uavcan.node.ID.1.0"
+---| "uavcan.node.IOStatistics.0.1"
+---| "uavcan.node.Mode.1.0"
+---| "uavcan.node.Version.1.0"
+---| "uavcan.node.port.ID.1.0"
+---| "uavcan.node.port.List.1.0"
+---| "uavcan.node.port.ServiceID.1.0"
+---| "uavcan.node.port.ServiceIDList.1.0"
+---| "uavcan.node.port.SubjectID.1.0"
+---| "uavcan.node.port.SubjectIDList.1.0"
+---| "uavcan.primitive.Empty.1.0"
+---| "uavcan.primitive.String.1.0"
+---| "uavcan.primitive.Unstructured.1.0"
+---| "uavcan.primitive.array.Bit.1.0"
+---| "uavcan.primitive.array.Integer16.1.0"
+---| "uavcan.primitive.array.Integer32.1.0"
+---| "uavcan.primitive.array.Integer64.1.0"
+---| "uavcan.primitive.array.Integer8.1.0"
+---| "uavcan.primitive.array.Natural16.1.0"
+---| "uavcan.primitive.array.Natural32.1.0"
+---| "uavcan.primitive.array.Natural64.1.0"
+---| "uavcan.primitive.array.Natural8.1.0"
+---| "uavcan.primitive.array.Real16.1.0"
+---| "uavcan.primitive.array.Real32.1.0"
+---| "uavcan.primitive.array.Real64.1.0"
+---| "uavcan.primitive.scalar.Bit.1.0"
+---| "uavcan.primitive.scalar.Integer16.1.0"
+---| "uavcan.primitive.scalar.Integer32.1.0"
+---| "uavcan.primitive.scalar.Integer64.1.0"
+---| "uavcan.primitive.scalar.Integer8.1.0"
+---| "uavcan.primitive.scalar.Natural16.1.0"
+---| "uavcan.primitive.scalar.Natural32.1.0"
+---| "uavcan.primitive.scalar.Natural64.1.0"
+---| "uavcan.primitive.scalar.Natural8.1.0"
+---| "uavcan.primitive.scalar.Real16.1.0"
+---| "uavcan.primitive.scalar.Real32.1.0"
+---| "uavcan.primitive.scalar.Real64.1.0"
+---| "uavcan.register.Access.Request.1.0"
+---| "uavcan.register.Access.Response.1.0"
+---| "uavcan.register.List.Request.1.0"
+---| "uavcan.register.List.Response.1.0"
+---| "uavcan.register.Name.1.0"
+---| "uavcan.register.Value.1.0"
+---| "uavcan.si.unit.acceleration.Scalar.1.0"
+---| "uavcan.si.unit.acceleration.Vector3.1.0"
+---| "uavcan.si.unit.angle.Quaternion.1.0"
+---| "uavcan.si.unit.angle.Scalar.1.0"
+---| "uavcan.si.unit.angular_acceleration.Scalar.1.0"
+---| "uavcan.si.unit.angular_acceleration.Vector3.1.0"
+---| "uavcan.si.unit.angular_velocity.Scalar.1.0"
+---| "uavcan.si.unit.angular_velocity.Vector3.1.0"
+---| "uavcan.si.unit.duration.Scalar.1.0"
+---| "uavcan.si.unit.duration.WideScalar.1.0"
+---| "uavcan.si.unit.electric_charge.Scalar.1.0"
+---| "uavcan.si.unit.electric_current.Scalar.1.0"
+---| "uavcan.si.unit.energy.Scalar.1.0"
+---| "uavcan.si.unit.force.Scalar.1.0"
+---| "uavcan.si.unit.force.Vector3.1.0"
+---| "uavcan.si.unit.frequency.Scalar.1.0"
+---| "uavcan.si.unit.length.Scalar.1.0"
+---| "uavcan.si.unit.length.Vector3.1.0"
+---| "uavcan.si.unit.length.WideScalar.1.0"
+---| "uavcan.si.unit.length.WideVector3.1.0"
+---| "uavcan.si.unit.luminance.Scalar.1.0"
+---| "uavcan.si.unit.magnetic_field_strength.Scalar.1.0"
+---| "uavcan.si.unit.magnetic_field_strength.Scalar.1.1"
+---| "uavcan.si.unit.magnetic_field_strength.Vector3.1.0"
+---| "uavcan.si.unit.magnetic_field_strength.Vector3.1.1"
+---| "uavcan.si.unit.magnetic_flux_density.Scalar.1.0"
+---| "uavcan.si.unit.magnetic_flux_density.Vector3.1.0"
+---| "uavcan.si.unit.mass.Scalar.1.0"
+---| "uavcan.si.unit.power.Scalar.1.0"
+---| "uavcan.si.unit.pressure.Scalar.1.0"
+---| "uavcan.si.unit.temperature.Scalar.1.0"
+---| "uavcan.si.unit.torque.Scalar.1.0"
+---| "uavcan.si.unit.torque.Vector3.1.0"
+---| "uavcan.si.unit.velocity.Scalar.1.0"
+---| "uavcan.si.unit.velocity.Vector3.1.0"
+---| "uavcan.si.unit.voltage.Scalar.1.0"
+---| "uavcan.si.unit.volume.Scalar.1.0"
+---| "uavcan.si.unit.volumetric_flow_rate.Scalar.1.0"
+---| "uavcan.time.GetSynchronizationMasterInfo.Request.0.1"
+---| "uavcan.time.GetSynchronizationMasterInfo.Response.0.1"
+---| "uavcan.time.Synchronization.1.0"
+---| "uavcan.time.SynchronizedTimestamp.1.0"
+---| "uavcan.time.TAIInfo.0.1"
+---| "uavcan.time.TimeSystem.0.1"
+
+---@alias CyphalService
+---| "uavcan.node.ExecuteCommand.1.0"
+---| "uavcan.node.ExecuteCommand.1.1"
+---| "uavcan.node.ExecuteCommand.1.2"
+---| "uavcan.node.GetInfo.1.0"
+---| "uavcan.node.GetTransportStatistics.0.1"
+---| "uavcan.register.Access.1.0"
+---| "uavcan.register.List.1.0"
+---| "uavcan.time.GetSynchronizationMasterInfo.0.1"
+
+
+---@class CyphalTopic
+---@field type CyphalType
+---@field port number
+
+---@class LocalCyphalService
+---@field type CyphalService
+---@field port number
+---@field handler asyncThunk<any, any>
+
+---@class CyphalNodeInfoVersion
+---@field major number
+---@field minor number
+
+---@class CyphalNodeInfo
+---@field protocol_version CyphalNodeInfoVersion?
+---@field hardware_version CyphalNodeInfoVersion?
+---@field software_version CyphalNodeInfoVersion?
+---@field software_vcs_revision_id number?
+---@field unique_id string?
+---@field name string?
+---@field software_image_crc number[]?
+---@field certificate_of_authenticity string?
+
+
+---@class CyphalConfig
+---@field can CanWorker
+---@field node_id number
+---@field heartbeat_period number?
+---@field tx_cap number?
+---@field subscribe table<string, CyphalTopic>?
+---@field publish table<string, CyphalTopic>?
+---@field node_info CyphalNodeInfo?
+---@field services LocalCyphalService[]?
+
+---@class CyphalRequestParams
+---@field type CyphalService
+---@field server number
+---@field port number
+---@field timeout number?
+
+
+---@class CyphalWorker : Worker
+RedisCacheWorker = {}
+
+---@param params CyphalRequestParams
+---@param msg any
+---@param callback fun(res: any, err: string)?
+function RedisCacheWorker:Request(params, msg, callback) end
+
+---@return CyphalWorker
+---@param params CyphalConfig
+function Cyphal(params) end

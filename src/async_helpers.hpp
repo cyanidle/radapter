@@ -47,42 +47,5 @@ QVariant makeLuaPromise(Worker* worker, Future<T>& future) {
     });
 }
 
-inline Future<QVariant> fromLuaPromise(LuaFunction func, QVariantList args)
-{
-    SharedPromise<QVariant> promise;
-    Future<QVariant> res = promise.GetFuture();
-    QVariant on_done = MakeFunction([promise](Instance* inst, QVariantList args) mutable -> QVariant {
-        if (args.size() == 0) {
-            promise(QVariant{});
-        } else if (args.size() == 1) {
-            promise(args.at(0));
-        } else if (args.size() == 2) {
-            auto res = args.at(0);
-            auto err = args.at(1);
-            if (res.isValid()) {
-                promise(std::move(res));
-            } else {
-                if (!err.canConvert<QString>()) {
-                    inst->Error("async", "In async function: second return value (res, _err_) should be convertible to string");
-                }
-                promise(std::make_exception_ptr(std::runtime_error(err.toString().toStdString())));
-            }
-        } else {
-            Raise("Expected 0, 1 or 2 return values from async function. ([ok], [err])");
-        }
-        return {};
-    });
-    try {
-        args.append(on_done);
-        auto res = func.Call(args);
-        if (res.isValid()) {
-            promise(res);
-        }
-    } catch (...) {
-        promise(std::current_exception());
-    }
-    return res;
-}
-
 
 }
