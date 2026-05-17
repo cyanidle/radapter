@@ -213,8 +213,7 @@ function notify_all(worker, msg, sender) end
 ---@return Pipable
 function create_worker(on_msg) end
 
----@class asyncThunk<R, T1, T2, T3, T4>
----@overload fun(defer: fun(p1: T1, p2: T2, p3: T3, p4: T4)): R
+---@alias asyncThunk fun()
 
 async = {
 

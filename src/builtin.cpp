@@ -517,10 +517,14 @@ void glua::Push(lua_State* L, QVariant const& val) {
         pushQStr(L, QString(val.toChar()));
         break;
     }
+    case QVariant::Type(QMetaType::SChar):
+    case QVariant::Type(QMetaType::Short):
     case QVariant::Type::Int: {
         lua_pushinteger(L, val.toInt());
         break;
     }
+    case QVariant::Type(QMetaType::UChar):
+    case QVariant::Type(QMetaType::UShort):
     case QVariant::Type::UInt: {
         lua_pushinteger(L, val.toUInt());
         break;
@@ -572,6 +576,8 @@ void glua::Push(lua_State* L, QVariant const& val) {
         } else if (auto cf = val.value<ExtraFunction>()) {
             glua::Push(L, ExtraHelper{std::move(cf)});
             lua_pushcclosure(L, glua::protect<wrapFunc>, 1);
+        } else if (auto v = val.value<LuaValue>()) {
+            lua_rawgeti(v._L, LUA_REGISTRYINDEX, v._ref);
         } else if (auto q = val.value<QObject*>()) {
             glua::Push(L, QPointer<QObject>{q});
         } else {

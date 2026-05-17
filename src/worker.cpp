@@ -11,6 +11,13 @@ Worker::Worker(Instance *parent, const char *category) :
     _Category(category)
 {
     _Inst = parent;
+    connect(this, &Worker::SendEventField, [this](const QString& key, const QVariant& data){
+        emit SendEvent(QVariantMap{{key, data}});
+    });
+    connect(this, &Worker::SendMsgField, [this](const QString& key, const QVariant& data){
+        emit SendMsg(QVariantMap{{key, data}});
+    });
+    // TODO: handle SendMsg/Event before LuaPush
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
@@ -161,13 +168,13 @@ static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMet
     lua_createtable(L, 0, 0); //evSubs
     impl->evListeners = LuaValue(L, ConsumeTop);
 
-    //SendEventField
-    impl->conns.emplace_back() = QObject::connect(w, &Worker::SendEvent, w, [=](QVariant const& msg){
+    impl->conns[0] = QObject::connect(w, &Worker::SendEvent, w, [=](QVariant const& msg){
         worker_notify(impl, msg, workerSelfRef, true);
     });
-    impl->conns.emplace_back() = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
+    impl->conns[1] = QObject::connect(w, &Worker::SendMsg, w, [=](QVariant const& msg){
         worker_notify(impl, msg, workerSelfRef, false);
     });
+
     if (luaL_newmetatable(L, clsname)) {
 
         lua_pushlightuserdata(L, &builtin::workers::Marker);
