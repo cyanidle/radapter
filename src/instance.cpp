@@ -84,9 +84,6 @@ Instance::Instance(QObject *parent) :
     lua_setglobal(L, "log");
 
     lua_register(L, "__gen_id", _gen_id);
-    lua_register(L, "__traceback", builtin::traceback);
-    lua_register(L, "__push_thread", builtin::push_thread);
-    lua_register(L, "__pop_thread", builtin::pop_thread);
     lua_register(L, "__json_decode", glua::protect<builtin::json_decode>);
     lua_register(L, "__json_encode", glua::protect<builtin::json_encode>);
 
@@ -101,7 +98,7 @@ Instance::Instance(QObject *parent) :
     radapter::compat::prequiref(L, "lfs", luaopen_lfs, 0);
     lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
-    LoadEmbeddedFile("async", LoadEmbedGlobal);
+    LoadEmbeddedFile("async");
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);

@@ -1,6 +1,5 @@
 local com = args[1]
 local parse_topics = require "parse_topics"
-local a = require "async"
 
 local topics = {}
 local gamble
@@ -12,7 +11,7 @@ if com then
         port = com,
         baud = 57600
     }
-    
+
     topics = parse_topics(serial, "./firmware/firmware.ino")
 
     local names = {}

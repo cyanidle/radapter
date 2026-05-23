@@ -1,48 +1,38 @@
-local a = async
-
-async_sleep = a.wrap(function (time, callback)
+local async_sleep = promisify(function (time, callback)
     after(time, callback)
 end)
 
-echo_in = a.wrap(function (time, arg, callback)
+local echo_in = promisify(function (time, arg, callback)
     after(time, function ()
+        log ("Timer callback with: {}", arg)
         callback(arg)
     end)
 end)
 
----- THESE two are identical to ^
-
--- async_sleep = function (time)
---     return function (callback)
---         after(time, callback)
---     end
--- end
-
--- echo_in = function (time, arg)
---     return function (callback)
---         after(time, function()
---             callback(arg)
---         end)
---     end
--- end
-
-async_main = a.sync(function ()
+local async_simple = async(function (arg1, arg2)
     log "Test Start!"
 
-    local A = a.wait(echo_in(1000, 123))
+    log("ARGS: {}", {arg1, arg2})
+
+    local A = await(echo_in(1000, 123))
     log "A calculated!"
 
-    local B = a.wait(echo_in(3000, 321))
+    local B = await(echo_in(3000, 321))
     log "B calculated!"
 
     log("a: {}, b: {}", A, B)
 
-    a.wait(async_sleep(1000))
+    await(async_sleep(1000))
 
-    return A, B
+    return A + B
 end)
 
-async_main(function(A, B)
-    log("Test Done! From main: {}, {}", A, B)
+local entry = async(function ()
+    local res, err = await(async_simple(23, 25))
+    log("RES: {} ERR: {}", res, err)
+end)
+
+entry()(function (res, err)
+    log "Entry done!"
     shutdown()
 end)

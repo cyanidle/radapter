@@ -175,8 +175,8 @@ log = {
     set_level = function (level) end,
 }
 
----@alias MsgHandler fun(msg: any, source: Worker)
----@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker)
+---@alias MsgHandler fun(msg: any, source: Worker): any
+---@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker): any
 
 ---@class Events
 ---@field get_listeners fun(self: Pipable): MsgHandler[]
@@ -212,35 +212,6 @@ function notify_all(worker, msg, sender) end
 ---@param on_msg MsgHandlerEx
 ---@return Pipable
 function create_worker(on_msg) end
-
----@alias asyncThunk fun()
-
-async = {
-
-    ---@generic T1
-    ---@generic T2
-    ---@generic T3
-    ---@generic T4
-    ---@generic R
-    ---@param func fun(p1: T1?, p2: T2?, p3: T3?, p4: T4?): R
-    ---@return asyncThunk<R, T1, T2, T3, T4>
-    sync = function (func) end,
-
-    ---@return fun(...): asyncThunk
-    wrap = function (...) end,
-
-    ---@generic R
-    ---@param thunk asyncThunk<R>
-    ---@return R
-    wait = function (thunk) end,
-
-    ---@param thunks asyncThunk[]
-    wait_all = function (thunks) end,
-
-    ---@param timeout number
-    ---@return asyncThunk
-    sleep = function (timeout) end,
-}
 
 ---@type string[]
 args = {}
@@ -576,12 +547,11 @@ function CAN(params) end
 
 
 ---@class CyphalWorker : Worker
-RedisCacheWorker = {}
+CyphalWorker = {}
 
----@param params CyphalRequestParams
----@param msg any
----@param callback fun(res: any, err: string)?
-function RedisCacheWorker:Request(params, msg, callback) end
+---@overload fun(self: CyphalWorker, params: CyphalRequestParams, msg: any, callback: fun(res: any, err: string))
+---@overload fun(self: CyphalWorker, params: CyphalRequestParams, msg: any): promise<any>
+function CyphalWorker:Request(params, msg, callback) end
 
 ---@return CyphalWorker
 ---@param params CyphalConfig

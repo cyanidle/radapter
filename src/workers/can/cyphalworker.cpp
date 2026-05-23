@@ -254,7 +254,7 @@ public:
         for (auto port = reqs.begin(); port != reqs.end();)
         {
             auto& in_flight = port->second.in_flight;
-            for (auto req = in_flight.begin(); req != in_flight.end(); ++req) {
+            for (auto req = in_flight.begin(); req != in_flight.end();) {
                 if (req->second.timeout < 500ms) {
                     req = in_flight.erase(req);
                 } else {

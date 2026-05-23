@@ -1,110 +1,93 @@
--- ! https://github.com/ms-jpq/lua-async-await
--- ! Forked by me (github user): cyanidle
-
---#################### ############ ####################
---#################### Async Region ####################
---#################### ############ ####################
-
+---@diagnostic disable: lowercase-global
 local co = coroutine
 
-local _push = __push_thread
-local _pop = __pop_thread
-local _trace = __traceback
+---@alias callback<T> fun(res: T?, err: string?)
+---@alias promise<T> fun(cb: callback<T>)
 
-_push(co.running())
--- ADor
--- Updated by me to allow multiple return values
-
--- use with wrap
-local pong = function (func, callback)
-  assert(type(func) == "function", "type error :: expected func")
-  local thread = co.create(func)
-  local step = nil
-  step = function (...)
-    _push(thread)
-    local pack = {co.resume(thread, ...)}
-    local status = pack[1]
-    local ret = pack[2]
-    if not status then
-      local trace = _trace(ret, 1)
-      _pop()
-      error(trace, 0)
-    end
-    _pop()
-    if co.status(thread) == "dead" then
-        if (callback) then 
-          (function (_, ...) callback(...) end)(table.unpack(pack))
+---@return promise
+local function make_promise(thread, ...)
+    local cb
+    local done
+    local res, err
+    local step
+    step = function (...) -- Args or (res, err) here
+        ok, res, err = co.resume(thread, ...)
+        if not ok then
+            err, res = res, nil
         end
-    else
-      assert(type(ret) == "function", "type error :: expected func - coroutine yielded some value")
-      ret(step)
-    end
-  end
-  step()
-end
-
-
--- use with pong, creates thunk factory
-local wrap = function (func)
-  assert(type(func) == "function", "type error :: expected func")
-  local factory = function (...)
-    local params = {...}
-    local thunk = function (step)
-      table.insert(params, step)
-      return func(unpack(params))
-    end
-    return thunk
-  end
-  return factory
-end
-
-
--- many thunks -> single thunk
-local join = function (thunks)
-  local len = table.getn(thunks)
-  local done = 0
-  local acc = {}
-
-  local thunk = function (step)
-    if len == 0 then
-      return step()
-    end
-    for i, tk in ipairs(thunks) do
-      assert(type(tk) == "function", "thunk must be function")
-      local callback = function (...)
-        acc[i] = {...}
-        done = done + 1
-        if done == len then
-          step(unpack(acc))
+        if co.status(thread) == "dead" then
+            done = true
+            if cb then cb(res, err) end
+            return
+        else
+            res(step)
         end
-      end
-      tk(callback)
     end
-  end
-  return thunk
+    step(...)
+    return function (callback)
+        if done then
+            callback(res, err)
+        else
+            cb = callback
+        end
+    end
 end
 
 
--- sugar over coroutine
-local await = function (defer)
-  assert(type(defer) == "function", "type error :: expected func")
-  return co.yield(defer)
+---@generic T
+---@param func fun(...): T?
+---@return fun(...): promise<T?>
+function async(func)
+    return function(...)
+        local thread = co.create(func)
+        local params = {...}
+        local promise = make_promise(thread, ...)
+        local last = params[#params]
+        if type(last) == "function" then
+            promise(last)
+        else
+            return promise
+        end
+    end
 end
 
-
-local await_all = function (defer)
-  assert(type(defer) == "table", "type error :: expected table")
-  return co.yield(join(defer))
+---@generic T
+---@overload fun(...)
+---@return fun(...): promise<T>
+function promisify(func)
+    return function(...)
+        local cb
+        local ok, res, err
+        local params = {...}
+        local last = params[#params]
+        table.insert(params, function (_res, _err)
+            if cb then
+                cb(_res, _err)
+            else
+                res, err = _res, _err
+            end
+        end)
+        local thread = co.create(func)
+        ok, err = co.resume(thread, unpack(params))
+        if ok then err = nil end
+        local promise = function (callback)
+            if res ~= nil or err ~= nil then
+                callback(res, err)
+            else
+                cb = callback
+            end
+        end
+        if type(last) == "function" then
+            promise(last)
+        else
+            return promise
+        end
+    end
 end
 
-local async_after = wrap(after)
-
-return {
-  sync = wrap(pong),
-  wait = await,
-  wait_all = await_all,
-  wrap = wrap,
-  sleep = function (time) 
-    await(async_after(time))
-  end,
-}
+---@generic T
+---@param promise promise<T>
+function await(promise)
+    assert(type(promise) == "function", "function expected")
+    return co.yield(promise)
+end

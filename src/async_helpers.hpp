@@ -16,14 +16,10 @@ void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
             return;
         }
         QVariantList args;
-        if (res) {
+        try {
             args = {res.get(), QVariant{}};
-        } else {
-            try {
-                std::rethrow_exception(res.get_exception());
-            } catch (std::exception& e) {
-                args = {QVariant{}, e.what()};
-            }
+        } catch (std::exception& e) {
+            args = {QVariant{}, e.what()};
         }
         try {
             cb.Call(std::move(args));

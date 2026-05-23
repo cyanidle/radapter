@@ -137,7 +137,8 @@ public:
                     poll();
                 });
             })
-            .CatchSync([this](std::exception& e){
+            .CatchSync([this, ref = QPointer(this)](std::exception& e){
+                if (!ref) return;
                 Error("Could not subscribe to hash: {}", e.what());
                 sub_client->ReconnectLater();
                 client->ReconnectLater();
@@ -165,7 +166,8 @@ public:
                     emit SendMsg(diff);
                 }
             })
-            .CatchSync([this](std::exception& e) {
+            .CatchSync([this, ref = QPointer(this)](std::exception& e) {
+                if (!ref) return;
                 Error("{}: Could not read hash {} => {}", objectName(), *config.hash_key, e.what());
             });
 
@@ -193,7 +195,8 @@ public:
                     Error("{}: non-ok responce: {}", objectName(), resp.toString());
                 }
             })
-            .CatchSync([this](std::exception& e){
+            .CatchSync([this, ref = QPointer(this)](std::exception& e){
+                if (!ref) return;
                 Error("{}: error writing: {}", objectName(), e.what());
             });
     }
@@ -240,13 +243,15 @@ class Stream : public Worker
 public:
     void saveLastId() {
         client->Execute({"SET", lastIdKey, lastId})
-            .CatchSync([this](std::exception& e) mutable {
+            .CatchSync([this, ref = QPointer(this)](std::exception& e) mutable {
+                if (!ref) return;
                 Error("{}: Could not save last id: {}", objectName(), e.what());
             });
     }
     void loadIdAndRead() {
         client->Execute({"GET", lastIdKey})
-            .AtLastSync([this](Result<QVariant> res) mutable noexcept {
+            .AtLastSync([this, ref = QPointer(this)](Result<QVariant> res) mutable noexcept {
+                if (!ref) return;
                 try {
                     lastId = res.get().toString().toStdString();
                 } catch (std::exception& e) {
@@ -298,7 +303,8 @@ public:
                  "BLOCK", std::to_string(config.block_timeout.value),
                  "STREAMS", config.stream_key, lastId,
             })
-            .AtLastSync([this](Result<QVariant> resp){
+            .AtLastSync([this, ref = QPointer(this)](Result<QVariant> resp){
+                if (!ref) return;
                 try {
                     parseReply(resp.get());
                     nextRead();
@@ -349,7 +355,8 @@ public:
             cmd.Arg(k);
             cmd.Temp(v.toString().toStdString());
         }
-        client->Execute(cmd).CatchSync([this](std::exception& e){
+        client->Execute(cmd).CatchSync([this, ref = QPointer(this)](std::exception& e){
+            if (!ref) return;
             Error("{}: could not write stream: {}", objectName(), e.what());
         });
     }

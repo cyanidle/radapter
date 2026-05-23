@@ -1,5 +1,3 @@
-local a = async
-
 Cyphal {
     can = CAN {
         plugin = "socketcan",
@@ -10,12 +8,12 @@ Cyphal {
         {
             type = "uavcan.node.ExecuteCommand.1.2",
             port = 400,
-            handler = function(req, cb)
+            handler = async(function(req)
                 log("Req: {}", req)
-                cb({
+                return {
                     status = 1
-                })
-            end
+                }
+            end)
         }
     }
 }
@@ -34,13 +32,13 @@ local executeParams = {
     port = 400,
 }
 
-a.sync(function (state)
+async(function (x, y, z)
     local promise = node2:Request(executeParams, {
         command = 65529,
         parameter = "kekus",
     })
-    local res, err = a.wait(promise)
+    local res, err = await(promise)
     log("Res: {}. Err: {}", res, err)
-end)()
+end)(1, 2, 3)
 
 

@@ -15,7 +15,6 @@ struct radapter::Instance::Impl {
     int luaLogHandler = LUA_NOREF;
     unsigned logCatLen = 12;
     optional<fs::path> currentFile;
-    std::vector<lua_State*> threads;
 
     static int luaLog(lua_State* L);
     static int log_level(lua_State* L);
