@@ -20,13 +20,13 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
 option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
+option(RADAPTER_GUI "Enable GUI capabilities" ON)
+option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
+option(RADAPTER_ROS2 "Develop ROS2 plugin" OFF)
 
 if (RADAPTER_JIT_STATIC)
     set(RADAPTER_JIT ON)
 endif()
-
-option(RADAPTER_GUI "Enable GUI capabilities" ON)
-option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
 
 set(RADAPTER_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RADAPTER_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -179,4 +179,8 @@ if (NOT RADAPTER_SDK_ONLY)
     create_radapter_plugin(radapter_test_plugin
         FILES plugins/test.cpp
     )
+endif()
+
+if (RADAPTER_ROS2)
+    add_subdirectory(plugins/ros)
 endif()

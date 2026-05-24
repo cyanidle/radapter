@@ -624,6 +624,7 @@ int builtin::api::LoadPlugin(lua_State *L)
     size_t len;
     auto* _path = luaL_checklstring(L, 1, &len);
     auto path = QString::fromUtf8(_path, int(len));
+    auto args = help::toArgs(L, 2);
     auto* self = Instance::FromLua(L);
     auto* loader = new QPluginLoader(path, self);
     try {
@@ -635,7 +636,7 @@ int builtin::api::LoadPlugin(lua_State *L)
         if (!plug) {
             Raise("Loaded plugin does not implement: {}", qobject_interface_iid<WorkerPlugin*>());
         }
-        plug->Initialize(self);
+        plug->Initialize(self, args);
         return 0;
     } catch (...) {
         delete loader;

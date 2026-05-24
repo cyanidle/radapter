@@ -1,8 +1,7 @@
 ---@meta radapter
 
 ---@param path string
----@return fun(params: any): Worker
-function load_plugin(path) end
+function load_plugin(path, ...) end
 
 ---@param table table
 ---@param key string

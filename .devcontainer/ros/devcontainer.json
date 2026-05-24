@@ -1,0 +1,5 @@
+{
+  "name": "ROS2 Plugin Development Environment",
+  "build": { "dockerfile": "../../plugins/ros/Dockerfile" },
+  "remoteUser": "ubuntu"
+}

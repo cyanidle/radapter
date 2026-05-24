@@ -4,6 +4,7 @@
 #include "logs.hpp"
 #include "radapter/config.hpp"
 #include <QtPlugin>
+#include <qobject.h>
 
 struct lua_State;
 
@@ -63,7 +64,7 @@ signals:
 
 struct RADAPTER_API WorkerPlugin {
     virtual ~WorkerPlugin() = default;
-    virtual void Initialize(Instance* target) = 0;
+    virtual void Initialize(Instance* target, QVariantList args) = 0;
 };
 
 }
@@ -78,8 +79,8 @@ Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
         Q_PLUGIN_METADATA(IID iid) \
         Q_INTERFACES(radapter::WorkerPlugin)  \
     public:  \
-        void Initialize(Instance* radapter) override;\
+        void Initialize(radapter::Instance* radapter, QVariantList args) override;\
     }; \
-void worker##_RadPluginImpl::Initialize(Instance* radapter)
+void worker##_RadPluginImpl::Initialize(radapter::Instance* radapter, QVariantList args)
 
 #endif //RADAPTER_WORKER_H
