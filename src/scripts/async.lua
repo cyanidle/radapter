@@ -60,27 +60,26 @@ function promisify(func)
         local ok, res, err
         local params = {...}
         local last = params[#params]
-        table.insert(params, function (_res, _err)
-            if cb then
-                cb(_res, _err)
-            else
-                res, err = _res, _err
-            end
-        end)
+        if type(last) ~= "function" then
+            table.insert(params, function (_res, _err)
+                if cb then
+                    cb(_res, _err)
+                else
+                    res, err = _res, _err
+                end
+            end)
+        end
         local thread = co.create(func)
         ok, err = co.resume(thread, unpack(params))
         if ok then err = nil end
-        local promise = function (callback)
-            if res ~= nil or err ~= nil then
-                callback(res, err)
-            else
-                cb = callback
+        if type(last) ~= "function" then
+            return function (callback)
+                if res ~= nil or err ~= nil then
+                    callback(res, err)
+                else
+                    cb = callback
+                end
             end
-        end
-        if type(last) == "function" then
-            promise(last)
-        else
-            return promise
         end
     end
 end

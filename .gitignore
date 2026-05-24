@@ -1,4 +1,4 @@
-build/
+**/build/
 VERSION
 GIT_COMMIT
 *.user

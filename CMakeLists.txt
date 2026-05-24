@@ -157,6 +157,16 @@ install(TARGETS radapter-sdk EXPORT radapter-config)
 install(DIRECTORY include/radapter DESTINATION include)
 install(FILES ${CMAKE_BINARY_DIR}/_info/radapter_info.hpp DESTINATION include/radapter)
 
+function(create_radapter_plugin name)
+    set(options)
+    set(args)
+    set(multi_args FILES)
+    cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
+
+    add_library(${name} SHARED ${ARG_FILES})
+    target_link_libraries(${name} PUBLIC radapter-sdk)
+endfunction()
+
 if (NOT RADAPTER_SDK_ONLY)
     add_executable(radapter ./app/main.cpp)
     target_link_libraries(radapter PRIVATE
@@ -164,21 +174,9 @@ if (NOT RADAPTER_SDK_ONLY)
         argparse
         efsw-static
         radapter-sdk)
-
-    function(create_radapter_plugin name)
-        set(options)
-        set(args)
-        set(multi_args FILES)
-        cmake_parse_arguments(PARSE_ARGV 0 ARG "${options}" "${args}" "${multi_args}")
-
-        add_library(${name} SHARED ${ARG_FILES})
-        target_link_libraries(${name} PUBLIC radapter-sdk)
-    endfunction()
-
+    install(TARGETS radapter EXPORT radapter-config)
 
     create_radapter_plugin(radapter_test_plugin
         FILES plugins/test.cpp
     )
-
-    install(TARGETS radapter EXPORT radapter-config)
 endif()
