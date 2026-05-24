@@ -1,5 +1,13 @@
 {
   "name": "ROS2 Plugin Development Environment",
   "build": { "dockerfile": "../../plugins/ros/Dockerfile" },
-  "remoteUser": "ubuntu"
+  "remoteUser": "ubuntu",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd"
+      ]
+    }
+  },
+  "runArgs": ["--network=host"]
 }

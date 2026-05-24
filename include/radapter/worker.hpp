@@ -72,8 +72,8 @@ struct RADAPTER_API WorkerPlugin {
 #define RadapterWorkerPlugin_iid "radapter.plugins.Worker/1.1"
 Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
 
-#define RADAPTER_PLUGIN(iid) \
-    class worker##_RadPluginImpl final : public QObject, public radapter::WorkerPlugin \
+#define RADAPTER_PLUGIN(plugin, iid) \
+    class plugin##_RadPluginImpl final : public QObject, public radapter::WorkerPlugin \
     {  \
         Q_OBJECT  \
         Q_PLUGIN_METADATA(IID iid) \
@@ -81,6 +81,6 @@ Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
     public:  \
         void Initialize(radapter::Instance* radapter, QVariantList args) override;\
     }; \
-void worker##_RadPluginImpl::Initialize(radapter::Instance* radapter, QVariantList args)
+void plugin##_RadPluginImpl::Initialize(radapter::Instance* radapter, QVariantList args)
 
 #endif //RADAPTER_WORKER_H
