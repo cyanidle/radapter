@@ -104,11 +104,13 @@ public:
                 if (!done) reload();
                 done = true;
             });
+        } else {
+            QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
         }
     }
 
     void shutdown() {
-        QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit);
+        QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
         inst->Shutdown(sigterm ? 500 : 5000);
         return;
     }

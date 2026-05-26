@@ -205,6 +205,20 @@ void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     }
 }
 
+template<typename...Ts, size_t...Is>
+void ParseTuple(std::tuple<Ts...>& tup, QVariantList const& conf, std::index_sequence<Is...>, TraceFrame const& frame) {
+    (Parse(std::get<Is>(tup), conf[Is], TraceFrame(Is, frame)), ...);
+}
+
+template<typename...Ts>
+void Parse(std::tuple<Ts...>& tup, QVariant const& conf, TraceFrame const& frame = {}) {
+    constexpr size_t sz = sizeof...(Ts);
+    QVariantList list = conf.toList();
+    if (!conf.canConvert<QVariantList>() || list.size() < sz)
+        Raise("{}: Tuple of size at least({}) expected", frame, sz);
+    ParseTuple(tup, list, std::make_index_sequence<sz>{}, frame);
+}
+
 template<typename T>
 T ParseAs(QVariant const& conf) {
     T res;
@@ -309,6 +323,18 @@ void Dump(const map<K, T>& in, QVariant& out) {
     out = std::move(res);
 }
 
+template<typename...Ts, size_t...Is>
+void DumpTuple(std::tuple<Ts...> const& tup, QVariant& out, std::index_sequence<Is...>) {
+    QVariant temp[sizeof...(Is)];
+    (Dump(temp[Is]), ...);
+    out = QVariantList{temp[Is]...};
+}
+
+template<typename...Ts>
+void Dump(std::tuple<Ts...> const& tup, QVariant& out) {
+    DumpTuple(tup, out, std::make_index_sequence<sizeof...(Ts)>{});
+}
+
 /// Populate Schema
 
 void RADAPTER_API PopulateSchema(bool&, QVariant& schema);
@@ -394,6 +420,18 @@ void PopulateSchema(vector<T>& in, QVariant& schema) {
     QVariant nested;
     PopulateSchema(in.emplace_back(), nested);
     schema = QVariantList{nested};
+}
+
+template<typename...Ts, size_t...Is>
+void PopulateSchemaTuple(std::tuple<Ts...>& in, QVariant& schema, std::index_sequence<Is...>) {
+    QVariant temp[sizeof...(Is)];
+    (PopulateSchema(std::get<Is>(in), temp[Is]), ...);
+    schema = QVariantList{temp[Is]...};
+}
+
+template<typename...Ts>
+void PopulateSchema(std::tuple<Ts...>& in, QVariant& schema) {
+    PopulateSchemaTuple(in, schema, std::make_index_sequence<sizeof...(Ts)>{});
 }
 
 template<typename K, typename T>

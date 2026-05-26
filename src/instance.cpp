@@ -316,7 +316,9 @@ void Instance::Shutdown(unsigned int timeout)
         }
     });
     if (d->workers.empty()) {
-        emit ShutdownDone();
+        if (!std::exchange(d->shutdownDone, true)) {
+            emit ShutdownDone();
+        }
     }
 }
 

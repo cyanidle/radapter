@@ -626,10 +626,15 @@ int builtin::api::LoadPlugin(lua_State *L)
     auto path = QString::fromUtf8(_path, int(len));
     auto args = help::toArgs(L, 2);
     auto* self = Instance::FromLua(L);
+    auto already_loaded = self->findChildren<QPluginLoader*>(QString(), Qt::FindDirectChildrenOnly);
     auto* loader = new QPluginLoader(path, self);
     try {
         if (!loader->load()) {
             Raise("Could not load {} => {}", path, loader->errorString());
+        }
+        for (auto* l: already_loaded) {
+            if (l->instance() == loader->instance())
+                Raise("Plugin: {} already loaded", l->fileName());
         }
         auto* inst = loader->instance();
         auto* plug = qobject_cast<WorkerPlugin*>(inst);
