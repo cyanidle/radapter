@@ -7,6 +7,8 @@
 #include <rosidl_typesupport_introspection_cpp/service_introspection.hpp>
 #include <rosidl_typesupport_introspection_cpp/field_types.hpp>
 
+#include "ros_conversions.hpp"
+
 using namespace radapter;
 
 namespace ros2
@@ -123,55 +125,40 @@ public:
 using MessageMembers = rosidl_typesupport_introspection_cpp::MessageMembers;
 using MessageMember = rosidl_typesupport_introspection_cpp::MessageMember;
 
-static QVariantMap ros_to_qvariant(const uint8_t* msg_ptr, const MessageMembers* members) {
-    QVariantMap map;
-    
-    for (size_t i = 0; i < members->member_count_; ++i) {
-        const MessageMember& member = members->members_[i];
-        const uint8_t* field_ptr = msg_ptr + member.offset_;
-        QString key = QString::fromStdString(member.name_);
-        
-        if (member.is_array_) {
-            // Handle arrays by looping through member.array_size_ or dynamic vectors
-            continue;
-        }
+struct Pub {
+    std::string type;
+    WithDefault<unsigned> qos = 10u;
+};
 
-        switch (member.type_id_) {
-            case rosidl_typesupport_introspection_cpp::ROS_TYPE_INT32:
-                map[key] = *reinterpret_cast<const int32_t*>(field_ptr);
-                break;
-            case rosidl_typesupport_introspection_cpp::ROS_TYPE_FLOAT:
-                map[key] = *reinterpret_cast<const float*>(field_ptr);
-                break;
-            case rosidl_typesupport_introspection_cpp::ROS_TYPE_STRING: {
-                const auto* str = reinterpret_cast<const std::string*>(field_ptr);
-                map[key] = QString::fromStdString(*str);
-                break;
-            }
-            case rosidl_typesupport_introspection_cpp::ROS_TYPE_MESSAGE: {
-                const auto* sub_members = static_cast<const MessageMembers*>(member.members_->data);
-                map[key] = ros_to_qvariant(field_ptr, sub_members);
-                break;
-            }
-        }
-    }
-    return map;
+RAD_DESCRIBE(Pub)
+{
+    RAD_MEMBER(type);
+    RAD_MEMBER(qos);
 }
 
-using MsgType = std::string;
-using Sub = std::tuple<MsgType>;
+struct Sub : Pub {
+    std::optional<LuaFunction> handler;
+};
+
+RAD_DESCRIBE(Sub)
+{
+    PARENT(Pub);
+    RAD_MEMBER(handler);
+}
 
 struct Config
 {
     std::string name;
     std::optional<std::string> namespace_;
     WithDefault<std::map<std::string, Sub>> subs;
+    WithDefault<std::map<std::string, Pub>> pubs;
 };
 
 RAD_DESCRIBE(Config) {
     RAD_MEMBER(name);
     MEMBER("namespace", &_::namespace_);
     RAD_MEMBER(subs);
+    RAD_MEMBER(pubs);
 }
 
 class NodeWorker final : public radapter::Worker {
@@ -181,6 +168,13 @@ class NodeWorker final : public radapter::Worker {
     RosState* m_state;
     rclcpp::Node::SharedPtr m_node;
     std::vector<rclcpp::GenericSubscription::SharedPtr> m_subs;
+
+    struct PubState {
+        rclcpp::GenericPublisher::SharedPtr pub;
+        const rosidl_message_type_support_t* ts;
+        const rosidl_message_type_support_t* its;
+    };
+    std::unordered_map<QString, PubState> m_pubs;
 public:
     ~NodeWorker() {
         m_state->executor->remove_node(m_node, true);
@@ -198,32 +192,64 @@ public:
             m_node = std::make_shared<rclcpp::Node>(m_config.name, opts);
         }
         for (auto& [topic, sub]: m_config.subs.value) {
-            auto& [type] = sub;
-            auto ts = m_state->get_msg_typesupport(false, type);
-            auto its = m_state->get_msg_typesupport(true, type);
-            const auto* members = static_cast<const MessageMembers*>(its->data);
-            m_subs.emplace_back(m_node->create_generic_subscription(topic, type, rclcpp::QoS(10), [ts, members, this, topic=QString::fromStdString(topic)](rclcpp::SerializedMessage msg){
-                try {
-                    rclcpp::SerializationBase serialization_engine(ts);
-                    alignas(void*) char stack_buffer[1024];
-                    std::pmr::monotonic_buffer_resource res(stack_buffer, sizeof(stack_buffer));
-                    std::pmr::vector<uint8_t> raw_memory_buffer(members->size_of_, &res);
-                    serialization_engine.deserialize_message(&msg, raw_memory_buffer.data());
-                    auto var = ros_to_qvariant(raw_memory_buffer.data(), members);
-                    QMetaObject::invokeMethod(this, [this, topic, var = std::move(var)]{
-                        emit SendMsgField(topic, var);
-                    }, Qt::QueuedConnection);
-                } catch (std::exception& e) {
-                    std::string msg = e.what();
-                    QMetaObject::invokeMethod(this, [this, msg = std::move(msg), topic]{
-                        Error("While deserializing msg from topic: {} -> {}", topic, msg);
-                    }, Qt::QueuedConnection);
-                }
-            }));
+            auto ts = m_state->get_msg_typesupport(false, sub.type);
+            auto its = m_state->get_msg_typesupport(true, sub.type);
+            m_subs.emplace_back(
+                m_node->create_generic_subscription(topic, sub.type, rclcpp::QoS(sub.qos),
+                [h = sub.handler ? &sub.handler.value() : nullptr, ts, its, this, topic=QString::fromStdString(topic)](rclcpp::SerializedMessage msg){
+                    try {
+                        rclcpp::SerializationBase serialization_engine(ts);
+                        const auto* members = static_cast<const MessageMembers*>(its->data);
+                        jv::DefaultArena<> arena;
+                        void* ros_msg = arena.Allocate(members->size_of_);
+                        if (members->init_function)
+                            members->init_function(ros_msg, rosidl_runtime_cpp::MessageInitialization::ALL);
+                        serialization_engine.deserialize_message(&msg, ros_msg);
+                        auto var = ros_to_qt(ros_msg, members);
+                        members->fini_function(ros_msg);
+                        QMetaObject::invokeMethod(this, [this, topic, var = std::move(var), h]{
+                            if (h)
+                                h->Call({var});
+                            emit SendMsgField(topic, var);
+                        }, Qt::QueuedConnection);
+                    } catch (std::exception& e) {
+                        std::string msg = e.what();
+                        QMetaObject::invokeMethod(this, [this, msg = std::move(msg), topic]{
+                            Error("While deserializing msg from topic: {} -> {}", topic, msg);
+                        }, Qt::QueuedConnection);
+                    }
+                }));
+        }
+        for (auto& [topic, pub]: m_config.pubs.value) {
+            auto ts = m_state->get_msg_typesupport(false, pub.type);
+            auto its = m_state->get_msg_typesupport(true, pub.type);
+            m_pubs[QString::fromStdString(topic)] = PubState{m_node->create_generic_publisher(topic, pub.type, rclcpp::QoS(pub.qos)), ts, its};
         }
         m_state->executor->add_node(m_node, true);
     }
     void OnMsg(QVariant const& msg) override {
+        auto map = msg.toMap();
+        for (auto it = map.constKeyValueBegin(); it != map.constKeyValueEnd(); ++it) {
+            const auto& [k, v] = *it;
+            auto p = m_pubs.find(k);
+            if (p == m_pubs.end())
+            {
+                Warn("Publisher topic with name {} not registered", k);
+                continue;
+            }
+            auto& [pub, ts, its] = p->second;
+            rclcpp::SerializedMessage serialized;
+            const auto* members = static_cast<const MessageMembers*>(its->data);
+            rclcpp::SerializationBase serialization_engine(ts);
+            jv::DefaultArena<> arena;
+            void* ros_msg = arena.Allocate(members->size_of_);
+            if (members->init_function)
+                members->init_function(ros_msg, rosidl_runtime_cpp::MessageInitialization::ALL);
+            qt_to_ros(ros_msg, v, members);
+            serialization_engine.serialize_message(ros_msg, &serialized);
+            members->fini_function(ros_msg);
+            pub->publish(serialized);
+        }
     }
 };
 

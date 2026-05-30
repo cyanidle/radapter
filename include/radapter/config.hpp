@@ -207,14 +207,14 @@ void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
 
 template<typename...Ts, size_t...Is>
 void ParseTuple(std::tuple<Ts...>& tup, QVariantList const& conf, std::index_sequence<Is...>, TraceFrame const& frame) {
-    (Parse(std::get<Is>(tup), conf[Is], TraceFrame(Is, frame)), ...);
+    (Parse(std::get<Is>(tup), conf.value(Is), TraceFrame(Is, frame)), ...);
 }
 
 template<typename...Ts>
 void Parse(std::tuple<Ts...>& tup, QVariant const& conf, TraceFrame const& frame = {}) {
     constexpr size_t sz = sizeof...(Ts);
     QVariantList list = conf.toList();
-    if (!conf.canConvert<QVariantList>() || list.size() < sz)
+    if (!conf.canConvert<QVariantList>())
         Raise("{}: Tuple of size at least({}) expected", frame, sz);
     ParseTuple(tup, list, std::make_index_sequence<sz>{}, frame);
 }
