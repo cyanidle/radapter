@@ -22,10 +22,11 @@ RUN apt-get update && apt-get upgrade -y && \
     clang-tidy \
     ros-jazzy-turtlesim \
     ros-jazzy-rqt* \
+    ros-jazzy-example-interfaces ros-jazzy-demo-nodes-cpp \
     git cmake ninja-build build-essential \
     libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
     libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
-    libssl-dev \
+    libssl-dev
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/ubuntu/.bashrc

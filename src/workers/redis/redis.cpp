@@ -7,7 +7,7 @@
 #include <QFile>
 #include <qcoreapplication.h>
 #include <set>
-#include "async_helpers.hpp"
+#include "radapter/async_helpers.hpp"
 
 namespace radapter::redis {
 

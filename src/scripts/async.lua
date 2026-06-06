@@ -4,6 +4,8 @@ local co = coroutine
 ---@alias callback<T> fun(res: T?, err: string?)
 ---@alias promise<T> fun(cb: callback<T>)
 
+--- TODO: error is lost here!
+
 ---@return promise
 local function make_promise(thread, ...)
     local cb

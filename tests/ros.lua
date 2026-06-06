@@ -16,6 +16,11 @@ local node = ROS2 {
         ["/chatter"] = {
             type = "std_msgs/msg/String"
         },
+    },
+    clients = {
+        ["/add_two_ints"] = {
+            type = "example_interfaces/srv/AddTwoInts"
+        },
     }
 }
 
@@ -23,10 +28,20 @@ pipe(node, function (msg)
     log("Msg from ros: {}", msg)
 end)
 
-each(1000, function ()
+each(3000, function ()
     node({
         ["/chatter"] = {
             data = "Hi from Radapter!"
         }
     })
 end)
+
+each(1000, async(function ()
+    log("Request!")
+    local promise = node:Request("/add_two_ints", {
+        a = 3,
+        b = 5,
+    })
+    local res = await(promise)
+    log("Req result: {}", res)
+end))

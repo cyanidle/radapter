@@ -1,4 +1,5 @@
 ﻿#include "radapter/radapter.hpp"
+#include "radapter/async_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <QMetaObject>
 #include <QCoreApplication>
@@ -28,6 +29,9 @@ RAD_DESCRIBE(PluginSettings) {
 }
 
 class RosState;
+
+using TS = const rosidl_message_type_support_t*;
+using SrvTS = std::pair<TS, TS>;
 
 static thread_local RosState* _t_state;
 
@@ -89,7 +93,7 @@ public:
         }, Qt::ConnectionType::QueuedConnection);
     }
 
-    const rosidl_message_type_support_t* get_typesupport(bool is_introspect, const std::string& package, const std::string& subfolder, const std::string& msg_name) {
+    TS get_typesupport(bool is_introspect, const std::string& package, const std::string& subfolder, const std::string& msg_name) {
         auto impl = is_introspect ? "_introspection" : "";
         std::string library_name = rcpputils::get_platform_library_name(fmt::format("{}__rosidl_typesupport{}_cpp", package, impl));
         auto it = libcache.find(library_name);
@@ -103,12 +107,12 @@ public:
         if (!shared_library->has_symbol(symbol_name)) {
             Raise("Symbol not found: " + symbol_name);
         }
-        using GetMsgTSFunc = const rosidl_message_type_support_t* (*)();
+        using GetMsgTSFunc = TS (*)();
         auto get_ts_func = reinterpret_cast<GetMsgTSFunc>(shared_library->get_symbol(symbol_name));
         return get_ts_func();
     }
 
-    const rosidl_message_type_support_t* get_msg_typesupport(bool is_introspection, std::string const& full_name) {
+    TS get_msg_typesupport(bool is_introspection, std::string const& full_name) {
         static QRegularExpression re("(\\w+)\\/msg\\/(\\w+)");
         auto match = re.match(QString::fromStdString(full_name));
         if (!match.hasMatch()) {
@@ -119,6 +123,25 @@ public:
             "msg",
             match.capturedView(2).toString().toStdString()
         );
+    }
+
+    SrvTS get_srv_typesupport(bool is_introspection, std::string const& full_name) {
+        static QRegularExpression re("(\\w+)\\/srv\\/(\\w+)");
+        auto match = re.match(QString::fromStdString(full_name));
+        if (!match.hasMatch()) {
+            Raise("Invalid srv name: {}", full_name);
+        }
+        auto req = get_typesupport(is_introspection,
+            match.capturedView(1).toString().toStdString(),
+            "srv",
+            match.capturedView(2).toString().toStdString() + "_Request"
+        );
+        auto res = get_typesupport(is_introspection,
+            match.capturedView(1).toString().toStdString(),
+            "srv",
+            match.capturedView(2).toString().toStdString() + "_Response"
+        );
+        return {req, res};
     }
 };
 
@@ -146,12 +169,22 @@ RAD_DESCRIBE(Sub)
     RAD_MEMBER(handler);
 }
 
+struct Client {
+    std::string type;
+};
+
+RAD_DESCRIBE(Client)
+{
+    RAD_MEMBER(type);
+};
+
 struct Config
 {
     std::string name;
     std::optional<std::string> namespace_;
     WithDefault<std::map<std::string, Sub>> subs;
     WithDefault<std::map<std::string, Pub>> pubs;
+    WithDefault<std::map<std::string, Client>> clients;
 };
 
 RAD_DESCRIBE(Config) {
@@ -159,6 +192,14 @@ RAD_DESCRIBE(Config) {
     MEMBER("namespace", &_::namespace_);
     RAD_MEMBER(subs);
     RAD_MEMBER(pubs);
+    RAD_MEMBER(clients);
+}
+
+static void* make_ros_msg(jv::Arena& arena, const MessageMembers* members) {
+    void* ros_msg = arena.Allocate(members->size_of_);
+    if (members->init_function)
+        members->init_function(ros_msg, rosidl_runtime_cpp::MessageInitialization::ALL);
+    return ros_msg;
 }
 
 class NodeWorker final : public radapter::Worker {
@@ -175,6 +216,23 @@ class NodeWorker final : public radapter::Worker {
         const rosidl_message_type_support_t* its;
     };
     std::unordered_map<QString, PubState> m_pubs;
+
+    struct ClientState {
+        rclcpp::GenericClient::SharedPtr client;
+        SrvTS ts;
+        SrvTS its;
+    };
+    std::unordered_map<QString, ClientState> m_clients;
+    rclcpp::TimerBase::SharedPtr m_poller;
+
+    struct PendingState {
+        rclcpp::GenericClient::FutureAndRequestId fut;
+        fut::Promise<QVariant> recv;
+        ClientState* client;
+    };
+
+    std::list<PendingState> m_pending;
+    std::mutex m_pending_mut;
 public:
     ~NodeWorker() {
         m_state->executor->remove_node(m_node, true);
@@ -201,9 +259,7 @@ public:
                         rclcpp::SerializationBase serialization_engine(ts);
                         const auto* members = static_cast<const MessageMembers*>(its->data);
                         jv::DefaultArena<> arena;
-                        void* ros_msg = arena.Allocate(members->size_of_);
-                        if (members->init_function)
-                            members->init_function(ros_msg, rosidl_runtime_cpp::MessageInitialization::ALL);
+                        void* ros_msg = make_ros_msg(arena, members);
                         serialization_engine.deserialize_message(&msg, ros_msg);
                         auto var = ros_to_qt(ros_msg, members);
                         members->fini_function(ros_msg);
@@ -223,9 +279,20 @@ public:
         for (auto& [topic, pub]: m_config.pubs.value) {
             auto ts = m_state->get_msg_typesupport(false, pub.type);
             auto its = m_state->get_msg_typesupport(true, pub.type);
-            m_pubs[QString::fromStdString(topic)] = PubState{m_node->create_generic_publisher(topic, pub.type, rclcpp::QoS(pub.qos)), ts, its};
+            auto gpub = m_node->create_generic_publisher(topic, pub.type, rclcpp::QoS(pub.qos));
+            m_pubs[QString::fromStdString(topic)] = PubState{gpub, ts, its};
+        }
+        for (auto& [service, client]: m_config.clients.value) {
+            auto ts = m_state->get_srv_typesupport(false, client.type);
+            auto its = m_state->get_srv_typesupport(true, client.type);
+            auto gclient = m_node->create_generic_client(service, client.type); //qos?
+            m_clients[QString::fromStdString(service)] = ClientState{gclient, ts, its};
         }
         m_state->executor->add_node(m_node, true);
+        m_poller = m_node->create_wall_timer(
+            std::chrono::milliseconds(5),
+            std::bind(&NodeWorker::pollFutures, this)
+        );
     }
     void OnMsg(QVariant const& msg) override {
         auto map = msg.toMap();
@@ -242,13 +309,65 @@ public:
             const auto* members = static_cast<const MessageMembers*>(its->data);
             rclcpp::SerializationBase serialization_engine(ts);
             jv::DefaultArena<> arena;
-            void* ros_msg = arena.Allocate(members->size_of_);
-            if (members->init_function)
-                members->init_function(ros_msg, rosidl_runtime_cpp::MessageInitialization::ALL);
+            void* ros_msg = make_ros_msg(arena, members);
             qt_to_ros(ros_msg, v, members);
             serialization_engine.serialize_message(ros_msg, &serialized);
             members->fini_function(ros_msg);
             pub->publish(serialized);
+        }
+    }
+    void pollFutures() {
+        
+        std::lock_guard<std::mutex> lock(m_pending_mut);
+        if (m_pending.empty()) return;
+
+        auto it = m_pending.begin();
+        while (it != m_pending.end()) {
+            if (it->fut.wait_for(std::chrono::microseconds{0}) != std::future_status::ready)
+            {
+                it++;
+                continue;
+            }
+            auto& [_, ts, its] = *it->client;
+            try {
+                std::shared_ptr<void> ros_msg = it->fut.get();
+                auto var = ros_to_qt(ros_msg.get(), static_cast<const MessageMembers*>(its.second->data));
+                it->recv(std::move(var));
+            } catch (...) {
+                it->recv(std::current_exception());
+            }
+            it = m_pending.erase(it);
+        }
+    }
+    QVariant Request(QVariantList args)
+    {
+        QString clientName;
+        clientName = args.value(0).toString();
+        QVariant data = args.value(1);
+        fut::Promise<QVariant> prom;
+        fut::Future<QVariant> future = prom.GetFuture();
+        auto it = m_clients.find(clientName);
+        if (it == m_clients.end())
+            Raise("Unknown client: {}", clientName);
+        auto& [client, ts, its] = it->second;
+        const auto* members = static_cast<const MessageMembers*>(its.first->data);
+        jv::DefaultArena<> arena;
+        void* ros_msg = make_ros_msg(arena, members);
+        qt_to_ros(ros_msg, data, members);
+        auto req = client->async_send_request(ros_msg);
+        {
+            std::lock_guard lock(m_pending_mut);
+            m_pending.emplace_back(PendingState{std::move(req), std::move(prom), &it->second});
+        }
+        members->fini_function(ros_msg);
+        if (args.size() > 2) {
+            LuaFunction func = args.value(2).value<LuaFunction>();
+            if (!func.IsValid())
+                Raise("Callback expected");
+            resolveLuaCallback(this, future, func);
+            return {};
+        } else {
+            return makeLuaPromise(this, future);
         }
     }
 };
@@ -260,7 +379,9 @@ using namespace ros2;
 
 RADAPTER_PLUGIN(Ros2, "radapter.plugins.Test") {
     radapter->Info("ros2", "Initializing ROS");
-    radapter->RegisterWorker<NodeWorker>("ROS2");
+    radapter->RegisterWorker<NodeWorker>("ROS2", {
+        {"Request", AsExtraMethod<&NodeWorker::Request>}
+    });
     radapter->RegisterSchema<Config>("ROS2");
 
     ros2::PluginSettings settings;

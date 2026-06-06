@@ -8,7 +8,7 @@
 #include <QSemaphore>
 #include <future/future.hpp>
 #include <qthread.h>
-#include "async_helpers.hpp"
+#include "radapter/async_helpers.hpp"
 
 namespace radapter::sql {
 

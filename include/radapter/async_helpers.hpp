@@ -1,6 +1,6 @@
-#include "radapter/radapter.hpp"
-#include "builtin.hpp"
 #include <future/future.hpp>
+
+#include "radapter/radapter.hpp"
 #include "radapter/worker.hpp"
 
 namespace radapter
