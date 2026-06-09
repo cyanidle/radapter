@@ -7,7 +7,7 @@
 #include <QSslCertificate>
 #include <QTimer>
 #include <qmetaobject.h>
-#include <set>
+#include <map>
 #include <json_view/json_view.hpp>
 #include <json_view/parse.hpp>
 #include <json_view/dump.hpp>
@@ -162,7 +162,7 @@ class Server : public Worker {
 
     WsServerConfig config;
     QWebSocketServer* server = nullptr;
-    std::set<QWebSocket*> socks;
+    std::map<QString, QWebSocket*> socks;
 public:
     Server(WsServerConfig conf, Instance* inst) :
         Worker(inst, "ws_server")
@@ -194,35 +194,53 @@ public:
 
     void OnMsg(QVariant const& msg) override {
         if (!msg.isValid()) return;
+        if (msg.type() == QVariant::Map) {
+            auto m = msg.toMap();
+            bool targeted = false;
+            for (auto it = m.begin(); it != m.end(); ++it) {
+                auto sockIt = socks.find(it.key());
+                if (sockIt != socks.end()) {
+                    targeted = true;
+                    auto toSend = prepareMsg(config, it.value());
+                    if (isBinary(config)) {
+                        sockIt->second->sendBinaryMessage(toSend);
+                    } else {
+                        sockIt->second->sendTextMessage(QString::fromUtf8(toSend));
+                    }
+                }
+            }
+            if (targeted) return;
+        }
         auto toSend = prepareMsg(config, msg);
         if (isBinary(config)) {
-            for (auto& cli: socks) {cli->sendBinaryMessage(toSend);}
+            for (auto& [_, cli]: socks) cli->sendBinaryMessage(toSend);
         } else {
             auto str = QString::fromUtf8(toSend);
-            for (auto& cli: socks) {cli->sendTextMessage(str);}
+            for (auto& [_, cli]: socks) cli->sendTextMessage(str);
         }
     }
 
     void accept(QWebSocket* sock) {
+        auto addr = QString("%1:%2").arg(sock->peerAddress().toString()).arg(sock->peerPort());
         sock->setParent(this);
-        sock->setObjectName(QString("%1:%2").arg(sock->peerAddress().toString()).arg(sock->peerPort()));
-        Info("{}: new client {}", objectName(), sock->objectName());
-        connect(sock, &QWebSocket::disconnected, sock, [=]{
-            Warn("{}: client disconnected {}", objectName(), sock->objectName());
+        sock->setObjectName(addr);
+        Info("{}: new client {}", objectName(), addr);
+        socks[addr] = sock;
+        emit SendEvent(QVariantMap{{"connected", addr}});
+        connect(sock, &QWebSocket::disconnected, this, [this, sock, addr]{
+            Warn("{}: client disconnected {}", objectName(), addr);
+            emit SendEvent(QVariantMap{{"disconnected", addr}});
             sock->deleteLater();
         });
-        connect(sock, &QWebSocket::textMessageReceived, this, [=](QString const& msg){
-            auto parsed = recvFrom(sock, this, config, msg.toUtf8());
-            emit SendMsg(parsed);
+        connect(sock, &QWebSocket::textMessageReceived, this, [this, sock, addr](QString const& msg){
+            emit SendMsg(QVariantMap{{addr, recvFrom(sock, this, config, msg.toUtf8())}});
         });
-        connect(sock, &QWebSocket::binaryMessageReceived, this, [=](QByteArray const& msg){
-            auto parsed = recvFrom(sock, this, config, msg);
-            emit SendMsg(parsed);
+        connect(sock, &QWebSocket::binaryMessageReceived, this, [this, sock, addr](QByteArray const& msg){
+            emit SendMsg(QVariantMap{{addr, recvFrom(sock, this, config, msg)}});
         });
-        connect(sock, &QWebSocket::destroyed, this, [=]{
-            socks.erase(sock);
+        connect(sock, &QWebSocket::destroyed, this, [this, addr]{
+            socks.erase(addr);
         });
-        socks.insert(sock);
     }
 };
 
@@ -236,7 +254,7 @@ public:
         Worker(inst, "ws_client")
     {
         config = std::move(conf);
-        setObjectName(QString("Client(%1:%2/%3)").arg(config.url));
+        setObjectName(QString("Client(%1/%2)").arg(config.url).arg(config.origin.value));
         optional<QSslConfiguration> ssl;
         if (config.cert_file.value.size() || config.key_file.value.size()) {
             ssl = CreateSslConfiguration(config.cert_file, config.key_file);
@@ -256,12 +274,10 @@ public:
             }
         });
         connect(sock, &QWebSocket::binaryMessageReceived, this, [=](QByteArray const& msg){
-            auto m = recvFrom(sock, this, config, msg);
-            if (m.isValid()) emit SendMsg(m);
+            emit SendMsg(recvFrom(sock, this, config, msg));
         });
         connect(sock, &QWebSocket::textMessageReceived, this, [=](QString const& msg){
-            auto m = recvFrom(sock, this, config, msg.toUtf8());
-            if (m.isValid()) emit SendMsg(m);
+            emit SendMsg(recvFrom(sock, this, config, msg.toUtf8()));
         });
         sock->open(QUrl(config.url));
     }

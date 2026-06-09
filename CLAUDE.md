@@ -169,6 +169,11 @@ nested described structs all compose recursively.
 
 ## Conventions
 
+- Comments: write no comments in C++ sources unless the WHY is non-obvious (hidden
+  constraint, subtle invariant, workaround for a specific bug). Never describe what the code
+  does — well-named identifiers do that. Lua scripts under `tests/` are public-facing
+  documentation and may carry header comments and usage instructions.
+
 - Logging: `worker->Info/Warn/Error/Debug("fmt {}", args)` (fmtlib syntax) or
   `inst->Info(category, ...)`. From Lua: `log.info(...)`, `log "msg"`, `log.set_level(...)`,
   `log.set_handler(fn)`.

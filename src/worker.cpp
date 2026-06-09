@@ -122,6 +122,7 @@ static int worker_index(lua_State* L) {
 }
 
 static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool is_event) {
+    if (!msg.isValid()) return;
     auto* L = impl->L;
     auto* w = impl->self.data();
     if (!w) {
