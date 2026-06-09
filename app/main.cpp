@@ -180,6 +180,9 @@ int main (int argc, char **argv) try {
         cli.add_argument("--gui")
             .flag()
             .help("Enable native gui mode");
+        cli.add_argument("--gui-auto-quit")
+            .flag()
+            .help("Quit the process when the last GUI window is closed (requires --gui)");
     }
     cli.add_argument("--watch-dir")
         .append()
@@ -208,6 +211,14 @@ int main (int argc, char **argv) try {
         std::cerr << cli << std::endl;
         return 1;
     }
+    if constexpr (radapter::GUI) {
+        if (cli["gui-auto-quit"] == true) {
+            if (cli["gui"] != true)
+                throw std::runtime_error("--gui-auto-quit requires --gui");
+            static_cast<QGuiApplication*>(app.get())->setQuitOnLastWindowClosed(true);
+        }
+    }
+
     auto sigs = QCtrlSignalHandler::instance();
     sigs->registerForSignal(QCtrlSignalHandler::SigInt);
     sigs->registerForSignal(QCtrlSignalHandler::SigTerm);

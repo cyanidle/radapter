@@ -30,7 +30,8 @@ build/bin/radapter tests/basic.lua
 build/bin/radapter --schema
 
 # Other useful flags
-build/bin/radapter --watch-dir . tests/modbus.lua   # hot reload on file change
+build/bin/radapter --watch-dir . tests/modbus.lua        # hot reload on file change
+build/bin/radapter --gui --gui-auto-quit tests/chat/client.lua  # quit when window closes
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
 build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables QML
@@ -52,6 +53,13 @@ drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 - `RADAPTER_GUI` (default ON) — enables Qt Gui/Qml/Quick and the `QML` worker.
 - `RADAPTER_STATIC` — build the SDK static; **disables runtime plugins**.
 - `RADAPTER_ROS2` — also build the out-of-tree ROS2 plugin under `plugins/ros/`.
+
+### Adding CLI flags
+
+`app/main.cpp` does a **pre-scan** of raw `argv` before argparse runs. This is necessary
+**only for `--gui`**, because `QGuiApplication` must be constructed before argparse touches
+`argc/argv`. All other flags must be added to the argparse parser and read after
+`cli.parse_args(args)` — do not add new flags to the pre-scan loop.
 
 ### Tests
 
