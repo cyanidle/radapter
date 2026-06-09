@@ -13,7 +13,7 @@ namespace radapter::gui
 
 struct QMLConfig {
     QString url;
-    vector<QString> props;
+    WithDefault<vector<QString>> props;
 };
 
 DESCRIBE("gui::QMLConfig", QMLConfig, void) {
