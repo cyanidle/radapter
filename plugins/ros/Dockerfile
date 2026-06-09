@@ -26,9 +26,10 @@ RUN apt-get update && apt-get upgrade -y && \
     git cmake ninja-build build-essential \
     libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
     libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
-    libssl-dev
+    curl libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl -fsSL https://raw.githubusercontent.com/dmtrKovalenko/fff.nvim/main/install-mcp.sh | bash
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/ubuntu/.bashrc
 ENV SHELL /bin/bash
 
