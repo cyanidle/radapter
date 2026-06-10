@@ -4,35 +4,59 @@ local co = coroutine
 ---@alias callback<T> fun(res: T?, err: string?)
 ---@alias promise<T> fun(cb: callback<T>)
 
---- TODO: error is lost here!
+local function is_callable(v)
+    if type(v) == "function" then return true end
+    local mt = getmetatable(v)
+    return mt ~= nil and mt.__call ~= nil
+end
+
+local promise_mt = {
+    __call = function(self, callback)
+        self.cb = callback
+        if self.done then
+            callback(self.res, self.err)
+        end
+    end
+}
+
+-- Subscription is synchronous in practice (await resumes and subscribes
+-- immediately; explicit promise(cb) follows the call on the same line), so a
+-- rejected promise still unsubscribed one event-loop turn later is
+-- fire-and-forget: report it instead of swallowing the error.
+local function unhandled_check(p)
+    after(0, function()
+        if not p.cb then
+            error("Unhandled async error: " .. tostring(p.err), 0)
+        end
+    end)
+end
 
 ---@return promise
 local function make_promise(thread, ...)
-    local cb
-    local done
-    local res, err
+    local p = setmetatable({}, promise_mt)
     local step
+    local function settle(res, err)
+        p.done, p.res, p.err = true, res, err
+        if p.cb then
+            p.cb(res, err)
+        elseif err ~= nil then
+            unhandled_check(p)
+        end
+    end
     step = function (...) -- Args or (res, err) here
-        ok, res, err = co.resume(thread, ...)
+        local ok, res, err = co.resume(thread, ...)
         if not ok then
-            err, res = res, nil
+            settle(nil, debug.traceback(thread, res))
+            return
         end
         if co.status(thread) == "dead" then
-            done = true
-            if cb then cb(res, err) end
-            return
+            settle(res, err)
         else
             res(step)
         end
     end
     step(...)
-    return function (callback)
-        if done then
-            callback(res, err)
-        else
-            cb = callback
-        end
-    end
+    return p
 end
 
 
@@ -59,10 +83,11 @@ end
 function promisify(func)
     return function(...)
         local cb
-        local ok, res, err
+        local res, err
         local params = {...}
         local last = params[#params]
-        if type(last) ~= "function" then
+        local inline = type(last) == "function"
+        if not inline then
             table.insert(params, function (_res, _err)
                 if cb then
                     cb(_res, _err)
@@ -72,9 +97,16 @@ function promisify(func)
             end)
         end
         local thread = co.create(func)
-        ok, err = co.resume(thread, unpack(params))
-        if ok then err = nil end
-        if type(last) ~= "function" then
+        local ok, rerr = co.resume(thread, unpack(params))
+        if not ok then
+            rerr = debug.traceback(thread, rerr)
+            if inline then
+                last(nil, rerr)
+                return
+            end
+            err = rerr
+        end
+        if not inline then
             return function (callback)
                 if res ~= nil or err ~= nil then
                     callback(res, err)
@@ -89,6 +121,6 @@ end
 ---@generic T
 ---@param promise promise<T>
 function await(promise)
-    assert(type(promise) == "function", "function expected")
+    assert(is_callable(promise), "callable (promise) expected")
     return co.yield(promise)
 end

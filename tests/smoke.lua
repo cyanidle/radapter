@@ -13,6 +13,7 @@ local checks = {
     ws_binary_roundtrip = true,
     sql_roundtrip = true,
     service = true,
+    async_unhandled = true,
 }
 
 local function pass(name)
@@ -98,6 +99,38 @@ db:Exec("SELECT x FROM t", function(rows, err)
     assert(err == nil, err)
     assert(rows[1][1] == 42, "unexpected select result: " .. __json_encode(rows))
     pass("sql_roundtrip")
+end)
+
+-- async: a discarded failing promise must be reported as an error;
+-- a subscribed one must reach its callback and NOT be reported
+local unhandled_seen = false
+local handled_misreported = false
+local handled_ok = false
+
+log.set_handler(function(msg)
+    local text = tostring(msg.msg)
+    if text:find("boom_unhandled") then
+        unhandled_seen = true
+    end
+    if text:find("Unhandled") and text:find("boom_handled") then
+        handled_misreported = true
+    end
+end)
+
+async(function() error("boom_unhandled") end)()
+
+local p = async(function() error("boom_handled") end)()
+p(function(res, err)
+    assert(err and err:find("boom_handled"), "subscriber must receive the error")
+    handled_ok = true
+end)
+
+after(300, function()
+    log.set_handler(nil)
+    assert(handled_ok, "handled async error must reach subscriber")
+    assert(not handled_misreported, "handled async error must not be reported as unhandled")
+    assert(unhandled_seen, "unhandled async error must be reported")
+    pass("async_unhandled")
 end)
 
 -- make_service correlation over a pure-Lua echo worker
