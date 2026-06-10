@@ -10,7 +10,7 @@
 
 local PORT = tonumber(args[1]) or 7654
 
-local server = WebsocketServer { port = PORT }
+local server = WebsocketServer { port = PORT, per_client = true }
 
 local clients = {}   -- addr:port -> true
 

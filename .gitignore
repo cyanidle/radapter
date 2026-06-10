@@ -10,3 +10,5 @@ CMakePresets.json
 out/
 toolchains/
 .cache
+.claude/
+.mcp.json

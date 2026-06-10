@@ -118,7 +118,7 @@ public:
         root->setParent(this);
         auto* meta = root->metaObject();
         auto handler = metaObject()->indexOfMethod("handlePropChange()");
-        for (auto& prop: config.props) {
+        for (auto& prop: config.props.value) {
             auto idx = meta->indexOfProperty(prop.toStdString().c_str());
             if (idx != - 1) {
                 auto p = meta->property(idx);

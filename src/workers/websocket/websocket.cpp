@@ -93,12 +93,14 @@ struct WsServerConfig : WsConfig {
     uint16_t port;
 
     WithDefault<string> host = "0.0.0.0";
+    WithDefault<bool> per_client = false;
 };
 
 RAD_DESCRIBE(WsServerConfig) {
     PARENT(WsConfig);
     RAD_MEMBER(port);
     RAD_MEMBER(host);
+    RAD_MEMBER(per_client);
 }
 
 using namespace jv;
@@ -194,7 +196,7 @@ public:
 
     void OnMsg(QVariant const& msg) override {
         if (!msg.isValid()) return;
-        if (msg.type() == QVariant::Map) {
+        if (config.per_client && msg.type() == QVariant::Map) {
             auto m = msg.toMap();
             bool targeted = false;
             for (auto it = m.begin(); it != m.end(); ++it) {
@@ -202,11 +204,10 @@ public:
                 if (sockIt != socks.end()) {
                     targeted = true;
                     auto toSend = prepareMsg(config, it.value());
-                    if (isBinary(config)) {
+                    if (isBinary(config))
                         sockIt->second->sendBinaryMessage(toSend);
-                    } else {
+                    else
                         sockIt->second->sendTextMessage(QString::fromUtf8(toSend));
-                    }
                 }
             }
             if (targeted) return;
@@ -233,10 +234,18 @@ public:
             sock->deleteLater();
         });
         connect(sock, &QWebSocket::textMessageReceived, this, [this, sock, addr](QString const& msg){
-            emit SendMsg(QVariantMap{{addr, recvFrom(sock, this, config, msg.toUtf8())}});
+            auto payload = recvFrom(sock, this, config, msg.toUtf8());
+            if (config.per_client)
+                emit SendMsg(QVariantMap{{addr, payload}});
+            else
+                emit SendMsg(payload);
         });
         connect(sock, &QWebSocket::binaryMessageReceived, this, [this, sock, addr](QByteArray const& msg){
-            emit SendMsg(QVariantMap{{addr, recvFrom(sock, this, config, msg)}});
+            auto payload = recvFrom(sock, this, config, msg);
+            if (config.per_client)
+                emit SendMsg(QVariantMap{{addr, payload}});
+            else
+                emit SendMsg(payload);
         });
         connect(sock, &QWebSocket::destroyed, this, [this, addr]{
             socks.erase(addr);
