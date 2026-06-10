@@ -1,89 +1,148 @@
-# Redis Adapter
+# radapter
 
-Как радаптер, но на LUA. Система для соединения зоопарка устройств/протоколов/баз данных
+**NodeJS-style plumbing for industrial/embedded integration.**  
+Wire together Modbus, WebSocket, Redis, SQL, Serial, CAN, and QML GUI using short Lua scripts — with schema validation, async/await, and hot-reload.
+
+## Why
+
+Integrating industrial devices usually means writing a full application: connect the device, parse the protocol, convert data, push it somewhere, repeat. radapter turns that into a pipeline:
+
+```lua
+local dev = TcpModbusDevice { host = "192.168.1.10", port = 502 }
+
+local plc = ModbusMaster {
+    device = dev, slave_id = 1,
+    registers = {
+        holding = {
+            ["pump:speed"]  = { index = 3, type = "float32" },
+            ["pump:status"] = { index = 1 },
+        },
+    },
+}
+
+local ws = WebsocketServer { port = 8080 }
+
+pipe(plc, ws)   -- register changes → all WebSocket clients as JSON
+pipe(ws, plc)   -- commands from clients → Modbus writes
+```
+
+The engine validates config, maps registers to named fields, and serializes messages.
+`pipe` accepts any mix of workers and plain Lua functions; return a value to forward it downstream.
+
+## Built-in workers
+
+| Worker | What it does |
+|---|---|
+| `TcpModbusDevice` / `ModbusMaster` | Modbus TCP master with named register mapping |
+| `WebsocketServer` / `WebsocketClient` | JSON or msgpack, broadcast or per-client routing |
+| `RedisCache` / `RedisStream` | Hash key sync and stream append |
+| `Sql` | SQLite / MySQL / PostgreSQL / ODBC |
+| `Serial` | Serial port, optional SLIP framing + msgpack |
+| `QML` | QML window as a bidirectional pipeline worker |
+| `CanMaster` / `CyphalMaster` | CAN/Cyphal frame I/O |
+
+## Lua API highlights
+
+```lua
+-- Message routing
+pipe(a, b, c)            -- connect workers/functions in sequence
+on(worker, "field", fn)  -- unwrap a field before the handler
+wrap("key")              -- { v } → { key = { v } }
+unwrap("key")            -- { key = { v } } → { v }
+-- path syntax: "a:b:[2]"  or  "a/b/c" (custom separator)
+
+-- Timers
+after(1000, fn)          -- one-shot
+each(500, fn)            -- repeating
+
+-- Async/await across the Qt event loop
+local rows, err = await(sql:Exec("SELECT * FROM users LIMIT 10"))
+
+-- Request/response correlation
+local call = make_service(req_worker, resp_worker, timeout_ms)
+call({ amount = 100 }, function(res, err) ... end)
+
+-- Custom workers in pure Lua
+local my_worker = create_worker(function(self, msg)
+    notify_all(self, transform(msg))
+end)
+
+-- Inline QML (no separate file needed)
+local view = QML[[ Window { visible: true; ... } ]]
+```
+
+## Build
+
+```bash
+sudo apt install cmake ninja-build build-essential \
+    libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
+    libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
+    qtdeclarative5-dev libqt5quickcontrols2-5
+
+cmake -B build -G Ninja
+cmake --build build -j $(nproc)
+
+build/bin/radapter tests/basic.lua   # smoke test (self-checking, no hardware needed)
+```
+
+Set `CPM_SOURCE_CACHE=$HOME/.cache/CPM` to cache dependencies across builds.
+
+## Running
+
+```bash
+build/bin/radapter script.lua                       # run a script
+build/bin/radapter --schema                         # print JSON schema of all workers, then exit
+build/bin/radapter --watch-dir . script.lua         # hot-reload on file change
+build/bin/radapter --gui script.lua                 # enable QML worker
+build/bin/radapter --gui --gui-auto-quit script.lua # exit when the window closes
+build/bin/radapter -e 'log.info("hi")'              # inline eval
+```
+
+Arguments after the script file are available in Lua as `args`:
+
+```bash
+build/bin/radapter tests/serial/serial.lua /dev/ttyUSB0
+```
+
+## Architecture
+
+radapter is a C++/Qt5 engine with a public SDK (`include/radapter/`). Three ways to extend it:
+
+- **Lua scripts** — the normal path. Wire built-in workers, write transform functions, build pipelines.
+- **Native plugins** — compile a separate `.so` against `radapter-sdk` and load at runtime with `load_plugin("path/to/lib.so")`. See `plugins/test.cpp` for the reference pattern.
+- **Direct embedding** — link `radapter-sdk` into your own C++ executable and construct `radapter::Instance`.
+
+Config structs are plain C++ structs annotated with `RAD_DESCRIBE`/`RAD_MEMBER`. The engine derives validation, conversion, and `--schema` output from that reflection automatically.
+
+## LuaJIT
+
+```bash
+sudo apt install libluajit2-5.1-dev
+cmake -B build -G Ninja -DRADAPTER_JIT=ON
+cmake --build build -j $(nproc)
+```
+
+JIT mode targets Lua 5.1. Embedded scripts ship as source rather than bytecode.
+
+## More examples
+
+See `tests/`:
+
+| Script | What to see |
+|---|---|
+| `tests/basic.lua` | Pipeline primitives, `wrap`/`unwrap`, `get`/`set` path syntax — no hardware |
+| `tests/websocket.lua` | Server ↔ client with msgpack + zlib compression |
+| `tests/redis.lua` | RedisCache + RedisStream + async/await |
+| `tests/sql.lua` | SQLite insert/select with callbacks and `await` |
+| `tests/modbus.lua` | Modbus TCP master (needs a device on :1502) |
+| `tests/serial/serial.lua` | Serial + SLIP + msgpack (pass port as arg) |
+| `tests/chat/` | Multi-client group chat: headless server + QML GUI client |
+| `tests/demo/` | QML gauge + Redis + Serial + `make_service` request/response |
+| `tests/test_async.lua` | `async`/`await`/`promisify` patterns |
+| `tests/gui.lua` | Inline QML string, bidirectional color binding |
+| `tests/can.lua` / `tests/cyphal.lua` | CAN/Cyphal (see `tests/setup_vcan.sh` for a virtual interface) |
 
 ## Special thanks
 
-* smokie-l for inspiration
-* https://github.com/pkulchenko/MobDebug for remote debugger
-
-## Build
-```bash
-sudo apt update
-sudo apt install \
-   cmake ninja-build build-essential \
-   libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
-   libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
-   qtdeclarative5-dev libqt5quickcontrols2-5
-
-# clone repo
-cmake -B build -G Ninja
-cmake --build build -j $(nproc)
-# we can test it with 
-build/bin/radapter tests/basic.lua
-```
-Рекомендуется объявить переменную окружения CPM_SOURCE_CACHE (для кэширования пакетов)
-```bash
-export CPM_SOURCE_CACHE="$HOME/.cache/CPM"
-echo "export CPM_SOURCE_CACHE=$CPM_SOURCE_CACHE" >> ~/.bashrc # применится после login
-```
-
-## --schema
-```bash
-radapter --schema # -> prints a json with available config description
-```
-
-## JIT
-Для сборки с поддержкой Just in Time Compilation:
-```bash
-sudo apt install libluajit2-5.1-dev #статическая 
-cmake -B build -G Ninja -D RADAPTER_JIT=ON
-cmake --build build -j $(nproc)
-build/bin/radapter tests/basic.lua
-```
-В Режиме JIT поддерживается [лишь LUA5.1](https://luajit.org/extensions.html) + Extension
-
-## Example
-```lua
--- func ({key = value}) -> () are optional for single param
-local device = TcpModbusDevice({
-   host = "localhost",
-   port = 502,
-})
-
--- These are workers (created with Function Calls)
-local modbus = ModbusMaster {
-   device = device,
-   slave_id = 1,
-   ... -- config will be validated
-}
-
-local ws = WebsocketServer {    
-   port = 10701
-}
-
--- pipelines
-pipe(modbus, ws)
-pipe(ws, modbus)
-
--- send a msg to websocket (all clients)
-ws {
-   hello = "world"
-}
-
--- send a msg after 3000ms (like setTimeout)
-after(3000, function()
-   ws {
-      data = 1
-   }
-end)
-
--- send a msg each 4000ms (like setInterval)
-each(4000, function()
-   ws {
-      data = 2
-   }
-end)
-
-
-```
+- smokie-l for inspiration
+- [MobDebug](https://github.com/pkulchenko/MobDebug) for the remote debugger
