@@ -16,7 +16,7 @@ struct QMLConfig {
     WithDefault<vector<QString>> props;
 };
 
-DESCRIBE("gui::QMLConfig", QMLConfig, void) {
+RAD_DESCRIBE(QMLConfig) {
     MEMBER("url", &_::url);
     MEMBER("props", &_::props);
 }

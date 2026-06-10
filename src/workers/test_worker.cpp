@@ -11,7 +11,7 @@ struct TestConfig {
 };
 
 
-DESCRIBE("radapter::ws::TestConfig", TestConfig, void) {
+RAD_DESCRIBE(TestConfig) {
     MEMBER("delay", &_::delay);
     MEMBER("name", &_::name);
 }

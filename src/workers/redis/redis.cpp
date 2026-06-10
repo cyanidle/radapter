@@ -32,7 +32,7 @@ struct CacheConfig : Config {
     WithDefault<CacheMode> mode = rw;
 };
 
-DESCRIBE("redis::CacheConfig", CacheConfig, void) {
+RAD_DESCRIBE(CacheConfig) {
     PARENT(Config);
     RAD_MEMBER(hash_key);
     RAD_MEMBER(enable_keyevents);
@@ -44,7 +44,7 @@ enum StreamStart {
     top,
     start,
 };
-DESCRIBE("redis::StreamStart", StreamStart, void) {
+RAD_DESCRIBE(StreamStart) {
     MEMBER("persistent_id", persistent_id);
     MEMBER("top", top);
     MEMBER("start", start);
@@ -61,7 +61,7 @@ struct StreamConfig : Config {
     WithDefault<CacheMode> mode = rw;
 };
 
-DESCRIBE("redis::StreamConfig", StreamConfig, void) {
+RAD_DESCRIBE(StreamConfig) {
     PARENT(Config);
     RAD_MEMBER(stream_key);
     RAD_MEMBER(start_from);
