@@ -4,16 +4,14 @@
 
 namespace radapter {
 
-struct TestConfig {
-    WithDefault<string> name = "TestWorker";
+struct TestConfig : WorkerConfig {
     WithDefault<int> delay = 1000;
-
 };
 
 
 RAD_DESCRIBE(TestConfig) {
+    PARENT(WorkerConfig);
     MEMBER("delay", &_::delay);
-    MEMBER("name", &_::name);
 }
 
 class TestWorker : public Worker {
@@ -21,11 +19,10 @@ class TestWorker : public Worker {
 public:
     TestConfig conf;
     unsigned current = 0;
-    TestWorker(QVariantList args, Instance* parent) :
-        Worker(parent, "test")
+    TestWorker(TestConfig config, Instance* parent) :
+        Worker(parent, config, "test")
     {
-        Parse(conf, args.value(0));
-        setObjectName(conf.name.value.c_str());
+        conf = std::move(config);
         auto timer = new QTimer(this);
         timer->callOnTimeout(this, [this]{
             emit SendMsg(current++);

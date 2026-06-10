@@ -84,7 +84,7 @@ RAD_DESCRIBE(CyphalNodeInfo)
     RAD_MEMBER(certificate_of_authenticity);
 }
 
-struct CyphalConfig
+struct CyphalConfig : WorkerConfig
 {
     QObject* can;
     CanardNodeID node_id;
@@ -98,6 +98,7 @@ struct CyphalConfig
 
 RAD_DESCRIBE(CyphalConfig)
 {
+    PARENT(WorkerConfig);
     RAD_MEMBER(can);
     RAD_MEMBER(node_id);
     RAD_MEMBER(heartbeat_period);
@@ -172,7 +173,9 @@ private:
     std::unordered_map<QString, PubMeta> pubs;
     QVariant node_info_resp;
 public:
-    CyphalWorker(CyphalConfig conf, radapter::Instance* inst) : radapter::Worker(inst, "cyphal") {
+    CyphalWorker(CyphalConfig conf, radapter::Instance* inst) :
+        radapter::Worker(inst, EnsureName(conf, QString("cyphal:%1").arg(conf.node_id)), "cyphal")
+    {
         config = std::move(conf);
         if (conf.node_id > CANARD_NODE_ID_MAX)
             Raise("Node id is too big: {} (max: {})", conf.node_id, CANARD_NODE_ID_MAX);

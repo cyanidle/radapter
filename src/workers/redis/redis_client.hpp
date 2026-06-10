@@ -9,7 +9,7 @@ struct redisAsyncContext;
 
 namespace radapter::redis {
 
-struct Config {
+struct Config : WorkerConfig {
     WithDefault<string> host = "localhost";
     WithDefault<uint16_t> port = uint16_t(6379);
     WithDefault<uint16_t> db = uint16_t(0);
@@ -17,6 +17,7 @@ struct Config {
 };
 
 DESCRIBE("redis::Config", Config, void) {
+    PARENT(WorkerConfig);
     MEMBER("host", &_::host);
     MEMBER("port", &_::port);
     MEMBER("db", &_::db);

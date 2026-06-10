@@ -30,7 +30,13 @@ public:
     };
     std::unordered_map<string, InFlight> inFlight;
     QMap<string, QVariant> currentState;
-    Master(MasterConfig conf, Instance* parent) : Worker(parent, "modbus") {
+    Master(MasterConfig conf, Instance* parent) :
+        Worker(parent,
+               EnsureName(conf, QString("%1/slave:%2")
+                                    .arg(conf.device->objectName())
+                                    .arg(conf.slave_id)),
+               "modbus")
+    {
         config = std::move(conf);
         validateRegisters(config.registers);
         if (config.queries) {
@@ -50,9 +56,6 @@ public:
             }
         });
         config.device->Start();
-        setObjectName(QString("%2_Master(%1)")
-                          .arg(config.slave_id)
-                          .arg(config.device->objectName()));
     }
     void poll() {
         for (auto& merged: reads) {

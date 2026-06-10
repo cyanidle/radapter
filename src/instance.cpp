@@ -184,6 +184,11 @@ QSet<Worker *> Instance::GetWorkers()
     return d->workers;
 }
 
+Worker *Instance::GetWorker(QString const& name)
+{
+    return findChild<Worker*>(name, Qt::FindDirectChildrenOnly);
+}
+
 std::runtime_error detail::doErr(fmt::string_view fmt, fmt::format_args args)
 {
     return std::runtime_error(fmt::vformat(fmt, args));
@@ -197,7 +202,10 @@ void detail::doRaise(fmt::string_view fmt, fmt::format_args args)
 void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args) try
 {
     if (d->globalLevel > lvl) return;
-    auto it = d->perCat.find(string_view{cat});
+    // cat may carry the worker name appended as "category/name" - filter by category alone
+    auto baseCat = string_view{cat};
+    baseCat = baseCat.substr(0, baseCat.find('/'));
+    auto it = d->perCat.find(baseCat);
     if (it != d->perCat.end() && it->second > lvl) {
         return;
     }

@@ -59,7 +59,7 @@ RAD_DESCRIBE(WsCompression) {
     MEMBER("zlib", zlib);
 }
 
-struct WsConfig {
+struct WsConfig : WorkerConfig {
     WithDefault<QString> origin = "radapter";
     WithDefault<string> cert_file = "";
     WithDefault<string> key_file = "";
@@ -69,6 +69,7 @@ struct WsConfig {
 };
 
 RAD_DESCRIBE(WsConfig) {
+    PARENT(WorkerConfig);
     RAD_MEMBER(origin);
     RAD_MEMBER(cert_file);
     RAD_MEMBER(key_file);
@@ -167,13 +168,13 @@ class Server : public Worker {
     std::map<QString, QWebSocket*> socks;
 public:
     Server(WsServerConfig conf, Instance* inst) :
-        Worker(inst, "ws_server")
+        Worker(inst,
+               EnsureName(conf, QString("%1:%2")
+                                    .arg(conf.host.value.c_str())
+                                    .arg(conf.port)),
+               "ws_server")
     {
         config = std::move(conf);
-        setObjectName(QString("Server(%1:%2/%3)")
-                      .arg(config.host.value.c_str())
-                      .arg(config.port)
-                      .arg(config.origin.value));
         optional<QSslConfiguration> ssl;
         if (config.cert_file.value.size() || config.key_file.value.size()) {
             ssl = CreateSslConfiguration(config.cert_file, config.key_file);
@@ -260,10 +261,9 @@ class Client : public Worker {
     QWebSocket* sock;
 public:
     Client(WsClientConfig conf, Instance* inst) :
-        Worker(inst, "ws_client")
+        Worker(inst, EnsureName(conf, conf.url), "ws_client")
     {
         config = std::move(conf);
-        setObjectName(QString("Client(%1/%2)").arg(config.url).arg(config.origin.value));
         optional<QSslConfiguration> ssl;
         if (config.cert_file.value.size() || config.key_file.value.size()) {
             ssl = CreateSslConfiguration(config.cert_file, config.key_file);

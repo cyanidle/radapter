@@ -12,7 +12,7 @@
 
 namespace radapter::sql {
 
-struct SqlConfig {
+struct SqlConfig : WorkerConfig {
     QString type;
     QString db;
     optional<QString> user;
@@ -21,6 +21,7 @@ struct SqlConfig {
 };
 
 RAD_DESCRIBE(SqlConfig) {
+    PARENT(WorkerConfig);
     RAD_MEMBER(type);
     RAD_MEMBER(db);
     RAD_MEMBER(user);
@@ -44,7 +45,9 @@ public:
         thread->quit();
         thread->wait();
     }
-    SqlWorker(SqlConfig conf, Instance* inst) : Worker(inst, "sql") {
+    SqlWorker(SqlConfig conf, Instance* inst) :
+        Worker(inst, EnsureName(conf, QString("%1:%2").arg(conf.type, conf.db)), "sql")
+    {
         config = std::move(conf);
         thread = new QThread(this);
         std::exception_ptr initException;
@@ -80,7 +83,7 @@ public:
         }
     }
 
-    void doExec(SharedPromise<QVariantList>& promise, QString& raw, QVariantList& binds) {
+    void doExec(SharedPromise<QVariant>& promise, QString& raw, QVariantList& binds) {
         QString error;
         QVariantList result;
         try {
@@ -105,7 +108,7 @@ public:
                 result.push_back(nested);
             }
             QMetaObject::invokeMethod(this, [MV(promise), MV(result)]() mutable {
-                promise(std::move(result));
+                promise(QVariant(std::move(result)));
             });
         } catch (...) {
             QMetaObject::invokeMethod(this, [MV(promise), exc = std::current_exception()]() mutable {
@@ -131,8 +134,8 @@ public:
             binds = secondArg.toList();
             cb = args.value(2).value<LuaFunction>();
         }
-        SharedPromise<QVariantList> promise;
-        Future<QVariantList> future = promise.GetFuture();
+        SharedPromise<QVariant> promise;
+        Future<QVariant> future = promise.GetFuture();
         QMetaObject::invokeMethod(other_thread_context, [this, MV(promise), MV(raw), MV(binds)]() mutable {
             doExec(promise, raw, binds);
         });

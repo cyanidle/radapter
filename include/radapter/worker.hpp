@@ -19,14 +19,41 @@ class Worker;
 using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
 using ExtraMethods = QMap<QString, ExtraMethod>;
 
+struct RADAPTER_API WorkerConfig {
+    optional<QString> name;
+    optional<QString> category;
+
+    bool generated_name = false;
+};
+
+RAD_DESCRIBE(WorkerConfig) {
+    RAD_MEMBER(name);
+    RAD_MEMBER(category);
+}
+
+template<typename C>
+C& EnsureName(C& conf, QString def) {
+    if (!conf.name || conf.name->isEmpty()) {
+        conf.name = std::move(def);
+        conf.generated_name = true;
+    }
+    return conf;
+}
+
 class RADAPTER_API Worker : public QObject {
     Q_OBJECT
 public:
     Instance* _Inst;
     WorkerImpl* _Impl;
-    const char* _Category;
+    string _Category;
+    string _LogCat;
 
     Worker(Instance* parent, const char* category);
+    Worker(Instance* parent, WorkerConfig const& conf, const char* category);
+
+    QString Name() const {
+        return objectName();
+    }
 
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
 

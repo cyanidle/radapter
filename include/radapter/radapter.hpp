@@ -110,6 +110,7 @@ public:
 
     QVariantMap GetSchemas();
     QSet<Worker*> GetWorkers();
+    Worker* GetWorker(QString const& name);
 
     void Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::format_args args);
     template<typename...Args>

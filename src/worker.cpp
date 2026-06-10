@@ -7,8 +7,13 @@ namespace radapter
 {
 
 Worker::Worker(Instance *parent, const char *category) :
+    Worker(parent, WorkerConfig{}, category)
+{
+}
+
+Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category) :
     QObject(parent),
-    _Category(category)
+    _Category(conf.category && !conf.category->isEmpty() ? conf.category->toStdString() : category)
 {
     _Inst = parent;
     connect(this, &Worker::SendEventField, [this](const QString& key, const QVariant& data){
@@ -18,11 +23,35 @@ Worker::Worker(Instance *parent, const char *category) :
         emit SendMsg(QVariantMap{{key, data}});
     });
     // TODO: handle SendMsg/Event before LuaPush
+
+    auto taken = [parent](QString const& n) {
+        return parent->findChild<Worker*>(n, Qt::FindDirectChildrenOnly) != nullptr;
+    };
+    QString name = conf.name.value_or(QString{});
+    bool autoNamed = conf.generated_name;
+    if (name.isEmpty()) {
+        name = QString::fromStdString(_Category);
+        autoNamed = true;
+    }
+    if (taken(name)) {
+        if (!autoNamed) {
+            Raise("Worker name '{}' is already taken", name);
+        }
+        QString candidate;
+        int n = 2;
+        do {
+            candidate = name + "#" + QString::number(n++);
+        } while (taken(candidate));
+        name = candidate;
+    }
+    setObjectName(name);
+    auto stdName = name.toStdString();
+    _LogCat = stdName == _Category ? _Category : _Category + "/" + stdName;
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
 {
-    _Inst->Log(lvl, _Category, fmt, args);
+    _Inst->Log(lvl, _LogCat.c_str(), fmt, args);
 }
 
 lua_State *Worker::LuaState() const
@@ -113,8 +142,17 @@ RAD_DESCRIBE(radWorkerEvents) {
 
 static int worker_index(lua_State* L) {
     constexpr string_view events = "events";
+    constexpr string_view name = "name";
     if (lua_type(L, 2) == LUA_TSTRING && lua_tostring(L, 2) == events) {
         glua::Push(L, radWorkerEvents{LuaUserData(L, 1)});
+    } else if (lua_type(L, 2) == LUA_TSTRING && lua_tostring(L, 2) == name) {
+        auto* ud = static_cast<WorkerImpl*>(lua_touserdata(L, 1));
+        auto w = ud->self.data();
+        if (!w) {
+            Raise("worker not usable");
+        }
+        auto n = w->objectName().toStdString();
+        lua_pushlstring(L, n.data(), n.size());
     } else {
         lua_rawget(L, lua_upvalueindex(1));
     }

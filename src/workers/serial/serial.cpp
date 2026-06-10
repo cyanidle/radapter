@@ -77,7 +77,7 @@ private:
 	QByteArray buffer;
 public:
 	SerialWorker(SerialConfig conf, Instance* inst) :
-		BinaryWorker(conf, inst, "serial")
+		BinaryWorker(EnsureName(conf, conf.port), inst, "serial")
 	{
 		config = std::move(conf);
 		port = new QSerialPort(config.port, this);

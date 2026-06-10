@@ -146,11 +146,12 @@ DESCRIBE("modbus::TcpDevice", TcpDevice, void) {
     MEMBER("port", &_::port);
 }
 
-struct WorkerConfig {
+struct WorkerConfig : ::radapter::WorkerConfig {
     RegistersMap registers;
     quint16 slave_id;
 };
 DESCRIBE("modbus::WorkerConfig", WorkerConfig, void) {
+    PARENT(::radapter::WorkerConfig);
     MEMBER("registers", &_::registers);
     MEMBER("slave_id", &_::slave_id);
 }

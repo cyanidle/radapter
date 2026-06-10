@@ -75,7 +75,7 @@ RAD_DESCRIBE(CanFilter) {
     RAD_MEMBER(mask);
 }
 
-struct CanConfig {
+struct CanConfig : WorkerConfig {
     QString plugin;
     QString device;
     WithDefault<std::vector<CanFilter>> filters;
@@ -86,6 +86,7 @@ struct CanConfig {
 
 
 RAD_DESCRIBE(CanConfig) {
+    PARENT(WorkerConfig);
     RAD_MEMBER(plugin);
     RAD_MEMBER(device);
     RAD_MEMBER(filters);

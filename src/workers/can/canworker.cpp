@@ -27,7 +27,9 @@ class CanWorker final : public ICanWorker
     CanConfig config;
     QCanBusDevice *device = nullptr;
 public:
-    CanWorker(CanConfig conf, radapter::Instance* inst) : ICanWorker(inst, "can") {
+    CanWorker(CanConfig conf, radapter::Instance* inst) :
+        ICanWorker(inst, EnsureName(conf, QString("%1:%2").arg(conf.plugin, conf.device)), "can")
+    {
         config = std::move(conf);
         QString errorString;
         QCanBus* bus = QCanBus::instance();

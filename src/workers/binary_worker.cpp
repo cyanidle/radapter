@@ -138,7 +138,7 @@ struct radapter::BinaryWorker::Impl {
 };
 
 radapter::BinaryWorker::BinaryWorker(BinaryConfig const& config, Instance* parent, const char* category) :
-	Worker(parent, category),
+	Worker(parent, config, category),
 	d(new Impl)
 {
     d->config = config;

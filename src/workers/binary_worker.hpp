@@ -33,13 +33,14 @@ RAD_DESCRIBE(BinaryFraming) {
     MEMBER("slip", _::slip);
 }
 
-struct BinaryConfig {
+struct BinaryConfig : WorkerConfig {
 	BinaryFraming framing;
 	BinaryProtocol protocol;
     optional<BinaryCrc> crc;
 };
 
 RAD_DESCRIBE(BinaryConfig) {
+	PARENT(WorkerConfig);
 	RAD_MEMBER(framing);
 	RAD_MEMBER(protocol);
     RAD_MEMBER(crc);

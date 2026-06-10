@@ -83,15 +83,18 @@ class Cache : public Worker
     QVariant state;
     QString preped_hash_key;
 public:
-    Cache(CacheConfig conf, Instance* inst) : Worker(inst, "redis")
+    Cache(CacheConfig conf, Instance* inst) :
+        Worker(inst,
+               EnsureName(conf, QString("redis:%1:%2/%3")
+                                    .arg(conf.host.value.c_str())
+                                    .arg(conf.port.value)
+                                    .arg(conf.hash_key ? conf.hash_key->c_str() : "-")),
+               "redis")
     {
         config = std::move(conf);
         preped_hash_key = QString::fromStdString(config.hash_key.value_or(""));
         client = new Client(config, this);
         sub_client = new Client(config, this);
-        setObjectName(QString("%1_hash(%2)")
-                          .arg(client->objectName())
-                          .arg(config.hash_key ? config.hash_key->c_str() : "-"));
         client->setObjectName(objectName());
         sub_client->setObjectName(objectName() + "_sub");
         connect(client, &Client::Error, this, [=](QString err){
@@ -265,7 +268,13 @@ public:
                 nextRead();
             });
     }
-    Stream(StreamConfig conf, Instance* inst) : Worker(inst, "redis")
+    Stream(StreamConfig conf, Instance* inst) :
+        Worker(inst,
+               EnsureName(conf, QString("redis:%1:%2/%3")
+                                    .arg(conf.host.value.c_str())
+                                    .arg(conf.port.value)
+                                    .arg(conf.stream_key.c_str())),
+               "redis")
     {
         config = std::move(conf);
         lastIdKey = fmt::format(
@@ -274,8 +283,7 @@ public:
             config.instance_id.value,
             config.stream_key);
         client = new Client(config, this);
-        client->setObjectName(client->objectName() + QString("_stream(%1)").arg(config.stream_key.c_str()));
-        setObjectName(client->objectName());
+        client->setObjectName(objectName());
         client->Start();
         if (config.mode & r) {
             read_client = new Client(config, this);

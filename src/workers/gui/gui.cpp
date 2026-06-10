@@ -11,14 +11,25 @@
 namespace radapter::gui 
 {
 
-struct QMLConfig {
+struct QMLConfig : WorkerConfig {
     QString url;
     WithDefault<vector<QString>> props;
 };
 
 RAD_DESCRIBE(QMLConfig) {
+    PARENT(WorkerConfig);
     MEMBER("url", &_::url);
     MEMBER("props", &_::props);
+}
+
+static QMLConfig baseConfig(QVariantList const& args) {
+    QMLConfig c;
+    auto first = args.value(0);
+    if (first.type() != QVariant::String) {
+        Parse(c, first);
+        EnsureName(c, c.url);
+    }
+    return c;
 }
 
 static void applyToQml(QVariant const& msg, QObject* target) {
@@ -95,7 +106,7 @@ private:
     GuiInstanceProxy* proxy;
 public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
-		Worker(inst, "qml")
+		Worker(inst, baseConfig(args), "qml")
     {
         auto* engine = g_engine();
         proxy = new GuiInstanceProxy{this};
