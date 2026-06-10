@@ -194,3 +194,14 @@ nested described structs all compose recursively.
   `src/builtin.hpp`, and add it to `_all[]` in `src/builtin.cpp`.
 - `src/workers/binary_worker.{hpp,cpp}` is a shared base for framed binary protocols (SLIP
   framing, msgpack, optional CRC) — reuse it for new serial/socket binary workers.
+
+## Git workflow
+
+After reaching a working functional checkpoint (e.g. a new config field added and at least
+minimally exercised, a bug fixed and verified, a feature complete end-to-end), create a
+commit automatically without waiting to be asked.
+
+Commit message style: one short subject line (≤72 chars), optionally one small paragraph of
+body if the motivation isn't obvious from the subject. Do not list minor incidental fixes
+(typos, braces, accessor corrections) — only the meaningful change warrants mention. Err on
+the side of terseness.
