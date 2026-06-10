@@ -38,6 +38,7 @@ local t2 = TestWorker { delay = 200 }
 local t3 = TestWorker { name = "custom", category = "custom_cat", delay = 200 }
 
 assert(t1.name == "test", "auto name: got " .. tostring(t1.name))
+assert(t1.origin:find("smoke%.lua:%d+"), "creation origin: got " .. tostring(t1.origin))
 assert(t2.name == "test#2", "auto name must get unique suffix: got " .. tostring(t2.name))
 assert(t3.name == "custom", "explicit name: got " .. tostring(t3.name))
 

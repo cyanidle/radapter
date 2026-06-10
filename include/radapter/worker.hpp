@@ -47,6 +47,7 @@ public:
     WorkerImpl* _Impl;
     string _Category;
     string _LogCat;
+    string _Origin; // "file:line" of the creating Lua call, or "<CPP>"
 
     Worker(Instance* parent, const char* category);
     Worker(Instance* parent, WorkerConfig const& conf, const char* category);

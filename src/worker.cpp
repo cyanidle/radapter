@@ -6,6 +6,17 @@
 namespace radapter
 {
 
+static string luaOrigin(lua_State* L) {
+    if (!L) return "<CPP>";
+    lua_Debug ar;
+    for (int lvl = 0; lua_getstack(L, lvl, &ar); ++lvl) {
+        if (lua_getinfo(L, "Sl", &ar) && ar.currentline > 0) {
+            return fmt::format("{}:{}", ar.short_src, ar.currentline);
+        }
+    }
+    return "<CPP>";
+}
+
 Worker::Worker(Instance *parent, const char *category) :
     Worker(parent, WorkerConfig{}, category)
 {
@@ -47,6 +58,7 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
     setObjectName(name);
     auto stdName = name.toStdString();
     _LogCat = stdName == _Category ? _Category : _Category + "/" + stdName;
+    _Origin = luaOrigin(parent->LuaState());
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
@@ -140,19 +152,28 @@ RAD_DESCRIBE(radWorkerEvents) {
     RAD_MEMBER(get_listeners);
 }
 
+static Worker* checkWorker(lua_State* L) {
+    auto* ud = static_cast<WorkerImpl*>(lua_touserdata(L, 1));
+    auto w = ud->self.data();
+    if (!w) {
+        Raise("worker not usable");
+    }
+    return w;
+}
+
 static int worker_index(lua_State* L) {
     constexpr string_view events = "events";
     constexpr string_view name = "name";
-    if (lua_type(L, 2) == LUA_TSTRING && lua_tostring(L, 2) == events) {
+    constexpr string_view origin = "origin";
+    auto key = lua_type(L, 2) == LUA_TSTRING ? string_view{lua_tostring(L, 2)} : string_view{};
+    if (key == events) {
         glua::Push(L, radWorkerEvents{LuaUserData(L, 1)});
-    } else if (lua_type(L, 2) == LUA_TSTRING && lua_tostring(L, 2) == name) {
-        auto* ud = static_cast<WorkerImpl*>(lua_touserdata(L, 1));
-        auto w = ud->self.data();
-        if (!w) {
-            Raise("worker not usable");
-        }
-        auto n = w->objectName().toStdString();
+    } else if (key == name) {
+        auto n = checkWorker(L)->objectName().toStdString();
         lua_pushlstring(L, n.data(), n.size());
+    } else if (key == origin) {
+        auto& o = checkWorker(L)->_Origin;
+        lua_pushlstring(L, o.data(), o.size());
     } else {
         lua_rawget(L, lua_upvalueindex(1));
     }
