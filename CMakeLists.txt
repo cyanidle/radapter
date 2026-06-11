@@ -105,7 +105,13 @@ function(radapter_scripts)
         foreach(file ${RADAPTER_QML})
             get_filename_component(name ${file} NAME)
             message(STATUS "Embedding qml => radapter/${name}")
-            file(COPY ${file} DESTINATION ${scripts_dir}/qml)
+            set(out ${scripts_dir}/qml/${name})
+            add_custom_command(
+                OUTPUT ${out}
+                DEPENDS ${file}
+                COMMAND ${CMAKE_COMMAND} -E copy ${file} ${out}
+                COMMENT "Embedding qml => ${out}"
+            )
             file(APPEND ${scripts_qrc} "<file alias=\"${name}\">qml/${name}</file>\n")
         endforeach()
         file(APPEND ${scripts_qrc} "</qresource>\n")
