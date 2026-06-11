@@ -292,10 +292,7 @@ public:
             Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
     }
-    QVariant Request(QVariantList const& args) {
-        RequestParams params;
-        Parse(params, args.value(0));
-        QVariant msg = args.value(1);
+    QVariant Request(RequestParams params, QVariant msg, std::optional<LuaFunction> cb) {
         auto [req, resp] = lookup_service_types(params.type);
         if (!req || !resp)
             Raise("Could not find types for service: {}", params.type);
@@ -334,9 +331,8 @@ public:
         pushMsg(&meta, req, msg);
         processTx();
 
-        if (args.size() > 2) {
-            LuaFunction cb = args.value(2).value<LuaFunction>();
-            resolveLuaCallback(this, future, cb);
+        if (cb) {
+            resolveLuaCallback(this, future, *cb);
             return {};
         } else {
             return makeLuaPromise(this, future);

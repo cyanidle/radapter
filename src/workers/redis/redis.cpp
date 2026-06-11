@@ -85,7 +85,7 @@ class Cache : public Worker
 public:
     Cache(CacheConfig conf, Instance* inst) :
         Worker(inst,
-               EnsureName(conf, QString("redis:%1:%2/%3")
+               EnsureName(conf, QString("%1:%2/%3")
                                     .arg(conf.host.value.c_str())
                                     .arg(conf.port.value)
                                     .arg(conf.hash_key ? conf.hash_key->c_str() : "-")),
@@ -270,7 +270,7 @@ public:
     }
     Stream(StreamConfig conf, Instance* inst) :
         Worker(inst,
-               EnsureName(conf, QString("redis:%1:%2/%3")
+               EnsureName(conf, QString("%1:%2/%3")
                                     .arg(conf.host.value.c_str())
                                     .arg(conf.port.value)
                                     .arg(conf.stream_key.c_str())),

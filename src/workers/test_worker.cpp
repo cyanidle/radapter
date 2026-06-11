@@ -39,11 +39,8 @@ public:
         Info("Msg => '{}'", msg.toString());
     }
 
-    QVariant Call(QVariantList args) {
-        Info("Called with {} args", args.size());
-        if (auto f = args.value(0).value<LuaFunction>()) {
-            f.Call({1, 2, 3});
-        }
+    QVariant Call(std::optional<LuaFunction> fn) {
+        if (fn) fn->Call({1, 2, 3});
         return {};
     }
 };

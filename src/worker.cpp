@@ -82,6 +82,8 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
     setObjectName(name);
     auto stdName = name.toStdString();
     _LogCat = stdName == _Category ? _Category : _Category + "/" + stdName;
+    auto& catLen = parent->_GetPrivate()->logCatLen;
+    if (_LogCat.size() > catLen) catLen = unsigned(_LogCat.size());
     auto* caller = parent->_GetPrivate()->currentCaller;
     _Origin = luaOrigin(caller ? caller : parent->LuaState());
 }
