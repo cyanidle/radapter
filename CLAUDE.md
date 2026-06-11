@@ -114,6 +114,14 @@ except under JIT/cross builds, where they ship as source. `builtins.lua` defines
 pipeline primitives; `async.lua` provides coroutine-based promises (`await`);
 `mobdebug*.lua` is the remote debugger; `socket.lua` is luasocket glue.
 
+Reusable QML components live in `src/qml/*.qml` with a `qmldir` (module `radapter`). The
+same `radapter_scripts` CMake function bakes them into the resource under `:/radapter/`,
+and the GUI worker adds `qrc:/` to the QML import path, so scripts can `import radapter`
+(e.g. `ModbusTable`). Data reaches a component by the GUI worker setting properties from
+the incoming message (nested map fields recurse into child objects found by `objectName`);
+a component that needs per-row reactive values creates persistent child holder objects
+named after each field rather than routing into recycled list/table delegates.
+
 ### Workers and the message model
 
 A `Worker` (`include/radapter/worker.hpp`) is a `QObject` with one inbound entry point and

@@ -139,6 +139,7 @@ See `examples/` — runnable demonstrations (most need live hardware/services):
 | `examples/demo/` | QML gauge + Redis + Serial + `make_service` request/response |
 | `examples/test_async.lua` | `async`/`await`/`promisify` patterns |
 | `examples/gui.lua` | Inline QML string, bidirectional color binding |
+| `examples/modbus_table.lua` | `import radapter`'s `ModbusTable` — configurable live register table |
 | `examples/can.lua` / `examples/cyphal.lua` | CAN/Cyphal (see `examples/setup_vcan.sh` for a virtual interface) |
 
 ## Tests
