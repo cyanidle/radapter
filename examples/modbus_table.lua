@@ -1,55 +1,92 @@
--- Visualize live register values in a configurable table (radapter.ModbusTable).
+-- Two ModbusMasters talk to one local Modbus TCP slave (server), each driving
+-- its own radapter.ModbusTable window. A write in one window travels master ->
+-- slave -> the other master, so both windows stay in sync after a poll cycle.
+--
+-- Covers all four register types:
+--   holding (read/write words & floats), input (read-only words),
+--   coils (read/write bits, shown as an editable checkbox),
+--   di / discrete inputs (read-only bits, shown as a read-only checkbox).
 --
 -- Run with:
 --   build/bin/radapter --gui examples/modbus_table.lua
---
--- Use the "+" button to add rows (name, address, register type); the three-dots
--- popup on each row configures endianness, data type (default: 16-bit word) and
--- hex display. A row shows whatever value is delivered to the table under a field
--- with the same name (e.g. `{ pump_speed = 1500 }`). A nested
--- `{ pump_speed = { value = .., quality = .. } }` works too when you need extra
--- fields. Double-click a value to edit it in place; the edit is sent out as
--- `{ name = value }` (logged below). Here a timer feeds the live rows, while
--- "setpoint" is left for you to edit.
 
-local view = QML[[
+local PORT = 15020
+
+local registers = {
+    holding = {
+        speed    = { index = 0, type = "float32" },
+        setpoint = { index = 2 },
+    },
+    input = {
+        uptime = { index = 0 },
+    },
+    coils = {
+        enable = { index = 0 },
+        valve_open = { index = 1 },
+    },
+    di = {
+        running = { index = 0 },
+    },
+}
+
+-- Local slave (server). Seed initial values, then drive the read-only registers
+-- (an input register and a discrete input) so both windows show them changing.
+local slave = ModbusSlave {
+    device = TcpModbusServer { host = "0.0.0.0", port = PORT },
+    slave_id = 1,
+    registers = registers,
+}
+
+slave { speed = 12.5, setpoint = 1000, enable = false, valve_open = false, uptime = 0, running = false }
+
+local up = 0
+each(1000, function()
+    up = up + 1
+    slave { uptime = up, running = (up % 2 == 0) }
+end)
+
+-- Build a window with a ModbusTable pre-populated with one row per register.
+local function make_window(title)
+    return QML([[
 import QtQuick 2.7
 import QtQuick.Controls 2.2
 import radapter 1.0
 
 ApplicationWindow {
     visible: true
-    width: 560; height: 360
-    title: "Modbus register table"
+    width: 560; height: 300
+    title: "]] .. title .. [["
 
     ModbusTable {
         objectName: "regs"
         anchors.fill: parent
         anchors.margins: 8
         Component.onCompleted: {
-            addRow("pump_speed",  3, "Holding")
-            addRow("pump_status", 1, "Holding")
-            addRow("temperature", 7, "Input")
-            addRow("setpoint",   10, "Holding")
+            addRow("speed",      0, "Holding", "Float32")
+            addRow("setpoint",   2, "Holding")
+            addRow("uptime",     0, "Input")
+            addRow("enable",     0, "Coil")
+            addRow("valve_open", 1, "Coil")
+            addRow("running",    0, "Discrete")
         }
     }
 }
-]]
+]])
+end
 
--- log values written from the table (in-place edits)
-pipe(view, function(msg)
-    for k, v in pairs(msg) do
-        log.info("write {} = {}", k, v)
-    end
-end)
+-- Connect a fresh master to the slave and wire it to a table window.
+local function connect_master(view)
+    local master = ModbusMaster {
+        device = TcpModbusDevice { host = "127.0.0.1", port = PORT },
+        slave_id = 1,
+        poll_rate = 200,
+        registers = registers,
+    }
+    -- polled changes -> table (nested under the table's objectName)
+    pipe(master, wrap("regs"), view)
+    -- table edits -> write to the slave
+    pipe(view, master) -- TODO: Should unwrap here. QML binding is kinda broken
+end
 
-local t = 0
-each(500, function()
-    t = t + 1
-    -- nested under the table's objectName, then a flat value per register
-    view{ regs = {
-        pump_speed  = 1500 + (t % 10) * 25,
-        pump_status = t % 2,
-        temperature = 20 + (t % 5),
-    }}
-end)
+connect_master(make_window("Master A"))
+connect_master(make_window("Master B"))

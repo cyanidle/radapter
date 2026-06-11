@@ -52,8 +52,8 @@ DESCRIBE("modbus::RegisterValueType", RegisterValueType, void) {
 }
 
 struct RegisterPacking {
-    WithDefault<ByteOrder> byte = little;
-    WithDefault<ByteOrder> word = little;
+    WithDefault<ByteOrder> byte = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
+    WithDefault<ByteOrder> word = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
 };
 DESCRIBE("modbus::RegisterPacking", RegisterPacking, void) {
     MEMBER("byte", &_::byte);

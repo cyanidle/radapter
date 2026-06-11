@@ -324,7 +324,7 @@ void Dump(const map<K, T>& in, QVariant& out) {
 }
 
 template<typename...Ts, size_t...Is>
-void DumpTuple(std::tuple<Ts...> const& tup, QVariant& out, std::index_sequence<Is...>) {
+void DumpTuple(std::tuple<Ts...> const&, QVariant& out, std::index_sequence<Is...>) {
     QVariant temp[sizeof...(Is)];
     (Dump(temp[Is]), ...);
     out = QVariantList{temp[Is]...};

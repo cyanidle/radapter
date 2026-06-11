@@ -37,7 +37,7 @@ Frame {
         }
     }
 
-    function addRow(name, address, regType) {
+    function addRow(name, address, regType, dataType = "Word", endianess = "Little") {
         name = (name || "").trim()
         if (!name.length || _holders[name])
             return
@@ -48,10 +48,10 @@ Frame {
         _holders = h
         regModel.append({
             name: name,
-            address: String(address || ""),
+            address: (address === undefined || address === null) ? "" : String(address),
             regType: regType || "Holding",
-            endian: "Big",
-            dataType: "Word",
+            endian: endianess,
+            dataType: dataType,
             hex: false
         })
     }

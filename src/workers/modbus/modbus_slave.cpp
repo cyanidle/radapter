@@ -91,14 +91,6 @@ public:
             if (reg.sizeOf == 4) {
                 server->data(type, uint16_t(reg.index + 1), &data[1]);
             }
-            if (reg.type == bit && data[0] > 1) {
-                // FC05 coil-on arrives as the raw 0xFF00 payload: normalize
-                // the storage too, so master reads see a proper bit
-                data[0] = 1;
-                applying = true;
-                server->setData(type, uint16_t(reg.index), 1);
-                applying = false;
-            }
             auto asVariant = decodeRegister(reg, data);
             auto& current = currentState[reg.key];
             if (current != asVariant) {

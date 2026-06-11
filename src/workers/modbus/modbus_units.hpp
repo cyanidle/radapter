@@ -52,7 +52,7 @@ static void validateReadOnly(string_view key, Register& reg, string_view type) {
 }
 
 static void validateSingleBit(string_view key, Register& reg, string_view type) {
-    if (reg.mode == write || reg.mode == read_write) {
+    if (reg.type != defaultValueType && reg.type != bit) {
         Raise("Register {}: {} registers cannot have a type (single bit only)", key, type);
     }
 }
@@ -64,10 +64,12 @@ static void validateRegisters(RegistersMap& regs) {
         validateSingleBit(k, v, "Discrete Input");
         v.mode = read;
         v.type = bit;
+        v.packing = {};
     }
     for (auto& [k, v]: regs.coils.value) {
         validateSingleBit(k, v, "Coils");
         v.type = bit;
+        v.packing = {};
     }
     for (auto& [k, v]: regs.input.value) {
         validateReadOnly(k, v, "Input");
@@ -289,7 +291,7 @@ static QVariant decodeRegister(PreparedRegister const& reg, uint16_t (&data)[2])
     }
     switch (reg.type) {
     case defaultValueType: assert(false && "lib error"); std::abort();
-    case bit:
+    case bit: return data[0] ? QVariant(true) : QVariant(false);
     case uint16: return parseWords<uint16_t>(reg.packing, data);
     case uint32: return parseWords<uint32_t>(reg.packing, data);
     case float32: return parseWords<float>(reg.packing, data);

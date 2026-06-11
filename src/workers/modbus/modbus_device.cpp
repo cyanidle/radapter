@@ -99,9 +99,10 @@ void radapter::modbus::MasterDevice::nextReq() {
     auto ctx = req.ctx;
     auto start = req.unit.startAddress();
     auto len = req.unit.valueCount();
+    auto unit = req.unit;
     QModbusReply* reply = isRead
-                              ? device->sendReadRequest(req.unit, req.slave_id)
-                              : device->sendWriteRequest(req.unit, req.slave_id);
+                              ? device->sendReadRequest(unit, req.slave_id)
+                              : device->sendWriteRequest(unit, req.slave_id);
     if (!reply) {
         busy = false;
         req.cb({}, std::make_exception_ptr(Err(
@@ -122,7 +123,26 @@ void radapter::modbus::MasterDevice::nextReq() {
                            reply->errorString()))
                    );
             } else {
-                cb(reply->result(), {});
+                auto code = reply->rawResult().functionCode();
+                // Qt (5.15) can hand back an empty values list for ReadCoils /
+                // ReadDiscreteInputs even on a successful reply, while the raw PDU
+                // still carries the packed bits. Rebuild the unit from the raw
+                // payload: [byteCount][status bytes...], bits LSB-first from the
+                // requested start address.
+                if (code == QModbusPdu::ReadCoils || code == QModbusPdu::ReadDiscreteInputs) {
+                    auto rdata = reply->rawResult().data();
+                    int count = int(unit.valueCount());
+                    QModbusDataUnit bits(unit.registerType(), unit.startAddress(), quint16(count));
+                    for (int i = 0; i < count; ++i) {
+                        int byteIdx = 1 + i / 8; // skip the leading byte-count byte
+                        if (byteIdx < rdata.size()) {
+                            bits.setValue(i, quint16((quint8(rdata[byteIdx]) >> (i % 8)) & 0x1));
+                        }
+                    }
+                    cb(std::move(bits), {});
+                } else {
+                    cb(reply->result(), {});
+                }
             }
         }
         reply->deleteLater();
