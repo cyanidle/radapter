@@ -56,6 +56,9 @@ class Client : public QObject {
     QtRedisAdapter* adapter{};
     redisAsyncContext* ctx{};
 public:
+    // weak: hiredis callbacks may fire while the owning worker is mid-destruction
+    QPointer<Worker> logger;
+
     Client(Config conf, Worker* parent);
     ~Client() override;
     void Start();

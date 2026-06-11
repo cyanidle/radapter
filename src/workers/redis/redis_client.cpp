@@ -88,7 +88,10 @@ struct Client::Impl {
             promise(std::current_exception());
         }
     } catch (std::exception& e) {
-        static_cast<Worker*>(static_cast<QObject*>(ctx->data)->parent())->Error("Exception in redis callback: {}", e.what());
+        auto logger = static_cast<Client*>(static_cast<QObject*>(ctx->data))->logger;
+        if (logger) {
+            logger->Error("Exception in redis callback: {}", e.what());
+        }
     }
 
     static void dbCallback(redisAsyncContext* ctx, void *reply, void*)
@@ -113,6 +116,7 @@ radapter::redis::Client::Client(Config _conf, Worker *parent) :
     QObject(parent),
     config(std::move(_conf))
 {
+    logger = parent;
     setObjectName(QString("Client(%1:%2)")
                       .arg(config.host.value.c_str())
                       .arg(config.port.value));
@@ -128,13 +132,19 @@ Client::~Client()
 
 void radapter::redis::Client::Start() {
     connect(this, &redis::Client::Error, this, [this](auto err){
-        static_cast<Worker*>(parent())->Error("{}: {}", objectName(), err);
+        if (logger) {
+            logger->Error("{}: {}", objectName(), err);
+        }
     });
     connect(this, &redis::Client::ConnectedChanged, this, [this](bool _ok){
         if (_ok) {
-            static_cast<Worker*>(parent())->Info("{}: connected", objectName());
+            if (logger) {
+                logger->Info("{}: connected", objectName());
+            }
         } else {
-            static_cast<Worker*>(parent())->Warn("{}: disconnected", objectName());
+            if (logger) {
+                logger->Warn("{}: disconnected", objectName());
+            }
             ReconnectLater();
         }
     });

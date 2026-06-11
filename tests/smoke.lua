@@ -14,6 +14,7 @@ local checks = {
     sql_roundtrip = true,
     service = true,
     async_unhandled = true,
+    modbus_roundtrip = true,
 }
 
 local function pass(name)
@@ -143,21 +144,37 @@ call({ payload = 1 }, function(res, err)
     pass("service")
 end)
 
+-- Modbus slave <-> master loopback over local TCP
+local mb_registers = {
+    holding = {
+        ["pump:status"] = { index = 0 },
+        ["pump:speed"] = { index = 1, type = "float32" },
+    },
+}
+
+local mb_slave = ModbusSlave {
+    device = TcpModbusServer { host = "0.0.0.0", port = 11502 },
+    slave_id = 1,
+    registers = mb_registers,
+}
+
+local mb_master = ModbusMaster {
+    device = TcpModbusDevice { host = "127.0.0.1", port = 11502 },
+    slave_id = 1,
+    poll_rate = 100,
+    registers = mb_registers,
+}
+
+mb_slave {
+    pump = { status = 5, speed = 12.5 },
+}
+
+pipe(mb_master, function(msg)
+    if get(msg, "pump:status") == 5 and get(msg, "pump:speed") == 12.5 then
+        pass("modbus_roundtrip")
+    end
+end)
+
 -- Constructed only (no live counterpart): must not throw, reconnect in background
 local cache = RedisCache { hash_key = "smoke", reconnect_timeout = 60000 }
 local stream = RedisStream { stream_key = "smoke:stream", reconnect_timeout = 60000 }
-local device = TcpModbusDevice {
-    host = "127.0.0.1",
-    port = 1502,
-    name = "smoke_dev",
-    reconnect_timeout_ms = 60000,
-}
-local master = ModbusMaster {
-    device = device,
-    slave_id = 1,
-    registers = {
-        holding = {
-            ["pump:status"] = { index = 1 },
-        },
-    },
-}

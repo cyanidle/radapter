@@ -3,20 +3,6 @@
 namespace radapter::modbus
 {
 
-static void applyPacking(QVector<uint16_t>& words, RegisterPacking pack) {
-    auto self = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
-    if (words.size() == 2 && self != pack.word) {
-        std::swap(words[0], words[1]);
-    }
-    for (auto& word: words) {
-        if (pack.byte == little) {
-            word = qToLittleEndian(word);
-        } else {
-            word = qToBigEndian(word);
-        }
-    }
-}
-
 class Master : public Worker
 {
     Q_OBJECT
@@ -77,14 +63,6 @@ public:
             config.device->Execute(MasterDevice::op_read, std::move(req));
         }
     }
-    template<typename T>
-    static T parseType(RegisterPacking packing, const void* val) {
-        if (packing.byte == big) {
-            return qFromBigEndian<T>(val);
-        } else {
-            return qFromLittleEndian<T>(val);
-        }
-    }
     void parsePoll(MergedRead const& read, QModbusDataUnit const& resp) {
         uint16_t data[2];
         FlatMap diff;
@@ -93,20 +71,7 @@ public:
             if (reg.sizeOf == 4) {
                 data[1] = resp.value(reg.index + 1 - resp.startAddress());
             }
-            constexpr auto self = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
-            if (reg.packing.word != self) {
-                std::swap(data[0], data[1]);
-            }
-            auto asVariant = [&]() -> QVariant {
-                switch (reg.type) {
-                case defaultValueType: assert(false && "lib error"); std::abort();
-                case bit:
-                case uint16: return parseType<uint16_t>(reg.packing, data);
-                case uint32: return parseType<uint32_t>(reg.packing, data);
-                case float32: return parseType<float>(reg.packing, data);
-                }
-                return {};
-            }();
+            auto asVariant = decodeRegister(reg, data);
             auto& current = currentState[reg.key];
             if (current != asVariant) {
                 current = std::move(asVariant);
@@ -139,52 +104,14 @@ public:
                     continue;
                 }
             }
+            QVector<uint16_t> words;
+            if (!encodeRegister(reg, v, words)) {
+                Warn("{}: could not encode '{}' <= {}", objectName(), k, v.toString());
+                continue;
+            }
             QModbusDataUnit unit;
             unit.setRegisterType(reg.mbType);
             unit.setStartAddress(reg.index);
-            unit.setValueCount(uint32_t(reg.sizeOf/2));
-            QVector<uint16_t> words;
-            switch (reg.type) {
-            case defaultValueType: 
-                assert(false && "lib error"); 
-                std::abort();
-            case bit: {
-                words.push_back(uint16_t(v.toBool()));
-                break;
-            }
-            case uint16: {
-                bool ok;
-                auto ui = v.toUInt(&ok);
-                if (!ok || ui > (std::numeric_limits<uint16_t>::max)()) {
-                    continue; //warn?
-                }
-                words.push_back(uint16_t(ui));
-                applyPacking(words, reg.packing);
-                break;
-            }
-            case uint32:  {
-                bool ok;
-                uint32_t ui = v.toUInt(&ok);
-                if (!ok || ui > (std::numeric_limits<uint16_t>::max)()) {
-                    continue; //warn?
-                }
-                words.resize(2);
-                memcpy(words.data(), &ui, sizeof(ui));
-                applyPacking(words, reg.packing);
-                break;
-            }
-            case float32:  {
-                bool ok;
-                float f = v.toFloat(&ok);
-                if (!ok) {
-                    continue; //warn?
-                }
-                words.resize(2);
-                memcpy(words.data(), &f, sizeof(f));
-                applyPacking(words, reg.packing);
-                break;
-            }
-            }
             unit.setValues(words);
             inFlight[k] = {unit, config.write_retries};
             write(std::move(unit), &reg, std::move(v));
@@ -237,24 +164,32 @@ public:
 
 }
 
-template<typename T>
+template<typename Device, typename T>
 static QVariant makeDevice(radapter::Instance* inst, QVariantList args) {
     using namespace radapter;
     T dev;
     Parse(dev, args.value(0));
-    QObject* device = new modbus::MasterDevice(std::move(dev), inst);
+    QObject* device = new Device(std::move(dev), inst);
     return QVariant::fromValue(device);
 }
 
 void radapter::builtin::workers::modbus(Instance* inst) {
-    inst->RegisterFunc("TcpModbusDevice", makeDevice<modbus::TcpDevice>);
+    inst->RegisterFunc("TcpModbusDevice", makeDevice<modbus::MasterDevice, modbus::TcpDevice>);
     inst->RegisterSchema("TcpModbusDevice", SchemaFor<modbus::TcpDevice>);
 
-    inst->RegisterFunc("RtuModbusDevice", makeDevice<modbus::RtuDevice>);
+    inst->RegisterFunc("RtuModbusDevice", makeDevice<modbus::MasterDevice, modbus::RtuDevice>);
     inst->RegisterSchema("RtuModbusDevice", SchemaFor<modbus::RtuDevice>);
+
+    inst->RegisterFunc("TcpModbusServer", makeDevice<modbus::SlaveDevice, modbus::TcpDevice>);
+    inst->RegisterSchema("TcpModbusServer", SchemaFor<modbus::TcpDevice>);
+
+    inst->RegisterFunc("RtuModbusServer", makeDevice<modbus::SlaveDevice, modbus::RtuDevice>);
+    inst->RegisterSchema("RtuModbusServer", SchemaFor<modbus::RtuDevice>);
 
     inst->RegisterWorker<modbus::Master>("ModbusMaster");
     inst->RegisterSchema("ModbusMaster", SchemaFor<modbus::MasterConfig>);
+
+    modbus::RegisterSlave(inst);
 }
 
 #include "modbus.moc"

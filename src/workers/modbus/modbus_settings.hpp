@@ -6,6 +6,8 @@
 namespace radapter::modbus
 {
 
+void RegisterSlave(Instance* inst);
+
 enum ByteOrder : uint8_t {
     big,
     little,

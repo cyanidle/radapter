@@ -1,6 +1,7 @@
 #pragma once
 #include "modbus_settings.hpp"
 #include "qmodbusdataunit.h"
+#include <QtEndian>
 
 namespace radapter::modbus
 {
@@ -87,10 +88,10 @@ static void validateRegisters(RegistersMap& regs) {
     }
 }
 
-static vector<PreparedRegister> prepareReadableSorted(SingleTypeMap const& map) {
+static vector<PreparedRegister> prepareReadableSorted(SingleTypeMap const& map, bool include_write_only = false) {
     vector<PreparedRegister> sorted;
     for (auto& [k, reg]: map) {
-        if (reg.mode == write) {
+        if (reg.mode == write && !include_write_only) {
             continue; //write-only register
         }
         PreparedRegister meta;
@@ -212,13 +213,13 @@ static PreparedReads prepareManualReads(RegistersMap const& map, vector<ManualQu
 using PreparedWrites = map<string, PreparedWriteRegister>;
 
 [[maybe_unused]]
-static PreparedWrites prepareWrites(RegistersMap const& map) {
+static PreparedWrites prepareWrites(RegistersMap const& map, bool include_read_only = false) {
     PreparedWrites result;
     vector<PreparedWriteRegister> regs;
     auto add = [&](SingleTypeMap const& src, QModbusDataUnit::RegisterType t) {
         regs.clear();
         for (auto& [k, r]: src) {
-            if (r.mode == RegisterMode::read) {
+            if (r.mode == RegisterMode::read && !include_read_only) {
                 continue;
             }
             PreparedWriteRegister reg;
@@ -253,6 +254,94 @@ static PreparedWrites prepareWrites(RegistersMap const& map) {
     add(map.holding.value, QModbusDataUnit::HoldingRegisters);
     add(map.input.value, QModbusDataUnit::InputRegisters);
     return result;
+}
+
+[[maybe_unused]]
+static void applyPacking(QVector<uint16_t>& words, RegisterPacking pack) {
+    auto self = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
+    if (words.size() == 2 && self != pack.word) {
+        std::swap(words[0], words[1]);
+    }
+    for (auto& word: words) {
+        if (pack.byte == little) {
+            word = qToLittleEndian(word);
+        } else {
+            word = qToBigEndian(word);
+        }
+    }
+}
+
+template<typename T>
+static T parseWords(RegisterPacking packing, const void* val) {
+    if (packing.byte == big) {
+        return qFromBigEndian<T>(val);
+    } else {
+        return qFromLittleEndian<T>(val);
+    }
+}
+
+//! data must contain register words in poll order; word packing is applied here
+[[maybe_unused]]
+static QVariant decodeRegister(PreparedRegister const& reg, uint16_t (&data)[2]) {
+    constexpr auto self = Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? little : big;
+    if (reg.packing.word != self) {
+        std::swap(data[0], data[1]);
+    }
+    switch (reg.type) {
+    case defaultValueType: assert(false && "lib error"); std::abort();
+    case bit:
+    case uint16: return parseWords<uint16_t>(reg.packing, data);
+    case uint32: return parseWords<uint32_t>(reg.packing, data);
+    case float32: return parseWords<float>(reg.packing, data);
+    }
+    return {};
+}
+
+[[maybe_unused]]
+static bool encodeRegister(PreparedRegister const& reg, QVariant const& v, QVector<uint16_t>& words) {
+    words.clear();
+    switch (reg.type) {
+    case defaultValueType:
+        assert(false && "lib error");
+        std::abort();
+    case bit: {
+        words.push_back(uint16_t(v.toBool()));
+        return true;
+    }
+    case uint16: {
+        bool ok;
+        auto ui = v.toUInt(&ok);
+        if (!ok || ui > (std::numeric_limits<uint16_t>::max)()) {
+            return false;
+        }
+        words.push_back(uint16_t(ui));
+        applyPacking(words, reg.packing);
+        return true;
+    }
+    case uint32: {
+        bool ok;
+        uint32_t ui = v.toUInt(&ok);
+        if (!ok) {
+            return false;
+        }
+        words.resize(2);
+        memcpy(words.data(), &ui, sizeof(ui));
+        applyPacking(words, reg.packing);
+        return true;
+    }
+    case float32: {
+        bool ok;
+        float f = v.toFloat(&ok);
+        if (!ok) {
+            return false;
+        }
+        words.resize(2);
+        memcpy(words.data(), &f, sizeof(f));
+        applyPacking(words, reg.packing);
+        return true;
+    }
+    }
+    return false;
 }
 
 }

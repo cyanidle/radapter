@@ -1,4 +1,6 @@
 #include "modbus_device.hpp"
+#include <qmodbusrtuserialslave.h>
+#include <qmodbustcpserver.h>
 
 radapter::modbus::MasterDevice::MasterDevice(RtuDevice config, QObject *parent) :
     MasterDevice(static_cast<Device&>(config), parent)
@@ -13,6 +15,7 @@ radapter::modbus::MasterDevice::MasterDevice(RtuDevice config, QObject *parent) 
     device->setConnectionParameter(Param::SerialStopBitsParameter, config.stop_bits.value);
     device->setConnectionParameter(Param::SerialParityParameter, config.parity.value);
     device->setConnectionParameter(Param::SerialPortNameParameter, QString::fromStdString(config.port));
+    setObjectName(QString::fromStdString(fmt::format("Device({}/{})", connectionString, config.name.value)));
 }
 
 radapter::modbus::MasterDevice::MasterDevice(TcpDevice config, QObject *parent) :
@@ -24,12 +27,12 @@ radapter::modbus::MasterDevice::MasterDevice(TcpDevice config, QObject *parent) 
     connectionString = fmt::format("{}:{}", config.host, config.port);
     device->setConnectionParameter(Param::NetworkAddressParameter, QString::fromStdString(config.host));
     device->setConnectionParameter(Param::NetworkPortParameter, config.port);
+    setObjectName(QString::fromStdString(fmt::format("Device({}/{})", connectionString, config.name.value)));
 }
 
 void radapter::modbus::MasterDevice::Start() {
     if (started) return;
     started = true;
-    setObjectName(QString::fromStdString(fmt::format("Device({}/{})", connectionString, config.name.value)));
     reconnect->setInterval(int(config.reconnect_timeout_ms));
     reconnect->setSingleShot(true);
     reconnect->callOnTimeout(this, &MasterDevice::doConnect);
@@ -132,4 +135,75 @@ void radapter::modbus::MasterDevice::doConnect() {
     }
     static_cast<Instance*>(parent())->Info("modbus", "{}: connecting...", objectName());
     device->connectDevice();
+}
+
+radapter::modbus::SlaveDevice::SlaveDevice(RtuDevice config, QObject *parent) :
+    SlaveDevice(static_cast<Device&>(config), parent)
+{
+    using Param = QModbusDevice::ConnectionParameter;
+    server = new QModbusRtuSerialSlave(this);
+    connectionString = config.port;
+    server->setConnectionParameter(Param::SerialPortNameParameter, QString::fromStdString(config.port));
+    server->setConnectionParameter(Param::SerialBaudRateParameter, config.baud.value);
+    server->setConnectionParameter(Param::SerialDataBitsParameter, config.data_bits.value);
+    server->setConnectionParameter(Param::SerialStopBitsParameter, config.stop_bits.value);
+    server->setConnectionParameter(Param::SerialParityParameter, config.parity.value);
+    setObjectName(QString::fromStdString(fmt::format("SlaveDevice({}/{})", connectionString, config.name.value)));
+}
+
+radapter::modbus::SlaveDevice::SlaveDevice(TcpDevice config, QObject *parent) :
+    SlaveDevice(static_cast<Device&>(config), parent)
+{
+    using Param = QModbusDevice::ConnectionParameter;
+    server = new QModbusTcpServer(this);
+    connectionString = fmt::format("{}:{}", config.host, config.port);
+    server->setConnectionParameter(Param::NetworkAddressParameter, QString::fromStdString(config.host));
+    server->setConnectionParameter(Param::NetworkPortParameter, config.port);
+    setObjectName(QString::fromStdString(fmt::format("SlaveDevice({}/{})", connectionString, config.name.value)));
+}
+
+radapter::modbus::SlaveDevice::SlaveDevice(const Device &conf, QObject *parent) :
+    QObject(parent),
+    reconnect(new QTimer(this)),
+    config(conf)
+{
+}
+
+QModbusServer* radapter::modbus::SlaveDevice::Claim(Worker* by) {
+    if (claimer) {
+        Raise("{}: already claimed by '{}' (created at {})",
+              objectName(), claimer->objectName(), claimer->_Origin);
+    }
+    claimer = by;
+    return server;
+}
+
+void radapter::modbus::SlaveDevice::Start() {
+    if (started) return;
+    started = true;
+    reconnect->setInterval(int(config.reconnect_timeout_ms));
+    reconnect->setSingleShot(true);
+    reconnect->callOnTimeout(this, &SlaveDevice::doListen);
+    connect(server, &QModbusServer::stateChanged, this, [this](QModbusDevice::State state){
+        if (state == QModbusDevice::ConnectedState) {
+            static_cast<Instance*>(parent())->Info("modbus", "{}: listening", objectName());
+            emit ConnectedChanged(true);
+        } else if (state == QModbusDevice::UnconnectedState) {
+            static_cast<Instance*>(parent())->Warn("modbus", "{}: stopped", objectName());
+            reconnect->start();
+            emit ConnectedChanged(false);
+        }
+    });
+    doListen();
+}
+
+void radapter::modbus::SlaveDevice::doListen() {
+    if (server->state() == QModbusDevice::ConnectedState) {
+        return;
+    }
+    if (!server->connectDevice()) {
+        static_cast<Instance*>(parent())->Warn("modbus", "{}: could not start: {}",
+                                               objectName(), server->errorString());
+        reconnect->start();
+    }
 }

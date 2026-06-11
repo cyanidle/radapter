@@ -66,8 +66,9 @@ drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 There is no unit-test framework. "Tests" are Lua scripts under `tests/` that you run the
 binary against. **The primary smoke test is `tests/smoke.lua`** — run it after any engine
 change (`build/bin/radapter tests/smoke.lua`); it constructs every worker that needs no
-external hardware/services, verifies live roundtrips (websocket pairs, sqlite, services,
-worker naming) and exits 0 on success / 1 on failure. `tests/basic.lua` is also
+external hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus
+slave/master loopback, services, worker naming) and exits 0 on success / 1 on failure.
+`tests/modbus_loopback.lua` is a deeper self-checking ModbusSlave <-> ModbusMaster test. `tests/basic.lua` is also
 self-checking but covers only the Lua builtins (pipe/get/set). Most other scripts need
 live hardware/services: `modbus.lua` (a Modbus TCP device on :1502), `redis.lua` (a Redis
 server), `serial/serial.lua` (a serial port arg), `can.lua`/`cyphal.lua` (a CAN

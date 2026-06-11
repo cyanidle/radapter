@@ -11,6 +11,8 @@
 #include <QModbusRtuSerialMaster>
 #include "modbus_units.hpp"
 
+class QModbusServer;
+
 namespace radapter::modbus
 {
 
@@ -52,6 +54,29 @@ private:
     MasterDevice(Device const& conf, QObject* parent);
     void nextReq();
     void doConnect();
+};
+
+class SlaveDevice : public QObject {
+    Q_OBJECT
+
+    bool started = false;
+    QPointer<Worker> claimer;
+    QTimer* reconnect = nullptr;
+    ::QModbusServer* server = nullptr;
+    Device config;
+    string connectionString;
+public:
+    SlaveDevice(RtuDevice config, QObject* parent);
+    SlaveDevice(TcpDevice config, QObject* parent);
+
+    //! a server can host exactly one ModbusSlave (single server address + map)
+    ::QModbusServer* Claim(Worker* by);
+    void Start();
+signals:
+    void ConnectedChanged(bool state);
+private:
+    SlaveDevice(Device const& conf, QObject* parent);
+    void doListen();
 };
 
 }
