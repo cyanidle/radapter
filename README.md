@@ -82,7 +82,7 @@ sudo apt install cmake ninja-build build-essential \
 cmake -B build -G Ninja
 cmake --build build -j $(nproc)
 
-build/bin/radapter tests/basic.lua   # smoke test (self-checking, no hardware needed)
+build/bin/radapter tests/smoke.lua   # smoke test (self-checking, no hardware needed)
 ```
 
 Set `CPM_SOURCE_CACHE=$HOME/.cache/CPM` to cache dependencies across builds.
@@ -101,7 +101,7 @@ build/bin/radapter -e 'log.info("hi")'              # inline eval
 Arguments after the script file are available in Lua as `args`:
 
 ```bash
-build/bin/radapter tests/serial/serial.lua /dev/ttyUSB0
+build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 ```
 
 ## Architecture
@@ -124,23 +124,33 @@ cmake --build build -j $(nproc)
 
 JIT mode targets Lua 5.1. Embedded scripts ship as source rather than bytecode.
 
-## More examples
+## Examples
 
-See `tests/`:
+See `examples/` — runnable demonstrations (most need live hardware/services):
 
 | Script | What to see |
 |---|---|
-| `tests/basic.lua` | Pipeline primitives, `wrap`/`unwrap`, `get`/`set` path syntax — no hardware |
-| `tests/websocket.lua` | Server ↔ client with msgpack + zlib compression |
-| `tests/redis.lua` | RedisCache + RedisStream + async/await |
-| `tests/sql.lua` | SQLite insert/select with callbacks and `await` |
-| `tests/modbus.lua` | Modbus TCP master (needs a device on :1502) |
-| `tests/serial/serial.lua` | Serial + SLIP + msgpack (pass port as arg) |
-| `tests/chat/` | Multi-client group chat: headless server + QML GUI client |
-| `tests/demo/` | QML gauge + Redis + Serial + `make_service` request/response |
-| `tests/test_async.lua` | `async`/`await`/`promisify` patterns |
-| `tests/gui.lua` | Inline QML string, bidirectional color binding |
-| `tests/can.lua` / `tests/cyphal.lua` | CAN/Cyphal (see `tests/setup_vcan.sh` for a virtual interface) |
+| `examples/websocket.lua` | Server ↔ client with msgpack + zlib compression |
+| `examples/redis.lua` | RedisCache + RedisStream + async/await |
+| `examples/sql.lua` | SQLite insert/select with callbacks and `await` |
+| `examples/modbus.lua` | Modbus TCP master (needs a device on :1502) |
+| `examples/serial/serial.lua` | Serial + SLIP + msgpack (pass port as arg) |
+| `examples/chat/` | Multi-client group chat: headless server + QML GUI client |
+| `examples/demo/` | QML gauge + Redis + Serial + `make_service` request/response |
+| `examples/test_async.lua` | `async`/`await`/`promisify` patterns |
+| `examples/gui.lua` | Inline QML string, bidirectional color binding |
+| `examples/can.lua` / `examples/cyphal.lua` | CAN/Cyphal (see `examples/setup_vcan.sh` for a virtual interface) |
+
+## Tests
+
+Self-checking scripts under `tests/` that the binary runs and exits 0/1 on:
+
+| Script | What it verifies |
+|---|---|
+| `tests/smoke.lua` | Primary smoke test — every hardware-free worker, live roundtrips, naming |
+| `tests/basic.lua` | Pipeline primitives, `wrap`/`unwrap`, `get`/`set` path syntax |
+| `tests/modbus_loopback.lua` | Deep ModbusSlave ↔ ModbusMaster loopback |
+| `tests/tags.lua` | Tag system (run with `--tags`) |
 
 ## Special thanks
 

@@ -1,7 +1,7 @@
 -- Radapter group chat — client.
 --
 -- Run with (GUI build required):
---   build/bin/radapter --gui tests/chat/client.lua [ws://host:port]
+--   build/bin/radapter --gui examples/chat/client.lua [ws://host:port]
 --
 -- On first open a nickname dialog is shown. After joining, the chat window
 -- becomes active. Messages are sent to server.lua which relays them to every

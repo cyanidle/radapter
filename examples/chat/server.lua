@@ -1,7 +1,7 @@
 -- Radapter group chat — headless relay server.
 --
 -- Run with:
---   build/bin/radapter tests/chat/server.lua [port]
+--   build/bin/radapter examples/chat/server.lua [port]
 --
 -- Accepts any number of WebSocket clients (client.lua).
 -- Every message from a client is relayed to all OTHER connected clients.

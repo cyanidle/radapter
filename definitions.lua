@@ -638,19 +638,19 @@ function Cyphal(params) end
 
 ---@class TagsApi
 ---@field changed Pipable  pipe target that fires a TagEvent on every tag update
-tags = {
-    ---Subscribe to a specific tag by name. Callback fires immediately on each update.
-    ---@param name string
-    ---@param fn fun(ev: TagEvent)
-    subscribe = function(name, fn) end,
+tags = {}
 
-    ---Return the last known value, quality and timestamp for a tag, or nil if unknown.
-    ---@param name string
-    ---@return TagInfo?
-    get = function(name) end,
+---Subscribe to a specific tag by name. Callback fires immediately on each update.
+---@param name string
+---@param fn fun(ev: TagEvent)
+function tags:subscribe(name, fn) end
 
-    ---Return the Worker object that owns the tag, or nil if not yet known.
-    ---@param name string
-    ---@return Worker?
-    source = function(name) end,
-}
+---Return the last known value, quality and timestamp for a tag, or nil if unknown.
+---@param name string
+---@return TagInfo?
+function tags:get(name) end
+
+---Return the Worker object that owns the tag, or nil if not yet known.
+---@param name string
+---@return Worker?
+function tags:source(name) end

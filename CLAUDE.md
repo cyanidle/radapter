@@ -30,13 +30,13 @@ build/bin/radapter tests/basic.lua
 build/bin/radapter --schema
 
 # Other useful flags
-build/bin/radapter --watch-dir . tests/modbus.lua        # hot reload on file change
-build/bin/radapter --gui --gui-auto-quit tests/chat/client.lua  # quit when window closes
+build/bin/radapter --watch-dir . examples/modbus.lua        # hot reload on file change
+build/bin/radapter --gui --gui-auto-quit examples/chat/client.lua  # quit when window closes
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
 build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables QML
 # trailing args after the script file land in the Lua global `args`
-build/bin/radapter tests/serial/serial.lua /dev/ttyUSB0
+build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 ```
 
 Set `CPM_SOURCE_CACHE` (e.g. `export CPM_SOURCE_CACHE="$HOME/.cache/CPM"`) to cache fetched
@@ -63,17 +63,23 @@ drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 
 ### Tests
 
-There is no unit-test framework. "Tests" are Lua scripts under `tests/` that you run the
-binary against. **The primary smoke test is `tests/smoke.lua`** — run it after any engine
+There is no unit-test framework. Self-checking scripts live under `tests/`; runnable
+demonstrations live under `examples/`.
+
+**Tests (`tests/`)** are self-checking — the binary runs them and they exit 0 on success /
+1 on failure. **The primary smoke test is `tests/smoke.lua`** — run it after any engine
 change (`build/bin/radapter tests/smoke.lua`); it constructs every worker that needs no
 external hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus
-slave/master loopback, services, worker naming) and exits 0 on success / 1 on failure.
-`tests/modbus_loopback.lua` is a deeper self-checking ModbusSlave <-> ModbusMaster test. `tests/basic.lua` is also
-self-checking but covers only the Lua builtins (pipe/get/set). Most other scripts need
-live hardware/services: `modbus.lua` (a Modbus TCP device on :1502), `redis.lua` (a Redis
-server), `serial/serial.lua` (a serial port arg), `can.lua`/`cyphal.lua` (a CAN
-interface — see `tests/setup_vcan.sh` for a virtual one), `plugin.lua` (pass the plugins
-build dir). `tests/demo/` is a small QML dashboard example.
+slave/master loopback, services, worker naming). `tests/modbus_loopback.lua` is a deeper
+ModbusSlave <-> ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pipe/get/set);
+`tests/tags.lua` covers the tag system (run with `--tags`).
+
+**Examples (`examples/`)** are documentation-grade demos; most need live hardware/services:
+`modbus.lua` (a Modbus TCP device on :1502), `redis.lua` (a Redis server),
+`serial/serial.lua` (a serial port arg), `can.lua`/`cyphal.lua` (a CAN interface — see
+`examples/setup_vcan.sh` for a virtual one), `plugin.lua` (pass the plugins build dir),
+`ros.lua` (ROS2 plugin). `examples/demo/` is a small QML dashboard example and
+`examples/chat/` a headless server + QML client.
 
 ## Architecture
 
@@ -187,7 +193,7 @@ nested described structs all compose recursively.
 
 - Comments: write no comments in C++ sources unless the WHY is non-obvious (hidden
   constraint, subtle invariant, workaround for a specific bug). Never describe what the code
-  does — well-named identifiers do that. Lua scripts under `tests/` are public-facing
+  does — well-named identifiers do that. Lua scripts under `examples/` are public-facing
   documentation and may carry header comments and usage instructions.
 
 - Logging: `worker->Info/Warn/Error/Debug("fmt {}", args)` (fmtlib syntax) or
