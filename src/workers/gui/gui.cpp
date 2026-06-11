@@ -102,6 +102,15 @@ class QMLWorker final : public radapter::Worker
 	Q_OBJECT
 public:
     QMap<QString, LuaFunction> calls;
+
+    QVariant AddCall(QVariantList const& args) {
+        auto name = args.value(0).toString();
+        if (name.isEmpty()) Raise("AddCall: arg 1 must be a non-empty string name");
+        auto fn = args.value(1).value<LuaFunction>();
+        if (!fn) Raise("AddCall: arg 2 must be a function");
+        calls[name] = std::move(fn);
+        return {};
+    }
 private:
     QMLConfig config;
     QQmlComponent* creator;
@@ -184,25 +193,16 @@ QVariant GuiInstanceProxy::call(const QString& name, QVariant rawArgs) {
     return it.value().Call(args);
 }
 
-static int qml_add_call(lua_State* L, Worker* w) {
-    auto* qw = static_cast<QMLWorker*>(w);
-    if (lua_type(L, 2) != LUA_TSTRING) Raise("AddCall: arg 1 must be a string name");
-    if (lua_type(L, 3) != LUA_TFUNCTION) Raise("AddCall: arg 2 must be a function");
-    auto name = QString::fromUtf8(lua_tostring(L, 2));
-    qw->calls[name] = LuaFunction{L, 3};
-    return 0;
-}
-
 }
 
 namespace radapter::builtin {
 
 
-void workers::gui(Instance* inst) 
+void workers::gui(Instance* inst)
 {
 	using namespace radapter::gui;
     g_engine()->clearComponentCache();
-    inst->RegisterWorker<QMLWorker>("QML", {}, {{"AddCall", qml_add_call}});
+    inst->RegisterWorker<QMLWorker>("QML", {{"AddCall", AsExtraMethod<&QMLWorker::AddCall>}});
 	inst->RegisterSchema<QMLConfig>("QML");
 }
 

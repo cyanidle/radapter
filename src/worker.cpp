@@ -119,7 +119,6 @@ struct FactoryContext {
     string name;
     Factory factory;
     ExtraMethods methods;
-    RawExtraMethods rawMethods;
 };
 DESCRIBE("radapter::FactoryContext", FactoryContext, void) {}
 
@@ -158,17 +157,6 @@ static int worker_call(lua_State* L) {
     ud->currentSender = builtin::help::toQVar(L, 3);
     w->OnMsg(builtin::help::toQVar(L, 2));
     return 1;
-}
-
-static int call_raw_extra(lua_State* L) {
-    auto* cls = lua_tostring(L, lua_upvalueindex(1));
-    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
-    auto* w = ud->self.data();
-    if (!w) {
-        Raise("worker not usable");
-    }
-    auto* method = reinterpret_cast<RawExtraMethod>(lua_touserdata(L, lua_upvalueindex(2)));
-    return method(L, w);
 }
 
 static int call_extra(lua_State* L) {
@@ -251,7 +239,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     lua_settop(L, msgh - 1);
 }
 
-static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods, RawExtraMethods const& rawMethods = {})
+static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
 {
     lua_pushstring(L, clsname);
     auto clsIdx = lua_gettop(L);
@@ -313,14 +301,6 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
             lua_settable(L, -3);
         }
 
-        for (auto it = rawMethods.begin(); it != rawMethods.end(); ++it) {
-            glua::Push(L, it.key().toStdString());
-            lua_pushvalue(L, clsIdx);
-            lua_pushlightuserdata(L, reinterpret_cast<void*>(it.value()));
-            lua_pushcclosure(L, glua::protect<call_raw_extra>, 2);
-            lua_settable(L, -3);
-        }
-
         lua_pushcfunction(L, glua::dtor_for<WorkerImpl>);
         lua_setfield(L, -2, "__gc");
         lua_pushvalue(L, -1);
@@ -343,14 +323,14 @@ static int workerFactory(lua_State* L) {
         d->currentCaller = was;
     });
     auto* w = ctx->factory(ctorArgs, inst);
-    push_worker(L, inst, ctx->name.c_str(), w, ctx->methods, ctx->rawMethods);
+    push_worker(L, inst, ctx->name.c_str(), w, ctx->methods);
     return 1;
 }
 
-void Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra, RawExtraMethods const& rawExtra)
+void Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra)
 {
     auto L = d->L;
-    glua::Push(L, FactoryContext{name, factory, extra, rawExtra});
+    glua::Push(L, FactoryContext{name, factory, extra});
     lua_pushcclosure(L, glua::protect<workerFactory>, 1);
     lua_setglobal(L, name);
 }
