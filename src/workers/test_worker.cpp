@@ -39,7 +39,8 @@ public:
         Info("Msg => '{}'", msg.toString());
     }
 
-    QVariant Call(std::optional<LuaFunction> fn) {
+    QVariant Call(std::tuple<std::optional<LuaFunction>> args) {
+        auto& [fn] = args;
         if (fn) fn->Call({1, 2, 3});
         return {};
     }

@@ -345,8 +345,9 @@ public:
             it = m_pending.erase(it);
         }
     }
-    QVariant Request(QString clientName, QVariant data, std::optional<LuaFunction> cb)
+    QVariant Request(std::tuple<QString, QVariant, std::optional<LuaFunction>> args)
     {
+        auto& [clientName, data, cb] = args;
         fut::Promise<QVariant> prom;
         fut::Future<QVariant> future = prom.GetFuture();
         auto it = m_clients.find(clientName);

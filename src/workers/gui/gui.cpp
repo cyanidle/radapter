@@ -103,7 +103,8 @@ class QMLWorker final : public radapter::Worker
 public:
     QMap<QString, LuaFunction> calls;
 
-    QVariant AddCall(QString name, LuaFunction fn) {
+    QVariant AddCall(std::tuple<QString, LuaFunction> args) {
+        auto& [name, fn] = args;
         if (name.isEmpty()) Raise("AddCall: arg 1 must be a non-empty string name");
         if (!fn) Raise("AddCall: arg 2 must be a function");
         calls[name] = std::move(fn);

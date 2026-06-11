@@ -622,3 +622,35 @@ function CyphalWorker:Request(params, msg, callback) end
 ---@return CyphalWorker
 ---@param params CyphalConfig
 function Cyphal(params) end
+
+-- Tag system (available only when radapter is run with --tags flag)
+
+---@class TagEvent
+---@field name string      tag name in "worker:field" form
+---@field value any        current value
+---@field quality "good" | "comm_fail"
+---@field ts number        milliseconds since epoch
+
+---@class TagInfo
+---@field value any
+---@field quality "good" | "comm_fail"
+---@field ts number
+
+---@class TagsApi
+---@field changed Pipable  pipe target that fires a TagEvent on every tag update
+tags = {
+    ---Subscribe to a specific tag by name. Callback fires immediately on each update.
+    ---@param name string
+    ---@param fn fun(ev: TagEvent)
+    subscribe = function(name, fn) end,
+
+    ---Return the last known value, quality and timestamp for a tag, or nil if unknown.
+    ---@param name string
+    ---@return TagInfo?
+    get = function(name) end,
+
+    ---Return the Worker object that owns the tag, or nil if not yet known.
+    ---@param name string
+    ---@return Worker?
+    source = function(name) end,
+}

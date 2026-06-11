@@ -34,10 +34,12 @@ void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction ope
 namespace detail {
 template<typename Cls, typename Ret, typename... Args>
 Cls* getcls(Ret(Cls::*)(Args...));
-template<typename Cls, typename Ret, typename... Args>
-std::tuple<Args...>* getargs(Ret(Cls::*)(Args...));
 
-// Detect single QVariantList parameter — pass through without parsing
+// Extract the single argument type (for the tuple-arg case)
+template<typename Cls, typename Ret, typename Arg>
+Arg* getarg(Ret(Cls::*)(Arg));
+
+// Detect QVariantList pass-through methods
 template<typename Cls, typename Ret>
 constexpr bool is_varlist(Ret(Cls::*)(QVariantList)) { return true; }
 template<typename Cls, typename Ret>
@@ -86,20 +88,17 @@ Worker* FactoryFor(QVariantList const& args, Instance* parent) {
 }
 
 // If f takes QVariantList/QVariantList const&, pass args directly.
-// Otherwise parse args into the typed parameter tuple via ParseTuple.
+// Otherwise f must take a single std::tuple<...> which is filled via Parse.
 template<auto f>
 QVariant AsExtraMethod(Worker* w, QVariantList const& argList) {
     using Cls = std::remove_pointer_t<decltype(detail::getcls(f))>;
     if constexpr (detail::is_varlist(f)) {
         return (static_cast<Cls*>(w)->*f)(argList);
     } else {
-        using ArgsTuple = std::remove_pointer_t<decltype(detail::getargs(f))>;
-        ArgsTuple args;
-        ParseTuple(args, argList,
-                   std::make_index_sequence<std::tuple_size_v<ArgsTuple>>{}, {});
-        return std::apply([&](auto&&... a) {
-            return (static_cast<Cls*>(w)->*f)(std::forward<decltype(a)>(a)...);
-        }, std::move(args));
+        using Arg = std::remove_pointer_t<decltype(detail::getarg(f))>;
+        Arg args;
+        Parse(args, QVariant(argList));
+        return (static_cast<Cls*>(w)->*f)(std::move(args));
     }
 }
 
