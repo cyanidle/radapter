@@ -94,6 +94,7 @@ public:
     void RegisterFunc(const char* name, ExtraFunction func);
     
     void EnableGui();
+    void EnableTags();
 
     void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {}, RawExtraMethods const& rawExtra = {});
 

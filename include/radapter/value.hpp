@@ -38,6 +38,8 @@ struct RADAPTER_API LuaValue {
     bool IsValid() const noexcept {
         return bool(*this);
     }
+    // Push the referenced value onto the Lua stack
+    void RADAPTER_API Push(lua_State* L) const;
     ~LuaValue();
 
     lua_State* _L;

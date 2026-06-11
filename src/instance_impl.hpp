@@ -2,10 +2,12 @@
 #include "radapter/radapter.hpp"
 #include <QSet>
 #include "builtin.hpp"
+#include "tags.hpp"
 
 struct radapter::Instance::Impl {
     lua_State* L;
     lua_State* currentCaller = nullptr; // thread invoking a worker factory (may be a coroutine)
+    std::unique_ptr<TagRegistry> tagRegistry;
     QSet<Worker*> workers;
     LogLevel globalLevel = LogLevel::debug;
     std::map<string, LogLevel, std::less<>> perCat;

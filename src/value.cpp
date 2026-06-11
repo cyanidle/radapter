@@ -67,6 +67,10 @@ bool LuaValue::operator==(const LuaValue &o) const noexcept
     return _ref == o._ref;
 }
 
+void LuaValue::Push(lua_State* L) const {
+    lua_rawgeti(L, LUA_REGISTRYINDEX, _ref);
+}
+
 LuaValue::~LuaValue()
 {
     if (_L) {

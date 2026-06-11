@@ -2,9 +2,28 @@
 #include "instance_impl.hpp"
 #include "glua/glua.hpp"
 #include "worker_impl.hpp"
+#include "tags.hpp"
 
 namespace radapter
 {
+
+static QString sanitizeName(QString const& s) {
+    QString out;
+    for (auto c : s) {
+        if (c.isLetterOrNumber() || c == '_') out += c;
+        else if (!out.isEmpty() && out.back() != '.') out += '.';
+    }
+    while (out.endsWith('.')) out.chop(1);
+    return out.isEmpty() ? QStringLiteral("worker") : out;
+}
+
+static bool isValidWorkerName(QString const& name) {
+    if (name.isEmpty()) return false;
+    for (auto c : name) {
+        if (!c.isLetterOrNumber() && c != '.' && c != '_') return false;
+    }
+    return true;
+}
 
 static string luaOrigin(lua_State* L) {
     if (!L) return "<CPP>";
@@ -44,6 +63,11 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
         name = QString::fromStdString(_Category);
         autoNamed = true;
     }
+    if (autoNamed) {
+        name = sanitizeName(name);
+    } else if (!isValidWorkerName(name)) {
+        Raise("Worker name '{}' must be alphanumeric, dots, or underscores only", name);
+    }
     if (taken(name)) {
         if (!autoNamed) {
             Raise("Worker name '{}' is already taken", name);
@@ -51,7 +75,7 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
         QString candidate;
         int n = 2;
         do {
-            candidate = name + "#" + QString::number(n++);
+            candidate = name + "." + QString::number(n++);
         } while (taken(candidate));
         name = candidate;
     }
@@ -60,6 +84,12 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
     _LogCat = stdName == _Category ? _Category : _Category + "/" + stdName;
     auto* caller = parent->_GetPrivate()->currentCaller;
     _Origin = luaOrigin(caller ? caller : parent->LuaState());
+}
+
+void Worker::AdvertiseFields(QStringList const& fields) {
+    if (auto* reg = _Inst->_GetPrivate()->tagRegistry.get()) {
+        reg->Advertise(this, fields);
+    }
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
@@ -200,6 +230,10 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     if (!w) {
         Raise("worker not usable");
     }
+    if (auto* reg = w->_Inst->_GetPrivate()->tagRegistry.get()) {
+        if (is_event) reg->onWorkerEvent(w, msg);
+        else          reg->onWorkerMsg(w, msg);
+    }
     if (!lua_checkstack(L, 4)) {
         w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
         return;
@@ -232,6 +266,7 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
 
     lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
     auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    w->_luaSelfRef = workerSelfRef;
     QObject::connect(w, &QObject::destroyed, w, [=]{
         luaL_unref(mainL, LUA_REGISTRYINDEX, workerSelfRef);
     });

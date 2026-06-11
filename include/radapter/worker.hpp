@@ -52,6 +52,7 @@ public:
     string _Category;
     string _LogCat;
     string _Origin; // "file:line" of the creating Lua call, or "<CPP>"
+    int _luaSelfRef = -1; // Lua registry ref to this worker's userdata (LUA_NOREF); set by push_worker
 
     Worker(Instance* parent, const char* category);
     Worker(Instance* parent, WorkerConfig const& conf, const char* category);
@@ -59,6 +60,9 @@ public:
     QString Name() const {
         return objectName();
     }
+
+    // Inform the tag registry about known output fields (call from ctor after fields are known)
+    void AdvertiseFields(QStringList const& fields);
 
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
 

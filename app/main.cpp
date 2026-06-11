@@ -74,6 +74,10 @@ public:
             inst->EnableGui();
         }
 
+        if (config->cli["tags"] == true) {
+            inst->EnableTags();
+        }
+
         if (config->cli["schema"] == true) {
             std::cerr << QJsonDocument::fromVariant(inst->GetSchemas()).toJson().toStdString() << std::endl;
             std::exit(0);
@@ -191,6 +195,9 @@ int main (int argc, char **argv) try {
     cli.add_argument("--schema")
         .flag()
         .help("Print config schema");
+    cli.add_argument("--tags")
+        .flag()
+        .help("Enable the tag registry (tags.subscribe/get/source/changed)");
     cli.add_argument("--debug")
         .flag()
         .help("Enable debugger Mobdebug");
