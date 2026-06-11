@@ -152,7 +152,7 @@ public:
         client->Execute({"HGETALL", *config.hash_key})
             .ThenSync([this](QVariant resp){
                 if (resp.type() != QVariant::List) {
-                    Error("{}: error reading all keys: {}", objectName(), resp.toString());
+                    Error("error reading all keys: {}", resp.toString());
                     return;
                 }
                 auto list = resp.toList();
@@ -171,17 +171,17 @@ public:
             })
             .CatchSync([this, ref = QPointer(this)](std::exception& e) {
                 if (!ref) return;
-                Error("{}: Could not read hash {} => {}", objectName(), *config.hash_key, e.what());
+                Error("Could not read hash {} => {}", *config.hash_key, e.what());
             });
 
     }
     void OnMsg(QVariant const& msg) override {
         if (!(config.mode & w)) {
-            Error("{}: write disabled", objectName());
+            Error("write disabled");
             return;
         }
         if (!config.hash_key) {
-            Error("{}: cannot handle msg: hash_key not set!", objectName());
+            Error("cannot handle msg: hash_key not set!");
             return;
         }
         FlatMap flat;
@@ -195,12 +195,12 @@ public:
         client->Execute(cmd)
             .ThenSync([this](QVariant resp){
                 if (resp != "OK") {
-                    Error("{}: non-ok responce: {}", objectName(), resp.toString());
+                    Error("non-ok responce: {}", resp.toString());
                 }
             })
             .CatchSync([this, ref = QPointer(this)](std::exception& e){
                 if (!ref) return;
-                Error("{}: error writing: {}", objectName(), e.what());
+                Error("error writing: {}", e.what());
             });
     }
 
@@ -248,7 +248,7 @@ public:
         client->Execute({"SET", lastIdKey, lastId})
             .CatchSync([this, ref = QPointer(this)](std::exception& e) mutable {
                 if (!ref) return;
-                Error("{}: Could not save last id: {}", objectName(), e.what());
+                Error("Could not save last id: {}", e.what());
             });
     }
     void loadIdAndRead() {
@@ -258,13 +258,13 @@ public:
                 try {
                     lastId = res.get().toString().toStdString();
                 } catch (std::exception& e) {
-                    Error("{}: Could not get last id: {}", objectName(), e.what());
+                    Error("Could not get last id: {}", e.what());
                 }
                 if (lastId.empty()) {
-                    Warn("{}: empty last id!", objectName());
+                    Warn("empty last id!");
                     lastId = "0-0";
                 }
-                Info("{}: will start from persistent id: {}", objectName(), lastId);
+                Info("will start from persistent id: {}", lastId);
                 nextRead();
             });
     }
@@ -317,13 +317,13 @@ public:
                     parseReply(resp.get());
                     nextRead();
                 } catch (std::exception& e) {
-                    Error("{}: error reading stream: {}", objectName(), e.what());
+                    Error("error reading stream: {}", e.what());
                 }
             });
     }
     void parseReply(QVariant resp) {
         if (resp.type() != QVariant::List) {
-            Error("{}: error reading stream: {}", objectName(), resp.toString());
+            Error("error reading stream: {}", resp.toString());
             return;
         }
         auto entries = resp.toList().value(0).toList().value(1).toList();
@@ -348,7 +348,7 @@ public:
     }
     void OnMsg(QVariant const& msg) override {
         if (!(config.mode & w)) {
-            Warn("{}: writing is disabled", objectName());
+            Warn("writing is disabled");
             return;
         }
         FlatMap flat;
@@ -365,7 +365,7 @@ public:
         }
         client->Execute(cmd).CatchSync([this, ref = QPointer(this)](std::exception& e){
             if (!ref) return;
-            Error("{}: could not write stream: {}", objectName(), e.what());
+            Error("could not write stream: {}", e.what());
         });
     }
 };

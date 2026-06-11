@@ -111,7 +111,7 @@ public:
             auto& reg = it->second;
             QVector<uint16_t> words;
             if (!encodeRegister(reg, v, words)) {
-                Warn("{}: could not encode '{}' <= {}", objectName(), k, v.toString());
+                Warn("could not encode '{}' <= {}", k, v.toString());
                 continue;
             }
             QModbusDataUnit unit;
@@ -122,7 +122,7 @@ public:
             auto ok = server->setData(unit);
             applying = false;
             if (!ok) {
-                Warn("{}: could not set '{}': {}", objectName(), k, server->errorString());
+                Warn("could not set '{}': {}", k, server->errorString());
             } else {
                 currentState[k] = v;
             }

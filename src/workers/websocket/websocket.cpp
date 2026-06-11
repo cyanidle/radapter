@@ -150,8 +150,8 @@ static QVariant recvFrom(QWebSocket* sock, Worker* self, WsConfig const& config,
                 recv = ParseJsonInPlace(msg.data(), size_t(msg.size()), alloc);
             }
         } catch (std::exception& e) {
-            self->Error("{}: Error receiving from ({}:{}) => {}",
-                  self->objectName(), sock->peerAddress().toString(),
+            self->Error("Error receiving from ({}:{}) => {}",
+                  sock->peerAddress().toString(),
                   sock->peerPort(), e.what());
             return {};
         }
@@ -185,9 +185,9 @@ public:
             server->setSslConfiguration(*ssl);
         }
         if (!server->listen(QHostAddress(QString::fromStdString(config.host)), config.port)) {
-            Raise("{}: could not listen on: {}:{}", objectName(), config.host.value, config.port);
+            Raise("could not listen on: {}:{}", config.host.value, config.port);
         }
-        Info("{}: listening on {}:{}", objectName(), config.host.value, config.port);
+        Info("listening on {}:{}", config.host.value, config.port);
         connect(server, &QWebSocketServer::newConnection, this, [this]{
             while(server->hasPendingConnections()) {
                 accept(server->nextPendingConnection());
@@ -226,11 +226,11 @@ public:
         auto addr = QString("%1:%2").arg(sock->peerAddress().toString()).arg(sock->peerPort());
         sock->setParent(this);
         sock->setObjectName(addr);
-        Info("{}: new client {}", objectName(), addr);
+        Info("new client {}", addr);
         socks[addr] = sock;
         emit SendEvent(QVariantMap{{"connected", addr}});
         connect(sock, &QWebSocket::disconnected, this, [this, sock, addr]{
-            Warn("{}: client disconnected {}", objectName(), addr);
+            Warn("client disconnected {}", addr);
             emit SendEvent(QVariantMap{{"disconnected", addr}});
             sock->deleteLater();
         });
@@ -274,7 +274,7 @@ public:
         }
         connect(sock, &QWebSocket::stateChanged, this, [=](auto state){
             const auto st = QMetaEnum::fromType<decltype(state)>().valueToKey(state);
-            Info("{}: New state: {}", objectName(), st);
+            Info("state: {}", st);
             emit SendEvent(QVariantMap{{"state", st}});
             if (state == QAbstractSocket::UnconnectedState) {
                 QTimer::singleShot(config.reconnect_timeout, this, [=]{

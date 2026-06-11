@@ -19,6 +19,10 @@ class Worker;
 using ExtraMethod = QVariant(*)(Worker*, QVariantList const&);
 using ExtraMethods = QMap<QString, ExtraMethod>;
 
+// Raw extra method: direct Lua stack access. Stack: [1]=worker userdata, [2..]=args.
+using RawExtraMethod = int(*)(lua_State*, Worker*);
+using RawExtraMethods = QMap<QString, RawExtraMethod>;
+
 struct RADAPTER_API WorkerConfig {
     optional<QString> name;
     optional<QString> category;

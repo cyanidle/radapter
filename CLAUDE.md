@@ -181,6 +181,10 @@ nested described structs all compose recursively.
 
 ## Conventions
 
+- **`definitions.lua`** is the Lua LSP type stub for the entire radapter public API. Keep it
+  up to date before committing: any new worker, extra method, global function, or worker
+  field exposed to Lua must have a corresponding entry there.
+
 - Comments: write no comments in C++ sources unless the WHY is non-obvious (hidden
   constraint, subtle invariant, workaround for a specific bug). Never describe what the code
   does — well-named identifiers do that. Lua scripts under `tests/` are public-facing

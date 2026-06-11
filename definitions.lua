@@ -153,6 +153,28 @@ function lfs.unlock (filehandle, start, length) end
 ---@return string
 function fmt(fmt, ...) end
 
+---@param data any
+---@return string
+function __json_encode(data) end
+
+---@class promise<T>: { __call: fun(self: promise<T>, callback: fun(result: T, err: string)) }
+
+---@alias asyncThunk<TIn, TOut> fun(input: TIn): promise<TOut>
+
+---@generic T
+---@param fn fun(...): T
+---@return fun(...): promise<T>
+function async(fn) end
+
+---@generic T
+---@param p promise<T>
+---@return T
+function await(p) end
+
+---@param fn fun(...) wrapped function whose last arg is a callback(result, err)
+---@return fun(...): promise<any>
+function promisify(fn) end
+
 ---@class logging
 ---@overload fun(msg: string)
 ---@overload fun(fmt: string, ...)
@@ -187,6 +209,8 @@ log = {
 ---@class Worker: Pipable
 ---@overload fun(msg: any, source: Worker)
 ---@field events Events
+---@field name string auto-generated or explicitly configured unique worker name
+---@field origin string Lua "file:line" where the worker was created, or "<CPP>"
 
 ---@alias pipeInput (Events | MsgHandler)
 
@@ -264,23 +288,66 @@ function SqlWorker:Exec(statement, params) end
 function Sql (params) end
 
 
----@class ModbusDevice
+---@class ModbusMasterDevice
+
+---@class ModbusSlaveDevice
+
+---@class WorkerBaseParams
+---@field name string? explicit unique worker name (auto-generated if omitted)
+---@field category string? log category override
+
+---@class ModbusMasterParams: WorkerBaseParams
+---@field device ModbusMasterDevice
+---@field slave_id number
+---@field poll_rate number? milliseconds between polls (default 500)
+---@field response_time number? ms to wait for response (default 150)
+---@field write_retries number? (default 3)
+---@field registers ModbusRegistersMap
+
+---@class ModbusSlaveParams: WorkerBaseParams
+---@field device ModbusSlaveDevice
+---@field slave_id number
+---@field registers ModbusRegistersMap
+
+---@class ModbusRegister
+---@field index number 0-based register index
+---@field type ("uint16"|"uint32"|"float32")?
+---@field mode ("r"|"rw"|"w")?
+
+---@class ModbusRegistersMap
+---@field holding table<string, ModbusRegister>?
+---@field coils table<string, ModbusRegister>?
+---@field di table<string, ModbusRegister>?
+---@field input table<string, ModbusRegister>?
 
 ---@return Worker
-function ModbusMaster (params) end
----@return Worker
-function ModbusDevice (params) end
+---@param params ModbusMasterParams
+function ModbusMaster(params) end
 
----@return ModbusDevice
-function TcpModbusDevice (params) end
----@return ModbusDevice
-function RtuModbusDevice (params) end
+---@return Worker
+---@param params ModbusSlaveParams
+function ModbusSlave(params) end
+
+---@return ModbusMasterDevice
+function TcpModbusDevice(params) end
+---@return ModbusMasterDevice
+function RtuModbusDevice(params) end
+
+---@return ModbusSlaveDevice
+function TcpModbusServer(params) end
+---@return ModbusSlaveDevice
+function RtuModbusServer(params) end
 
 ---@class QMLWorker: Worker
 QMLWorker = {}
 
 ---@return string
 function QMLWorker:dir() end
+
+---Register a Lua function callable from QML via radapter.call(name, args)
+---@param name string
+---@param fn fun(...): any
+function QMLWorker:AddCall(name, fn) end
 
 ---@class QMLParams
 ---@field url string

@@ -95,11 +95,11 @@ public:
     
     void EnableGui();
 
-    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
+    void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {}, RawExtraMethods const& rawExtra = {});
 
     template<typename T, if_valid_worker<T> = 1>
-    void RegisterWorker(const char* name, ExtraMethods const& extra = {}) {
-        RegisterWorker(name, FactoryFor<T>, extra);
+    void RegisterWorker(const char* name, ExtraMethods const& extra = {}, RawExtraMethods const& rawExtra = {}) {
+        RegisterWorker(name, FactoryFor<T>, extra, rawExtra);
     }
 
     void RegisterSchema(const char* name, ExtraSchema schemaGen);

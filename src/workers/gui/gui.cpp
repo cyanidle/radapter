@@ -1,5 +1,6 @@
 #include <radapter/radapter.hpp>
 #include <radapter/logs.hpp>
+#include <radapter/function.hpp>
 #include "builtin.hpp"
 #include <QQmlEngine>
 #include <QQmlComponent>
@@ -93,11 +94,14 @@ signals:
 public slots:
     void shutdown(unsigned timeout = 5000);
     void sendMsg(QVariant const& msg);
+    Q_INVOKABLE QVariant call(const QString& name, QVariant args = {});
 };
 
 class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
+public:
+    QMap<QString, LuaFunction> calls;
 private:
     QMLConfig config;
     QQmlComponent* creator;
@@ -171,6 +175,24 @@ void GuiInstanceProxy::sendMsg(const QVariant &msg) {
     w->handleMsgFromQml(msg);
 }
 
+QVariant GuiInstanceProxy::call(const QString& name, QVariant rawArgs) {
+    auto it = w->calls.find(name);
+    if (it == w->calls.end()) return {};
+    QVariantList args;
+    if (rawArgs.type() == QVariant::List) args = rawArgs.toList();
+    else if (rawArgs.isValid()) args.push_back(rawArgs);
+    return it.value().Call(args);
+}
+
+static int qml_add_call(lua_State* L, Worker* w) {
+    auto* qw = static_cast<QMLWorker*>(w);
+    if (lua_type(L, 2) != LUA_TSTRING) Raise("AddCall: arg 1 must be a string name");
+    if (lua_type(L, 3) != LUA_TFUNCTION) Raise("AddCall: arg 2 must be a function");
+    auto name = QString::fromUtf8(lua_tostring(L, 2));
+    qw->calls[name] = LuaFunction{L, 3};
+    return 0;
+}
+
 }
 
 namespace radapter::builtin {
@@ -180,7 +202,7 @@ void workers::gui(Instance* inst)
 {
 	using namespace radapter::gui;
     g_engine()->clearComponentCache();
-    inst->RegisterWorker<QMLWorker>("QML");
+    inst->RegisterWorker<QMLWorker>("QML", {}, {{"AddCall", qml_add_call}});
 	inst->RegisterSchema<QMLConfig>("QML");
 }
 

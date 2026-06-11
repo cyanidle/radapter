@@ -133,17 +133,17 @@ Client::~Client()
 void radapter::redis::Client::Start() {
     connect(this, &redis::Client::Error, this, [this](auto err){
         if (logger) {
-            logger->Error("{}: {}", objectName(), err);
+            logger->Error("{}", err);
         }
     });
     connect(this, &redis::Client::ConnectedChanged, this, [this](bool _ok){
         if (_ok) {
             if (logger) {
-                logger->Info("{}: connected", objectName());
+                logger->Info("connected");
             }
         } else {
             if (logger) {
-                logger->Warn("{}: disconnected", objectName());
+                logger->Warn("disconnected");
             }
             ReconnectLater();
         }
