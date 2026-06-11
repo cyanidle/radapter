@@ -41,8 +41,7 @@ static void applyToQml(QVariant const& msg, QObject* target) {
             const auto& k = it.key();
             const auto& v = it.value();
             auto key = k.toUtf8();
-            auto child = target->findChild<QObject*>(k, Qt::FindChildOption::FindDirectChildrenOnly);
-            if (child) {
+            if (auto child = target->findChild<QObject*>(k, Qt::FindChildOption::FindDirectChildrenOnly)) {
                 applyToQml(v, child);
             } else if (auto nested = target->property(key.constData()).value<QObject*>()) {
                 applyToQml(v, nested);
