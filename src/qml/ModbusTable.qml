@@ -48,7 +48,7 @@ Frame {
         _holders = h
         regModel.append({
             name: name,
-            address: (address === undefined || address === null) ? "" : String(address),
+            address: String(address),
             regType: regType || "Holding",
             endian: endianess,
             dataType: dataType,

@@ -220,6 +220,12 @@ nested described structs all compose recursively.
   `log.set_handler(fn)`.
 - Raise errors in SDK/worker code with `radapter::Raise("msg {}", x)` (throws
   `std::runtime_error`, caught at the eval boundary) — don't return error codes.
+- **Fail fast; don't silence the unexpected.** Don't add defensive `if (x == null) …`
+  guards or `x || default` fallbacks for conditions that shouldn't happen — they hide bugs
+  behind plausible-looking output. Let it crash, or assert/`Raise` with a clear message.
+  Only guard inputs that are *legitimately* optional, and then handle them explicitly
+  (not by coalescing to a silent default). This applies to Lua/QML too (e.g. don't paper
+  over an `undefined` that means a caller passed the wrong thing).
 - The SDK hides symbols by default (`-fvisibility=hidden`); anything crossing the
   shared-lib boundary must be marked `RADAPTER_API`.
 - `src/**/*.cpp|*.hpp` are globbed with `CONFIGURE_DEPENDS`. Adding a built-in worker means:
