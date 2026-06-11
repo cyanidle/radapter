@@ -235,7 +235,7 @@ int main (int argc, char **argv) try {
         watcher.emplace();
         listener.emplace();
         for (auto& dir: watch_dirs) {
-            auto id = watcher->addWatch(dir, &*listener);
+            auto id = watcher->addWatch(dir, &*listener, true);
             if (id < 0) {
                 std::cerr << "# WARN: could not watch: " << dir << ": " << Errors::Log::getLastErrorLog() << std::endl;
             } else {
