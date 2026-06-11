@@ -41,19 +41,11 @@ static void applyToQml(QVariant const& msg, QObject* target) {
             const auto& k = it.key();
             const auto& v = it.value();
             auto key = k.toUtf8();
-            auto t = v.type();
             auto child = target->findChild<QObject*>(k, Qt::FindChildOption::FindDirectChildrenOnly);
-            if (t == QVariant::Map || t == QVariant::List) {
-                if (child) {
-                    applyToQml(v, child);
-                } else if (auto nested = target->property(key.constData()).value<QObject*>()) {
-                    applyToQml(v, nested);
-                }
-            } else if (child && child->metaObject()->indexOfProperty("value") != -1) {
-                // a same-named child exposing a `value` property acts as a typed,
-                // reactive sink for a scalar field (lets a list/table row update
-                // without nesting under an explicit `value` key)
-                child->setProperty("value", v);
+            if (child) {
+                applyToQml(v, child);
+            } else if (auto nested = target->property(key.constData()).value<QObject*>()) {
+                applyToQml(v, nested);
             } else {
                 target->setProperty(key.constData(), v);
             }
@@ -73,7 +65,8 @@ static void applyToQml(QVariant const& msg, QObject* target) {
         break;
     }
     default: {
-        break;
+        if (target->metaObject()->indexOfProperty("value") != -1)
+            target->setProperty("value", msg);
     }
     }
 }
