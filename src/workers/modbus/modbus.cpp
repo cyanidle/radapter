@@ -31,6 +31,13 @@ public:
             reads = prepareReads(config.registers);
         }
         writable = prepareWrites(config.registers);
+        {
+            QStringList fields;
+            for (auto& merged : reads)
+                for (auto& reg : merged.regs)
+                    fields << QString::fromStdString(reg.key);
+            AdvertiseFields(fields);
+        }
         QTimer* poller = new QTimer(this);
         poller->setInterval(int(config.poll_rate));
         poller->callOnTimeout(this, &Master::poll);

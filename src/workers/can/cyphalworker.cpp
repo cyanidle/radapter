@@ -221,6 +221,12 @@ public:
             }
             add_filter(canardMakeFilterForSubject(port_id));
         }
+        {
+            QStringList fields;
+            for (auto& [name, topic]: config.subscribe.value)
+                fields << name;
+            AdvertiseFields(fields);
+        }
         for (auto& service: config.services.value) {
             auto [req, resp] = lookup_service_types(service.type);
             if (!req || !resp) {
