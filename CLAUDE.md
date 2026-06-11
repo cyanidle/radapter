@@ -118,10 +118,13 @@ pipeline primitives; `async.lua` provides coroutine-based promises (`await`);
 Reusable QML components live in `src/qml/*.qml` with a `qmldir` (module `radapter`). The
 same `radapter_scripts` CMake function bakes them into the resource under `:/radapter/`,
 and the GUI worker adds `qrc:/` to the QML import path, so scripts can `import radapter`
-(e.g. `ModbusTable`). Data reaches a component by the GUI worker setting properties from
-the incoming message (nested map fields recurse into child objects found by `objectName`);
-a component that needs per-row reactive values creates persistent child holder objects
-named after each field rather than routing into recycled list/table delegates.
+(e.g. `ModbusTable`). Data reaches a component by the GUI worker (`applyToQml`) setting
+properties from the incoming message: nested map fields recurse into child objects found by
+`objectName`, and a *scalar* field whose name matches a direct child that declares a `value`
+property is written into that child's `value`. A component needing per-row reactive values
+(like `ModbusTable`) therefore creates persistent child holder objects named after each
+field — flat `{ name = v }` updates `holder.value` reactively — rather than relying on
+recycled list/table delegates.
 
 ### Workers and the message model
 

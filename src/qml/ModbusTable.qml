@@ -5,10 +5,11 @@ import QtQuick.Layouts 1.3
 // Configurable table that visualizes Modbus register values.
 //
 // Add rows with "+", giving each a name, address and register type. Each row's
-// value mirrors data delivered to this component under a nested field with the
-// same name, e.g. piping `{ pump_speed = { value = 1234 } }` updates the row
-// named "pump_speed". The "details" (three dots) popup configures endianness
-// and data type per row (default: a 16-bit word).
+// value mirrors data delivered to this component under a field with the same
+// name, e.g. piping `{ pump_speed = 1234 }` updates the row named "pump_speed"
+// (a nested `{ pump_speed = { value = 1234, quality = .. } }` also works for
+// extra fields). The "details" (three dots) popup configures endianness and
+// data type per row (default: a 16-bit word).
 Frame {
     id: root
     padding: 8
@@ -20,8 +21,9 @@ Frame {
     readonly property var regTypes: ["Holding", "Input", "Coil", "Discrete"]
 
     // value-holder objects keyed by register name. Each is a child QObject named
-    // after the register so that an incoming `{ name = { value = .. } }` message
-    // is routed into its declared (reactive) `value` property by the GUI worker.
+    // after the register; the GUI worker routes an incoming scalar `{ name = .. }`
+    // into its declared (reactive) `value` property (or a nested map into its
+    // fields), keeping list rows reactive without per-delegate routing.
     property var _holders: ({})
 
     Component {

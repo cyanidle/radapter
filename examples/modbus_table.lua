@@ -6,8 +6,9 @@
 -- Use the "+" button to add rows (name, address, register type); the three-dots
 -- popup on each row configures endianness and data type (default: 16-bit word).
 -- A row shows whatever value is delivered to the table under a field with the
--- same name. Values arrive as nested objects: `{ <name> = { value = .. } }`.
--- Here a timer feeds simulated values to a few pre-populated rows.
+-- same name (e.g. `{ pump_speed = 1500 }`). A nested `{ pump_speed = { value =
+-- .., quality = .. } }` works too when you need extra fields. Here a timer
+-- feeds simulated values to a few pre-populated rows.
 
 local view = QML[[
 import QtQuick 2.7
@@ -35,10 +36,10 @@ ApplicationWindow {
 local t = 0
 each(500, function()
     t = t + 1
-    -- nested under the table's objectName, then per-register value objects
+    -- nested under the table's objectName, then a flat value per register
     view{ regs = {
-        pump_speed  = { value = 1500 + (t % 10) * 25 },
-        pump_status = { value = t % 2 },
-        temperature = { value = 20 + (t % 5) },
+        pump_speed  = 1500 + (t % 10) * 25,
+        pump_status = t % 2,
+        temperature = 20 + (t % 5),
     }}
 end)
