@@ -8,8 +8,9 @@ import QtQuick.Layouts 1.3
 // value mirrors data delivered to this component under a field with the same
 // name, e.g. piping `{ pump_speed = 1234 }` updates the row named "pump_speed"
 // (a nested `{ pump_speed = { value = 1234, quality = .. } }` also works for
-// extra fields). The "details" (three dots) popup configures endianness and
-// data type per row (default: a 16-bit word).
+// extra fields). The "details" (three dots) popup configures endianness, data
+// type (default: a 16-bit word) and hex display per row. Double-click a value to
+// edit it in place; committing sends the new value out as `{ name = value }`.
 Frame {
     id: root
     padding: 8
@@ -48,7 +49,8 @@ Frame {
             address: String(address || ""),
             regType: regType || "Holding",
             endian: "Big",
-            dataType: "Word"
+            dataType: "Word",
+            hex: false
         })
     }
 
@@ -63,15 +65,48 @@ Frame {
         if (holder) holder.destroy()
     }
 
-    function formatValue(v, dataType) {
+    function formatValue(v, dataType, hex) {
         if (v === undefined || v === null) return "—"
-        if (dataType === "Float32") return Number(v).toFixed(3)
         if (dataType === "Bool") return v ? "true" : "false"
-        if (dataType === "Word") {
-            var n = Number(v)
-            if (!isNaN(n)) return n + "  (0x" + (n & 0xFFFF).toString(16).toUpperCase() + ")"
+        if (dataType === "Float32") return Number(v).toFixed(3)
+        var n = Number(v)
+        if (isNaN(n)) return String(v)
+        if (hex) {
+            var wide = (dataType === "Int32" || dataType === "UInt32")
+            var u = wide ? (n >>> 0) : (n & 0xFFFF)
+            var s = u.toString(16).toUpperCase()
+            while (s.length < (wide ? 8 : 4)) s = "0" + s
+            return "0x" + s
         }
-        return String(v)
+        return String(n)
+    }
+
+    // parse user-typed text back into a value of the row's data type, or
+    // undefined if it isn't valid (so an empty/garbage edit is ignored)
+    function parseValue(text, dataType) {
+        text = (text || "").trim()
+        if (!text.length) return undefined
+        if (dataType === "Bool") {
+            var t = text.toLowerCase()
+            return (t === "true" || t === "1" || t === "on")
+        }
+        var n = /^0x/i.test(text) ? parseInt(text, 16) : Number(text)
+        if (isNaN(n)) return undefined
+        return dataType === "Float32" ? n : Math.trunc(n)
+    }
+
+    // commit an in-place edit: update the holder locally (optimistic) and send
+    // the write out the worker's data channel as `{ name = value }`
+    function commitEdit(name, text, dataType) {
+        var v = root.parseValue(text, dataType)
+        if (v === undefined) return
+        var holder = _holders[name]
+        if (holder) holder.value = v
+        if (typeof radapter !== "undefined" && radapter) {
+            var msg = {}
+            msg[name] = v
+            radapter.sendMsg(msg)
+        }
     }
 
     ListModel { id: regModel }
@@ -124,10 +159,45 @@ Frame {
                 Label { text: model.name;    Layout.preferredWidth: 150; elide: Text.ElideRight }
                 Label { text: model.address; Layout.preferredWidth: 80 }
                 Label { text: model.regType; Layout.preferredWidth: 80 }
-                Label {
+
+                // editable value cell: double-click to edit (Enter/focus-out
+                // commits, Esc cancels)
+                Item {
+                    id: valueCell
                     Layout.fillWidth: true
-                    elide: Text.ElideRight
-                    text: rowItem.holder ? root.formatValue(rowItem.holder.value, model.dataType) : "—"
+                    implicitHeight: valLabel.implicitHeight
+                    property bool editing: false
+
+                    Label {
+                        id: valLabel
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        visible: !valueCell.editing
+                        elide: Text.ElideRight
+                        text: rowItem.holder ? root.formatValue(rowItem.holder.value, model.dataType, model.hex) : "—"
+                        MouseArea {
+                            anchors.fill: parent
+                            onDoubleClicked: {
+                                editField.text = (rowItem.holder && rowItem.holder.value !== undefined)
+                                                 ? String(rowItem.holder.value) : ""
+                                valueCell.editing = true
+                                editField.forceActiveFocus()
+                                editField.selectAll()
+                            }
+                        }
+                    }
+                    TextField {
+                        id: editField
+                        anchors.fill: parent
+                        visible: valueCell.editing
+                        function commit() {
+                            root.commitEdit(model.name, text, model.dataType)
+                            valueCell.editing = false
+                        }
+                        onAccepted: commit()
+                        onActiveFocusChanged: if (!activeFocus && valueCell.editing) commit()
+                        Keys.onEscapePressed: valueCell.editing = false
+                    }
                 }
                 Button {
                     text: "⋮"
@@ -189,6 +259,7 @@ Frame {
             var r = regModel.get(rowIndex)
             endianBox.currentIndex = Math.max(0, root.endians.indexOf(r.endian))
             typeBox.currentIndex = Math.max(0, root.dataTypes.indexOf(r.dataType))
+            hexCheck.checked = r.hex === true
         }
 
         ColumnLayout {
@@ -215,6 +286,13 @@ Frame {
                     onActivated: if (detailsPopup.rowIndex >= 0)
                         regModel.setProperty(detailsPopup.rowIndex, "dataType", currentText)
                 }
+            }
+
+            CheckBox {
+                id: hexCheck
+                text: "Hex view"
+                onToggled: if (detailsPopup.rowIndex >= 0)
+                    regModel.setProperty(detailsPopup.rowIndex, "hex", checked)
             }
 
             Button {
