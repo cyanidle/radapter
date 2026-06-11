@@ -10,10 +10,10 @@ namespace radapter
 static QString sanitizeName(QString const& s) {
     QString out;
     for (auto c : s) {
-        if (c.isLetterOrNumber() || c == '_') out += c;
-        else if (!out.isEmpty() && out.back() != '.') out += '.';
+        if (c.isLetterOrNumber() || c == '_' || c == '.') out += c;
+        else if (!out.isEmpty() && out.back() != '_') out += '_';
     }
-    while (out.endsWith('.')) out.chop(1);
+    while (out.endsWith('_')) out.chop(1);
     return out.isEmpty() ? QStringLiteral("worker") : out;
 }
 
