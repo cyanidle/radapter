@@ -34,18 +34,6 @@ void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction ope
 namespace detail {
 template<typename Cls, typename Ret, typename... Args>
 Cls* getcls(Ret(Cls::*)(Args...));
-
-// Extract the single argument type (for the tuple-arg case)
-template<typename Cls, typename Ret, typename Arg>
-Arg* getarg(Ret(Cls::*)(Arg));
-
-// Detect QVariantList pass-through methods
-template<typename Cls, typename Ret>
-constexpr bool is_varlist(Ret(Cls::*)(QVariantList)) { return true; }
-template<typename Cls, typename Ret>
-constexpr bool is_varlist(Ret(Cls::*)(QVariantList const&)) { return true; }
-template<typename F>
-constexpr bool is_varlist(F) { return false; }
 }
 
 class Instance;
@@ -92,14 +80,7 @@ Worker* FactoryFor(QVariantList const& args, Instance* parent) {
 template<auto f>
 QVariant AsExtraMethod(Worker* w, QVariantList const& argList) {
     using Cls = std::remove_pointer_t<decltype(detail::getcls(f))>;
-    if constexpr (detail::is_varlist(f)) {
-        return (static_cast<Cls*>(w)->*f)(argList);
-    } else {
-        using Arg = std::remove_pointer_t<decltype(detail::getarg(f))>;
-        Arg args;
-        Parse(args, QVariant(argList));
-        return (static_cast<Cls*>(w)->*f)(std::move(args));
-    }
+    return (static_cast<Cls*>(w)->*f)(WorkerArguments{argList});
 }
 
 QVariant RADAPTER_API MakeFunction(ExtraFunction func);
