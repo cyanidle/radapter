@@ -99,7 +99,9 @@ function(radapter_scripts)
     file(APPEND ${scripts_qrc} "</qresource>\n")
     file(APPEND ${scripts_qrc} "</RCC>\n")
 
-    qt5_add_resources(RADAPTER_QRC ${scripts_qrc})
+    qt5_add_resources(RADAPTER_QRC ${scripts_qrc}
+        OPTIONS --compress 9 --threshold 70
+    )
     set(RADAPTER_QRC ${RADAPTER_QRC} PARENT_SCOPE)
 endfunction()
 
