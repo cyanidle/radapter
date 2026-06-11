@@ -124,3 +124,23 @@ function await(promise)
     assert(is_callable(promise), "callable (promise) expected")
     return co.yield(promise)
 end
+
+-- Runs a main chunk (Eval/EvalFile) inside a coroutine so that await() works
+-- at the top level. Errors before the first await are re-raised synchronously
+-- (startup failures must still fail Eval); later errors are logged.
+function __eval_async(chunk, chunkname)
+    local sync_phase = true
+    local sync_err = nil
+    local p = async(chunk)()
+    p(function(_, err)
+        if sync_phase then
+            sync_err = err
+        elseif err ~= nil then
+            log.error("In ({}): {}", chunkname, err)
+        end
+    end)
+    sync_phase = false
+    if sync_err ~= nil then
+        error(sync_err, 0)
+    end
+end

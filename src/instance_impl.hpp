@@ -5,6 +5,7 @@
 
 struct radapter::Instance::Impl {
     lua_State* L;
+    lua_State* currentCaller = nullptr; // thread invoking a worker factory (may be a coroutine)
     QSet<Worker*> workers;
     LogLevel globalLevel = LogLevel::debug;
     std::map<string, LogLevel, std::less<>> perCat;

@@ -15,6 +15,7 @@ local checks = {
     service = true,
     async_unhandled = true,
     modbus_roundtrip = true,
+    top_level_await = true,
 }
 
 local function pass(name)
@@ -101,6 +102,11 @@ db:Exec("SELECT x FROM t", function(rows, err)
     assert(rows[1][1] == 42, "unexpected select result: " .. __json_encode(rows))
     pass("sql_roundtrip")
 end)
+
+-- await works at the top level (Eval/EvalFile run in a coroutine)
+local sleep = promisify(function(ms, cb) after(ms, cb) end)
+await(sleep(10))
+pass("top_level_await")
 
 -- async: a discarded failing promise must be reported as an error;
 -- a subscribed one must reach its callback and NOT be reported

@@ -272,8 +272,6 @@ void Instance::EvalFile(fs::path path)
         d->currentFile = std::move(was);
     });
     d->currentFile = path;
-    lua_pushcfunction(L, builtin::traceback);
-    auto msgh = lua_gettop(L);
     auto load = luaL_loadfile(L, path.string().c_str());
     if (load != LUA_OK) {
         Raise("Error loading file {}: {}", path.string(), builtin::help::toSV(L));
@@ -284,7 +282,11 @@ void Instance::EvalFile(fs::path path)
     if (!dir.empty()) {
         QDir::setCurrent(QString::fromUtf8(dir.u8string().c_str()));
     }
-    auto res = lua_pcall(L, 0, 0, msgh);
+    lua_getglobal(L, "__eval_async");
+    lua_insert(L, -2);
+    lua_pushstring(L, path.string().c_str());
+    // no message handler: sync errors already carry the coroutine traceback
+    auto res = lua_pcall(L, 2, 0, 0);
     if (!dir.empty()) {
         QDir::setCurrent(wasCwd);
     }
@@ -297,13 +299,15 @@ void Instance::EvalFile(fs::path path)
 void Instance::Eval(string_view code, string_view chunk)
 {
     auto L = d->L;
-    lua_pushcfunction(L, builtin::traceback);
-    auto msgh = lua_gettop(L);
     auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {
         Raise("Error loading code: {}", builtin::help::toSV(L));
     }
-    auto res = lua_pcall(L, 0, 0, msgh);
+    lua_getglobal(L, "__eval_async");
+    lua_insert(L, -2);
+    lua_pushlstring(L, chunk.data(), chunk.size());
+    // no message handler: sync errors already carry the coroutine traceback
+    auto res = lua_pcall(L, 2, 0, 0);
     if (res != LUA_OK) {
         auto e = builtin::help::toSV(L);
         Raise("Eval error:\n\t{}", e);

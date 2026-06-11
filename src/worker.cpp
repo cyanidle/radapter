@@ -58,7 +58,8 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
     setObjectName(name);
     auto stdName = name.toStdString();
     _LogCat = stdName == _Category ? _Category : _Category + "/" + stdName;
-    _Origin = luaOrigin(parent->LuaState());
+    auto* caller = parent->_GetPrivate()->currentCaller;
+    _Origin = luaOrigin(caller ? caller : parent->LuaState());
 }
 
 void Worker::Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args)
@@ -204,15 +205,15 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     lua_settop(L, msgh - 1);
 }
 
-static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
+static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
 {
-    auto L = inst->LuaState();
-
     lua_pushstring(L, clsname);
     auto clsIdx = lua_gettop(L);
 
     auto* ud = lua_udata(L, sizeof(WorkerImpl));
-    auto* impl = new (ud) WorkerImpl{L};
+    // L may be a (collectable) coroutine: keep the main state for later use
+    auto* mainL = inst->LuaState();
+    auto* impl = new (ud) WorkerImpl{mainL};
 
     impl->self = w;
     w->_Impl = impl;
@@ -220,7 +221,7 @@ static void push_worker(Instance* inst, const char* clsname, Worker* w, ExtraMet
     lua_pushvalue(L, -1); // prevent gc, while actual worker is alive
     auto workerSelfRef = luaL_ref(L, LUA_REGISTRYINDEX);
     QObject::connect(w, &QObject::destroyed, w, [=]{
-        luaL_unref(L, LUA_REGISTRYINDEX, workerSelfRef);
+        luaL_unref(mainL, LUA_REGISTRYINDEX, workerSelfRef);
     });
 
     lua_createtable(L, 0, 0); //subs
@@ -281,8 +282,13 @@ static int workerFactory(lua_State* L) {
     auto* ctx = static_cast<FactoryContext*>(lua_touserdata(L, lua_upvalueindex(1)));
     auto ctorArgs = builtin::help::toArgs(L, 1);
     auto* inst = Instance::FromLua(L);
+    auto* d = inst->_GetPrivate();
+    auto was = std::exchange(d->currentCaller, L);
+    defer revert([&]{
+        d->currentCaller = was;
+    });
     auto* w = ctx->factory(ctorArgs, inst);
-    push_worker(inst, ctx->name.c_str(), w, ctx->methods);
+    push_worker(L, inst, ctx->name.c_str(), w, ctx->methods);
     return 1;
 }
 
