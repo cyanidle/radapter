@@ -70,7 +70,7 @@ public:
             shutdown();
         });
 
-        if (radapter::GUI && config->cli["gui"] == true) {
+        if (radapter::GUI && (config->cli["gui"] == true || config->cli["gui-auto-quit"] == true)) {
             inst->EnableGui();
         }
 
@@ -140,7 +140,7 @@ int main (int argc, char **argv) try {
     std::unique_ptr<QCoreApplication> app;
 #ifdef RADAPTER_GUI
     for (auto it = argv; it != argv + argc; ++it) {
-        if (strcmp(*it, "--gui") == 0) {
+        if (strcmp(*it, "--gui") == 0 || strcmp(*it, "--gui-auto-quit") == 0) {
             auto gapp = new QGuiApplication(argc, argv);
             gapp->setQuitOnLastWindowClosed(false);
             app.reset(gapp);
@@ -186,7 +186,7 @@ int main (int argc, char **argv) try {
             .help("Enable native gui mode");
         cli.add_argument("--gui-auto-quit")
             .flag()
-            .help("Quit the process when the last GUI window is closed (requires --gui)");
+            .help("Quit the process when the last GUI window is closed (implies --gui)");
     }
     cli.add_argument("--watch-dir")
         .append()
@@ -220,8 +220,6 @@ int main (int argc, char **argv) try {
     }
     if constexpr (radapter::GUI) {
         if (cli["gui-auto-quit"] == true) {
-            if (cli["gui"] != true)
-                throw std::runtime_error("--gui-auto-quit requires --gui");
             static_cast<QGuiApplication*>(app.get())->setQuitOnLastWindowClosed(true);
         }
     }

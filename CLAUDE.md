@@ -57,9 +57,10 @@ drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 ### Adding CLI flags
 
 `app/main.cpp` does a **pre-scan** of raw `argv` before argparse runs. This is necessary
-**only for `--gui`**, because `QGuiApplication` must be constructed before argparse touches
-`argc/argv`. All other flags must be added to the argparse parser and read after
-`cli.parse_args(args)` — do not add new flags to the pre-scan loop.
+**only for the GUI-enabling flags** (`--gui`, and `--gui-auto-quit` which implies it),
+because `QGuiApplication` must be constructed before argparse touches `argc/argv`. All
+other flags must be added to the argparse parser and read after `cli.parse_args(args)` —
+do not add new flags to the pre-scan loop.
 
 ### Tests
 
