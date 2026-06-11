@@ -105,8 +105,10 @@ public:
         }
         if (config->listener) {
             QObject::connect(config->listener, &Listener::FileChanged, this, [this, done = false]() mutable {
-                if (!done) reload();
-                done = true;
+                if (done) return;
+                // keep this instance live (and retry on the next change) if the
+                // reload bails out, e.g. because the pre-reload command failed
+                done = reload();
             });
         } else {
             QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
@@ -119,7 +121,15 @@ public:
         return;
     }
 
-    void reload() {
+    bool reload() {
+        if (auto cmd = config->cli.present("pre-reload")) {
+            std::cerr << "# Pre-reload: " << *cmd << std::endl;
+            if (int rc = std::system(cmd->c_str())) {
+                std::cerr << "# Pre-reload command failed (exit " << rc
+                          << "), keeping current instance" << std::endl;
+                return false;
+            }
+        }
         std::cerr << "# Hot reload..." << std::endl;
         QObject::connect(inst, &QObject::destroyed, [config = config]{
             try {
@@ -131,6 +141,7 @@ public:
             }
         });
         inst->Shutdown();
+        return true;
     }
 
     ~AppState() {}
@@ -192,6 +203,9 @@ int main (int argc, char **argv) try {
         .append()
         .store_into(watch_dirs)
         .help("Reload on modified files in <dir>");
+    cli.add_argument("--pre-reload")
+        .help("Shell command to run before each hot reload (e.g. a rebuild); "
+              "the reload is skipped if it exits non-zero");
     cli.add_argument("--schema")
         .flag()
         .help("Print config schema");
