@@ -293,6 +293,12 @@ public:
             std::chrono::milliseconds(5),
             std::bind(&NodeWorker::pollFutures, this)
         );
+        {
+            QStringList fields;
+            for (auto& [topic, sub]: m_config.subs.value)
+                fields << QString::fromStdString(topic);
+            AdvertiseFields(fields);
+        }
     }
     void OnMsg(QVariant const& msg) override {
         auto map = msg.toMap();
@@ -339,11 +345,8 @@ public:
             it = m_pending.erase(it);
         }
     }
-    QVariant Request(QVariantList args)
+    QVariant Request(QString clientName, QVariant data, std::optional<LuaFunction> cb)
     {
-        QString clientName;
-        clientName = args.value(0).toString();
-        QVariant data = args.value(1);
         fut::Promise<QVariant> prom;
         fut::Future<QVariant> future = prom.GetFuture();
         auto it = m_clients.find(clientName);
@@ -360,11 +363,8 @@ public:
             m_pending.emplace_back(PendingState{std::move(req), std::move(prom), &it->second});
         }
         members->fini_function(ros_msg);
-        if (args.size() > 2) {
-            LuaFunction func = args.value(2).value<LuaFunction>();
-            if (!func.IsValid())
-                Raise("Callback expected");
-            resolveLuaCallback(this, future, func);
+        if (cb) {
+            resolveLuaCallback(this, future, *cb);
             return {};
         } else {
             return makeLuaPromise(this, future);
