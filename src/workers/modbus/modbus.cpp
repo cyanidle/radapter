@@ -31,7 +31,7 @@ public:
             reads = prepareReads(config.registers);
         }
         writable = prepareWrites(config.registers);
-        {
+        if (TagsEnabled()) {
             QStringList fields;
             for (auto& merged : reads)
                 for (auto& reg : merged.regs)

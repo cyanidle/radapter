@@ -56,15 +56,17 @@ public:
         connect(server, &QModbusServer::dataWritten, this, &Slave::onDataWritten);
         config.device->Start();
 
-        QStringList fields;
-        auto addFields = [&](vector<PreparedRegister> const& regs) {
-            for (auto& r : regs) fields << QString::fromStdString(r.key);
-        };
-        addFields(sortedHolding);
-        addFields(sortedCoils);
-        addFields(sortedDI);
-        addFields(sortedInput);
-        AdvertiseFields(fields);
+        if (TagsEnabled()) {
+            QStringList fields;
+            auto addFields = [&](vector<PreparedRegister> const& regs) {
+                for (auto& r : regs) fields << QString::fromStdString(r.key);
+            };
+            addFields(sortedHolding);
+            addFields(sortedCoils);
+            addFields(sortedDI);
+            addFields(sortedInput);
+            AdvertiseFields(fields);
+        }
     }
 
     void onDataWritten(QModbusDataUnit::RegisterType type, int address, int size) {

@@ -221,7 +221,7 @@ public:
             }
             add_filter(canardMakeFilterForSubject(port_id));
         }
-        {
+        if (TagsEnabled()) {
             QStringList fields;
             for (auto& [name, topic]: config.subscribe.value)
                 fields << name;

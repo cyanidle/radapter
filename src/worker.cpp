@@ -88,6 +88,10 @@ Worker::Worker(Instance *parent, WorkerConfig const& conf, const char *category)
     _Origin = luaOrigin(caller ? caller : parent->LuaState());
 }
 
+bool Worker::TagsEnabled() const {
+    return _Inst->_GetPrivate()->tagRegistry != nullptr;
+}
+
 void Worker::AdvertiseFields(QStringList const& fields) {
     if (auto* reg = _Inst->_GetPrivate()->tagRegistry.get()) {
         reg->Advertise(this, fields);

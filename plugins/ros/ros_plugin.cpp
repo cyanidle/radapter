@@ -293,7 +293,7 @@ public:
             std::chrono::milliseconds(5),
             std::bind(&NodeWorker::pollFutures, this)
         );
-        {
+        if (TagsEnabled()) {
             QStringList fields;
             for (auto& [topic, sub]: m_config.subs.value)
                 fields << QString::fromStdString(topic);

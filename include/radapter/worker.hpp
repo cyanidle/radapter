@@ -57,7 +57,7 @@ public:
         return objectName();
     }
 
-    // Inform the tag registry about known output fields (call from ctor after fields are known)
+    bool TagsEnabled() const;
     void AdvertiseFields(QStringList const& fields);
 
     void Log(LogLevel lvl, fmt::string_view fmt, fmt::format_args args);
