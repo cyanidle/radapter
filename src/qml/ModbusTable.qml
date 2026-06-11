@@ -165,7 +165,8 @@ Frame {
                 Item {
                     id: valueCell
                     Layout.fillWidth: true
-                    implicitHeight: valLabel.implicitHeight
+                    // size to the editor so the in-place TextField isn't clipped
+                    implicitHeight: editField.implicitHeight
                     property bool editing: false
 
                     Label {
