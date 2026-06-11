@@ -11,11 +11,38 @@
 #include <QGuiApplication>
 #endif
 
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
+
 using namespace efsw;
 using std::vector;
 using std::string;
 
 using Strings = vector<string>;
+
+// captured at the very start of main() before any QApplication can strip Qt
+// arguments, so a re-exec relaunches with exactly what the user passed.
+static std::vector<std::string> g_argv;
+
+// true from the start of a reload until the fresh instance is up. Guards against
+// pre-reload side effects (e.g. a build writing into a watched dir) retriggering
+// a reload that is already in flight.
+static bool g_reloading = false;
+
+// Replace the running process image with a fresh launch of the (possibly
+// rebuilt) executable. POSIX only; returns only on failure.
+static void reexec() {
+#ifdef Q_OS_UNIX
+    auto exe = QCoreApplication::applicationFilePath().toStdString();
+    std::vector<char*> a;
+    for (auto& s : g_argv) a.push_back(const_cast<char*>(s.c_str()));
+    a.push_back(nullptr);
+    std::cerr << "# Re-exec: " << exe << std::endl;
+    execv(exe.c_str(), a.data());
+    std::perror("# Re-exec failed");
+#endif
+}
 
 class Listener final : public QObject, public efsw::FileWatchListener {
     Q_OBJECT
@@ -104,11 +131,12 @@ public:
             inst->EvalFile(radapter::fs::u8path(*f));
         }
         if (config->listener) {
-            QObject::connect(config->listener, &Listener::FileChanged, this, [this, done = false]() mutable {
-                if (done) return;
-                // keep this instance live (and retry on the next change) if the
-                // reload bails out, e.g. because the pre-reload command failed
-                done = reload();
+            QObject::connect(config->listener, &Listener::FileChanged, this, [this] {
+                if (g_reloading) return;          // a reload is already in flight
+                g_reloading = true;
+                // release the guard (and retry on the next change) if the reload
+                // bails out, e.g. because the pre-reload command failed
+                if (!reload()) g_reloading = false;
             });
         } else {
             QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
@@ -130,8 +158,10 @@ public:
                 return false;
             }
         }
-        std::cerr << "# Hot reload..." << std::endl;
-        QObject::connect(inst, &QObject::destroyed, [config = config]{
+        bool execMode = config->cli["reload-exec"] == true;
+        std::cerr << (execMode ? "# Restart..." : "# Hot reload...") << std::endl;
+        QObject::connect(inst, &QObject::destroyed, [config = config, execMode]{
+            if (execMode) reexec();   // on success the image is replaced and never returns
             try {
                 new AppState{config};
                 std::cerr << "# Hot reload done." << std::endl;
@@ -139,6 +169,8 @@ public:
                 std::cerr << "# Hot reload error: " << e.what() << std::endl;
                 qApp->exit(1);
             }
+            // release the guard only after queued build side-effect events drain
+            QTimer::singleShot(0, qApp, []{ g_reloading = false; });
         });
         inst->Shutdown();
         return true;
@@ -148,6 +180,7 @@ public:
 };
 
 int main (int argc, char **argv) try {
+    g_argv.assign(argv, argv + argc);
     std::unique_ptr<QCoreApplication> app;
 #ifdef RADAPTER_GUI
     for (auto it = argv; it != argv + argc; ++it) {
@@ -199,13 +232,18 @@ int main (int argc, char **argv) try {
             .flag()
             .help("Quit the process when the last GUI window is closed (implies --gui)");
     }
-    cli.add_argument("--watch-dir")
+    cli.add_argument("--watch-dir", "-w")
         .append()
         .store_into(watch_dirs)
         .help("Reload on modified files in <dir>");
     cli.add_argument("--pre-reload")
         .help("Shell command to run before each hot reload (e.g. a rebuild); "
               "the reload is skipped if it exits non-zero");
+    cli.add_argument("--reload-exec", "-r")
+        .flag()
+        .help("On hot reload, re-exec the (rebuilt) binary instead of rebuilding "
+              "the instance in-process (POSIX only); picks up changes baked into "
+              "the executable such as embedded QML/scripts");
     cli.add_argument("--schema")
         .flag()
         .help("Print config schema");

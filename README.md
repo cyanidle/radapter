@@ -94,6 +94,7 @@ build/bin/radapter script.lua                       # run a script
 build/bin/radapter --schema                         # print JSON schema of all workers, then exit
 build/bin/radapter --watch-dir . script.lua         # hot-reload on file change
 build/bin/radapter --watch-dir . --pre-reload "cmake --build build" script.lua  # rebuild before each reload
+build/bin/radapter --watch-dir . --pre-reload "cmake --build build" --reload-exec script.lua  # rebuild + restart (picks up embedded QML/scripts)
 build/bin/radapter --gui script.lua                 # enable QML worker
 build/bin/radapter --gui --gui-auto-quit script.lua # exit when the window closes
 build/bin/radapter -e 'log.info("hi")'              # inline eval

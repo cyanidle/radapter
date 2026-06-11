@@ -91,6 +91,11 @@ ModbusSlave <-> ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pi
   hot-reload loop (which destroys the `Instance` and builds a fresh one on file change).
   `--pre-reload "<cmd>"` runs a shell command (e.g. `cmake --build build`) before each
   reload and skips the reload — keeping the current instance live — if the command fails.
+  `--reload-exec` makes reload `execv` the (rebuilt) binary instead of rebuilding the
+  `Instance` in-process, so changes baked into the executable (embedded QML/scripts) take
+  effect; POSIX only, falls back to in-process reload elsewhere. A reload-in-flight guard
+  ignores file events caused by the pre-reload command's own side effects (e.g. build
+  output landing in a watched dir).
 - `src/` → builds **`radapter-sdk`** (shared by default; `RADAPTER_API` = export/import).
   This is the engine: Lua VM wrapper, config/schema system, and all built-in workers.
 - `include/radapter/` → the public SDK headers installed for SDK consumers and plugin
