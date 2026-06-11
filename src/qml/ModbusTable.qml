@@ -9,8 +9,10 @@ import QtQuick.Layouts 1.3
 // name, e.g. piping `{ pump_speed = 1234 }` updates the row named "pump_speed"
 // (a nested `{ pump_speed = { value = 1234, quality = .. } }` also works for
 // extra fields). The "details" (three dots) popup configures endianness, data
-// type (default: a 16-bit word) and hex display per row. Double-click a value to
-// edit it in place; committing sends the new value out as `{ name = value }`.
+// type (default: a 16-bit word) and hex display per row. Coil/Discrete rows show
+// a checkbox (read-only for discrete inputs); numeric rows show editable text.
+// Writable rows (Holding, Coil) can be edited — double-click text or toggle the
+// checkbox — and the new value is sent out as `{ name = value }`.
 Frame {
     id: root
     padding: 8
@@ -95,11 +97,13 @@ Frame {
         return dataType === "Float32" ? n : Math.trunc(n)
     }
 
-    // commit an in-place edit: update the holder locally (optimistic) and send
-    // the write out the worker's data channel as `{ name = value }`
-    function commitEdit(name, text, dataType) {
-        var v = root.parseValue(text, dataType)
-        if (v === undefined) return
+    function truthy(v) {
+        return v === true || v === 1 || v === "true" || v === "1"
+    }
+
+    // write a value: update the holder locally (optimistic) and send it out the
+    // worker's data channel as `{ name = value }`
+    function sendWrite(name, v) {
         var holder = _holders[name]
         if (holder) holder.value = v
         if (typeof radapter !== "undefined" && radapter) {
@@ -107,6 +111,12 @@ Frame {
             msg[name] = v
             radapter.sendMsg(msg)
         }
+    }
+
+    // commit an in-place text edit (parsed to the row's data type)
+    function commitEdit(name, text, dataType) {
+        var v = root.parseValue(text, dataType)
+        if (v !== undefined) root.sendWrite(name, v)
     }
 
     ListModel { id: regModel }
@@ -160,28 +170,50 @@ Frame {
                 Label { text: model.address; Layout.preferredWidth: 80 }
                 Label { text: model.regType; Layout.preferredWidth: 80 }
 
-                // editable value cell: double-click to edit (Enter/focus-out
-                // commits, Esc cancels)
+                // value cell: a checkbox for bit registers (coils editable,
+                // discrete inputs read-only), editable text otherwise (input
+                // registers are read-only). Double-click text to edit it in
+                // place (Enter/focus-out commits, Esc cancels).
                 Item {
-                    id: valueCell
+                    id: valueArea
                     Layout.fillWidth: true
-                    // size to the editor so the in-place TextField isn't clipped
-                    implicitHeight: editField.implicitHeight
+                    implicitHeight: Math.max(editField.implicitHeight, bitCheck.implicitHeight)
+                    property bool isBit: model.regType === "Coil" || model.regType === "Discrete"
+                    property bool writable: model.regType === "Holding" || model.regType === "Coil"
                     property bool editing: false
+
+                    CheckBox {
+                        id: bitCheck
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: valueArea.isBit
+                        enabled: valueArea.writable
+                        // controlled checkbox: state is driven from the holder, not
+                        // a binding (a user click would otherwise break it), so the
+                        // box keeps tracking external updates after a local toggle
+                        onToggled: root.sendWrite(model.name, checked)
+                        Component.onCompleted: checked = rowItem.holder ? root.truthy(rowItem.holder.value) : false
+                        Connections {
+                            target: rowItem.holder
+                            function onValueChanged() {
+                                bitCheck.checked = root.truthy(rowItem.holder.value)
+                            }
+                        }
+                    }
 
                     Label {
                         id: valLabel
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        visible: !valueCell.editing
+                        visible: !valueArea.isBit && !valueArea.editing
                         elide: Text.ElideRight
                         text: rowItem.holder ? root.formatValue(rowItem.holder.value, model.dataType, model.hex) : "—"
                         MouseArea {
                             anchors.fill: parent
+                            enabled: valueArea.writable
                             onDoubleClicked: {
                                 editField.text = (rowItem.holder && rowItem.holder.value !== undefined)
                                                  ? String(rowItem.holder.value) : ""
-                                valueCell.editing = true
+                                valueArea.editing = true
                                 editField.forceActiveFocus()
                                 editField.selectAll()
                             }
@@ -190,14 +222,14 @@ Frame {
                     TextField {
                         id: editField
                         anchors.fill: parent
-                        visible: valueCell.editing
+                        visible: !valueArea.isBit && valueArea.editing
                         function commit() {
                             root.commitEdit(model.name, text, model.dataType)
-                            valueCell.editing = false
+                            valueArea.editing = false
                         }
                         onAccepted: commit()
-                        onActiveFocusChanged: if (!activeFocus && valueCell.editing) commit()
-                        Keys.onEscapePressed: valueCell.editing = false
+                        onActiveFocusChanged: if (!activeFocus && valueArea.editing) commit()
+                        Keys.onEscapePressed: valueArea.editing = false
                     }
                 }
                 Button {
