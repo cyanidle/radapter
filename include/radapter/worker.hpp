@@ -8,6 +8,8 @@
 
 struct lua_State;
 
+namespace fut { template<typename T> struct Future; }
+
 namespace radapter
 {
 
@@ -83,6 +85,11 @@ public:
 
     virtual void OnMsg(QVariant const& msg) = 0;
     virtual void Destroy();
+
+    // Asynchronously shut this worker down: triggers Destroy() and completes when
+    // the worker emits ShutdownDone (which a worker may defer for async cleanup).
+    fut::Future<void> shutdown();
+
     virtual ~Worker();
 protected:
     QVariant CurrentSender();

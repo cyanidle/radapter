@@ -211,6 +211,8 @@ log = {
 ---@field events Events
 ---@field name string auto-generated or explicitly configured unique worker name
 ---@field origin string Lua "file:line" where the worker was created, or "<CPP>"
+---@field destroy fun(self: Worker) synchronously stop and delete the worker
+---@field shutdown fun(self: Worker): promise<nil> asynchronously stop the worker; await it to know when it has finished
 
 ---@alias pipeInput (Events | MsgHandler)
 

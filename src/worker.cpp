@@ -1,4 +1,5 @@
 #include "radapter/worker.hpp"
+#include "radapter/async_helpers.hpp"
 #include "instance_impl.hpp"
 #include "glua/glua.hpp"
 #include "worker_impl.hpp"
@@ -117,6 +118,18 @@ void Worker::Destroy() {
     emit ShutdownDone();
 }
 
+fut::Future<void> Worker::shutdown() {
+    fut::SharedPromise<void> promise;
+    auto future = promise.GetFuture();
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(this, &Worker::ShutdownDone, this, [promise, conn] {
+        QObject::disconnect(*conn);
+        promise();
+    });
+    Destroy();
+    return future;
+}
+
 Worker::~Worker()
 {
 }
@@ -147,6 +160,18 @@ static int worker_destroy(lua_State* L) {
     w->deleteLater();
     w = nullptr;
     return 0;
+}
+
+static int worker_shutdown(lua_State* L) {
+    auto* cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
+    auto w = ud->self.data();
+    if (!w) {
+        Raise("worker not usable");
+    }
+    auto fut = w->shutdown().ThenSync([]() -> QVariant { return QVariant{}; });
+    glua::Push(L, makeLuaPromise(w, fut));
+    return 1;
 }
 
 static int worker_call(lua_State* L) {
@@ -285,6 +310,10 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
         lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<worker_destroy>, 1);
         lua_setfield(L, -2, "destroy");
+
+        lua_pushvalue(L, clsIdx);
+        lua_pushcclosure(L, glua::protect<worker_shutdown>, 1);
+        lua_setfield(L, -2, "shutdown");
 
         lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<get_listeners>, 1);
