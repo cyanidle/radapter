@@ -104,13 +104,10 @@ Frame {
     // write a value: update the holder locally (optimistic) and send it out the
     // worker's data channel as `{ name = value }`
     function sendWrite(name, v) {
-        var holder = _holders[name]
-        if (holder) holder.value = v
-        if (typeof radapter !== "undefined" && radapter) {
-            var msg = {}
-            msg[name] = v
-            radapter.sendMsg(msg)
-        }
+        _holders[name].value = v   // optimistic local update
+        var msg = {}
+        msg[name] = v
+        radapter.sendMsg(msg)
     }
 
     // commit an in-place text edit (parsed to the row's data type)
