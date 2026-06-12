@@ -127,20 +127,24 @@ same `radapter_scripts` CMake function bakes them into the resource under `:/rad
 and the GUI worker adds `qrc:/` to the QML import path, so scripts can `import radapter`
 (e.g. `ModbusTable`).
 
-The GUI worker (`src/workers/gui/gui.cpp`) exposes a `radapter` context object with two
-channels that both map onto the worker's `OnMsg`/`SendMsg`:
-- **State** — `radapter.model`, a tree of `GuiModel` nodes (a `QQmlPropertyMap` subclass).
-  `model.node("regs")` gets/creates a nested node; `model[key]` is a reactive value (use
-  `ensure(key)` to make a key bindable before data arrives). Inbound messages are merged in
-  via `applyIncoming` (C++ `insert`, so no echo); a QML write to a key goes through
-  `updateValue`, which auto-emits the change as a path-scoped message (a write to the `regs`
+The GUI worker (`src/workers/gui/gui.cpp`) exposes a `radapter` context object whose
+`radapter.model` is the root of a tree of `GuiModel` nodes (a `QQmlPropertyMap` subclass).
+Both data channels map onto the worker's `OnMsg`/`SendMsg` and are **scoped to a node's path
+in the tree** (the root node's path is empty → flat messages):
+- **State** — `model.node("regs")` gets/creates a nested node; `model[key]` is a reactive
+  value (use `ensure(key)` to make a key bindable before data arrives). Inbound messages are
+  merged in via `applyIncoming` (C++ `insert`, so no echo); a QML write to a key goes through
+  `updateValue`, which auto-emits the change wrapped in the node's path (a write to the `regs`
   node's `enable` emits `{regs={enable=..}}`) — symmetric with `pipe(src, wrap("regs"), view)`
-  / `pipe(view, unwrap("regs"), src)`. This is the path for dashboards/tables; bind
-  `model[key]` and let edits emit automatically (no manual send). `ModbusTable` takes its
-  node via `model:` and binds `model[name]` per row — no holders, no delegate routing.
-- **Events** — `radapter.send(msg)` (out) and the `radapter.received(msg)` signal (in), for
-  streams/RPC that aren't state (chat log, request/response). Every inbound message also
-  fires `received`; dashboards ignore it, event UIs ignore the model.
+  / `pipe(view, unwrap("regs"), src)`. Bind `model[key]` and let edits emit automatically (no
+  manual send). `ModbusTable` takes its node via `model:` and binds `model[name]` per row —
+  no holders, no delegate routing.
+- **Events** — `node.send(msg)` (out) and the `node.received(msg)` signal (in), for
+  streams/RPC that aren't state (chat log, request/response). `send` wraps `msg` in the
+  node's path and `received` fires on each node with the inbound sub-message scoped to it, so
+  a nested component is addressed correctly without a manual prefix. `radapter.model.send` /
+  `radapter.model.received` (root node) are the flat/global form. (It's `send`, not `emit` —
+  `emit` is a reserved Qt macro and can't be a method name.)
 
 A two-way control (CheckBox/TextField/Slider) bound to external state must use a `Binding`
 element (or imperative set on change) for its display, because a user interaction

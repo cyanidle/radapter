@@ -43,10 +43,12 @@ static QVariant unwrapQmlVar(QVariant const& var) {
 class QMLWorker;
 
 // A reactive node in the GUI data model, mirroring the radapter message tree:
-// each nested map is a child GuiModel reached via node(). Writes from QML go
-// through updateValue() and auto-emit the change as a path-scoped message;
-// writes from C++ (applyIncoming, via insert) don't, so inbound data delivered
-// by a pipe doesn't echo straight back out.
+// each nested map is a child GuiModel reached via node(). State writes from QML
+// go through updateValue() and auto-emit the change; writes from C++ (insert via
+// applyIncoming) don't, so inbound data delivered by a pipe doesn't echo back.
+// The node also carries the event channel: send() emits a message and received()
+// fires on inbound — both scoped to the node's path in the tree, so a nested
+// component is addressed correctly without a manually-managed prefix.
 class GuiModel : public QQmlPropertyMap {
     Q_OBJECT
 public:
@@ -70,22 +72,23 @@ public:
         if (!contains(key)) QQmlPropertyMap::insert(key, QVariant{});
     }
 
-    // merge an inbound message into the tree (no outbound echo)
-    void applyIncoming(QVariant const& msg) {
-        auto map = msg.toMap();
-        for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-            if (it.value().type() == QVariant::Map) {
-                node(it.key())->applyIncoming(it.value());
-            } else {
-                QQmlPropertyMap::insert(it.key(), it.value());
-            }
-        }
-    }
+    // emit an event from this node, wrapped in the node's path (the root node
+    // emits it flat); the inverse of the inbound routing
+    Q_INVOKABLE void send(QVariant const& msg);
+
+    // merge an inbound message into the tree, then fire received() at this node
+    // (and, recursively, at child nodes) with the sub-message scoped to each
+    void applyIncoming(QVariant const& msg);
+
+signals:
+    void received(QVariant const& msg);
 
 protected:
     QVariant updateValue(QString const& key, QVariant const& input) override;
 
 private:
+    QVariant wrapPath(QVariant payload) const;
+
     QMLWorker* _worker;
     GuiModel* _up;
     QString _key;
@@ -99,11 +102,8 @@ class GuiInstanceProxy : public QObject {
 public:
     GuiInstanceProxy(QMLWorker* worker);
     GuiModel* model() const;
-signals:
-    void received(QVariant const& msg);   // inbound message (event channel)
 public slots:
     void shutdown(unsigned timeout = 5000);
-    void send(QVariant const& msg);        // outbound message (event channel)
 };
 
 class QMLWorker final : public radapter::Worker
@@ -140,31 +140,49 @@ public:
         root->setParent(this);
     }
 	void OnMsg(QVariant const& msg) override {
-        model->applyIncoming(msg);
-        emit proxy->received(msg);
+        model->applyIncoming(msg);   // fires received() on the matching node(s)
     }
     GuiModel* dataModel() const { return model; }
     void emitModelChange(QVariant const& payload) { emit SendMsg(payload); }
-    void emitEvent(QVariant const& var) { emit SendMsg(unwrapQmlVar(var)); }
 };
 
-QVariant GuiModel::updateValue(QString const& key, QVariant const& input) {
-    QVariantMap leaf;
-    leaf.insert(key, input);
-    QVariant payload = leaf;
-    for (GuiModel* n = this; n->_up; n = n->_up) {
+// wrap a payload in this node's path: walk up to the root prepending each key,
+// so an event/change from a nested node is addressed like the inbound routing
+QVariant GuiModel::wrapPath(QVariant payload) const {
+    for (GuiModel const* n = this; n->_up; n = n->_up) {
         QVariantMap wrapped;
         wrapped.insert(n->_key, payload);
         payload = wrapped;
     }
-    _worker->emitModelChange(payload);
+    return payload;
+}
+
+QVariant GuiModel::updateValue(QString const& key, QVariant const& input) {
+    QVariantMap leaf;
+    leaf.insert(key, input);
+    _worker->emitModelChange(wrapPath(leaf));
     return input;
+}
+
+void GuiModel::send(QVariant const& msg) {
+    _worker->emitModelChange(wrapPath(unwrapQmlVar(msg)));
+}
+
+void GuiModel::applyIncoming(QVariant const& msg) {
+    auto map = msg.toMap();
+    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+        if (it.value().type() == QVariant::Map) {
+            node(it.key())->applyIncoming(it.value());
+        } else {
+            QQmlPropertyMap::insert(it.key(), it.value());
+        }
+    }
+    emit received(msg);
 }
 
 GuiInstanceProxy::GuiInstanceProxy(QMLWorker *worker) : QObject(worker), w(worker) {}
 GuiModel* GuiInstanceProxy::model() const { return w->dataModel(); }
 void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeout); }
-void GuiInstanceProxy::send(const QVariant &msg) { w->emitEvent(msg); }
 
 }
 
