@@ -2,17 +2,17 @@ import QtQuick 2.7
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 
-// Configurable table that visualizes Modbus register values.
+// Configurable table that visualizes Modbus register values, bound to a radapter
+// GUI model node. Pass the node via `model`, e.g.
+//   ModbusTable { model: radapter.model.node("regs") }
 //
-// Add rows with "+", giving each a name, address and register type. Each row's
-// value mirrors data delivered to this component under a field with the same
-// name, e.g. piping `{ pump_speed = 1234 }` updates the row named "pump_speed"
-// (a nested `{ pump_speed = { value = 1234, quality = .. } }` also works for
-// extra fields). The "details" (three dots) popup configures endianness, data
-// type (default: a 16-bit word) and hex display per row. Coil/Discrete rows show
-// a checkbox (read-only for discrete inputs); numeric rows show editable text.
-// Writable rows (Holding, Coil) can be edited — double-click text or toggle the
-// checkbox — and the new value is sent out as `{ name = value }`.
+// Add rows with "+", giving each a name, address, register type (and optional
+// data type / endianness). A row reads and writes `model[name]`, so data piped
+// under the node's path updates the row, and an edit writes back through the
+// model (which emits the change automatically). The "details" (three dots) popup
+// configures endianness, data type (default: a 16-bit word) and hex display.
+// Coil/Discrete rows show a checkbox (read-only for discrete inputs); numeric
+// rows show editable text (read-only for input registers).
 Frame {
     id: root
     padding: 8
@@ -23,29 +23,15 @@ Frame {
     readonly property var endians: ["Big", "Little"]
     readonly property var regTypes: ["Holding", "Input", "Coil", "Discrete"]
 
-    // value-holder objects keyed by register name. Each is a child QObject named
-    // after the register; the GUI worker routes an incoming scalar `{ name = .. }`
-    // into its declared (reactive) `value` property (or a nested map into its
-    // fields), keeping list rows reactive without per-delegate routing.
-    property var _holders: ({})
-
-    Component {
-        id: holderComp
-        QtObject {
-            property var value
-            property string quality: ""
-        }
-    }
+    // the GUI model node this table is bound to; rows read/write model[name].
+    // required so it is supplied at construction (before bindings evaluate),
+    // which keeps row bindings from dereferencing a null model
+    required property var model
 
     function addRow(name, address, regType, dataType = "Word", endianess = "Little") {
         name = (name || "").trim()
-        if (!name.length || _holders[name])
-            return
-        var holder = holderComp.createObject(root, { objectName: name })
-        var h = {}
-        for (var k in _holders) h[k] = _holders[k]
-        h[name] = holder
-        _holders = h
+        if (!name.length) return
+        model.ensure(name)   // make the key reactive before the row binds to it
         regModel.append({
             name: name,
             address: String(address),
@@ -58,13 +44,7 @@ Frame {
 
     function removeRow(index) {
         if (index < 0 || index >= regModel.count) return
-        var name = regModel.get(index).name
-        var holder = _holders[name]
-        var h = {}
-        for (var k in _holders) if (k !== name) h[k] = _holders[k]
-        _holders = h
         regModel.remove(index)
-        if (holder) holder.destroy()
     }
 
     function formatValue(v, dataType, hex) {
@@ -101,19 +81,11 @@ Frame {
         return v === true || v === 1 || v === "true" || v === "1"
     }
 
-    // write a value: update the holder locally (optimistic) and send it out the
-    // worker's data channel as `{ name = value }`
-    function sendWrite(name, v) {
-        _holders[name].value = v   // optimistic local update
-        var msg = {}
-        msg[name] = v
-        radapter.sendMsg(msg)
-    }
-
-    // commit an in-place text edit (parsed to the row's data type)
+    // commit an in-place text edit: parse to the row's data type and write it to
+    // the model (which emits the change). Garbage/empty edits are ignored.
     function commitEdit(name, text, dataType) {
         var v = root.parseValue(text, dataType)
-        if (v !== undefined) root.sendWrite(name, v)
+        if (v !== undefined) model[name] = v
     }
 
     ListModel { id: regModel }
@@ -161,7 +133,6 @@ Frame {
                 id: rowItem
                 width: ListView.view ? ListView.view.width : implicitWidth
                 spacing: 8
-                property QtObject holder: root._holders[model.name] || null
 
                 Label { text: model.name;    Layout.preferredWidth: 150; elide: Text.ElideRight }
                 Label { text: model.address; Layout.preferredWidth: 80 }
@@ -184,17 +155,10 @@ Frame {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: valueArea.isBit
                         enabled: valueArea.writable
-                        // controlled checkbox: state is driven from the holder, not
-                        // a binding (a user click would otherwise break it), so the
-                        // box keeps tracking external updates after a local toggle
-                        onToggled: root.sendWrite(model.name, checked)
-                        Component.onCompleted: checked = rowItem.holder ? root.truthy(rowItem.holder.value) : false
-                        Connections {
-                            target: rowItem.holder
-                            function onValueChanged() {
-                                bitCheck.checked = root.truthy(rowItem.holder.value)
-                            }
-                        }
+                        // controlled via a Binding so a user click doesn't break the
+                        // link to the model; the click still writes back via onToggled
+                        Binding { target: bitCheck; property: "checked"; value: root.truthy(root.model[model.name]) }
+                        onToggled: root.model[model.name] = checked
                     }
 
                     Label {
@@ -203,13 +167,13 @@ Frame {
                         verticalAlignment: Text.AlignVCenter
                         visible: !valueArea.isBit && !valueArea.editing
                         elide: Text.ElideRight
-                        text: rowItem.holder ? root.formatValue(rowItem.holder.value, model.dataType, model.hex) : "—"
+                        text: root.formatValue(root.model[model.name], model.dataType, model.hex)
                         MouseArea {
                             anchors.fill: parent
                             enabled: valueArea.writable
                             onDoubleClicked: {
-                                editField.text = (rowItem.holder && rowItem.holder.value !== undefined)
-                                                 ? String(rowItem.holder.value) : ""
+                                var cur = root.model[model.name]
+                                editField.text = cur === undefined ? "" : String(cur)
                                 valueArea.editing = true
                                 editField.forceActiveFocus()
                                 editField.selectAll()

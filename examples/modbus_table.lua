@@ -58,7 +58,7 @@ ApplicationWindow {
     title: "]] .. title .. [["
 
     ModbusTable {
-        objectName: "regs"
+        model: radapter.model.node("regs")   // the "regs" sub-tree
         anchors.fill: parent
         anchors.margins: 8
         Component.onCompleted: {
@@ -82,10 +82,10 @@ local function connect_master(view)
         poll_rate = 200,
         registers = registers,
     }
-    -- polled changes -> table (nested under the table's objectName)
+    -- symmetric: polled changes wrap into the "regs" node; edits emitted by the
+    -- table arrive pre-wrapped as { regs = { .. } } and unwrap back to registers
     pipe(master, wrap("regs"), view)
-    -- table edits -> write to the slave
-    pipe(view, master) -- TODO: Should unwrap here. QML binding is kinda broken
+    pipe(view, unwrap("regs"), master)
 end
 
 connect_master(make_window("Master A"))
