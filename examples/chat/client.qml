@@ -25,7 +25,7 @@ ApplicationWindow {
             root.status = String(msg.status)
     }
 
-    Component.onCompleted: radapter.msg.connect(onMsg)
+    Component.onCompleted: radapter.received.connect(onMsg)
 
     // ── Nickname overlay ─────────────────────────────────────────────────────
     Rectangle {
@@ -133,7 +133,7 @@ ApplicationWindow {
                     var t = msgInput.text
                     if (t.length === 0 || root.myName.length === 0) return
                     root.addMessage(root.myName, t, true)
-                    radapter.sendMsg({ from: root.myName, text: t })
+                    radapter.send({ from: root.myName, text: t })
                     msgInput.text = ""
                 }
             }

@@ -346,7 +346,6 @@ function QMLWorker:dir() end
 
 ---@class QMLParams
 ---@field url string
----@field props string[]
 
 ---@return QMLWorker
 ---@param params QMLParams

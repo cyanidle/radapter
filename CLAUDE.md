@@ -125,13 +125,27 @@ pipeline primitives; `async.lua` provides coroutine-based promises (`await`);
 Reusable QML components live in `src/qml/*.qml` with a `qmldir` (module `radapter`). The
 same `radapter_scripts` CMake function bakes them into the resource under `:/radapter/`,
 and the GUI worker adds `qrc:/` to the QML import path, so scripts can `import radapter`
-(e.g. `ModbusTable`). Data reaches a component by the GUI worker (`applyToQml`) setting
-properties from the incoming message: nested map fields recurse into child objects found by
-`objectName`, and a *scalar* field whose name matches a direct child that declares a `value`
-property is written into that child's `value`. A component needing per-row reactive values
-(like `ModbusTable`) therefore creates persistent child holder objects named after each
-field — flat `{ name = v }` updates `holder.value` reactively — rather than relying on
-recycled list/table delegates.
+(e.g. `ModbusTable`).
+
+The GUI worker (`src/workers/gui/gui.cpp`) exposes a `radapter` context object with two
+channels that both map onto the worker's `OnMsg`/`SendMsg`:
+- **State** — `radapter.model`, a tree of `GuiModel` nodes (a `QQmlPropertyMap` subclass).
+  `model.node("regs")` gets/creates a nested node; `model[key]` is a reactive value (use
+  `ensure(key)` to make a key bindable before data arrives). Inbound messages are merged in
+  via `applyIncoming` (C++ `insert`, so no echo); a QML write to a key goes through
+  `updateValue`, which auto-emits the change as a path-scoped message (a write to the `regs`
+  node's `enable` emits `{regs={enable=..}}`) — symmetric with `pipe(src, wrap("regs"), view)`
+  / `pipe(view, unwrap("regs"), src)`. This is the path for dashboards/tables; bind
+  `model[key]` and let edits emit automatically (no manual send). `ModbusTable` takes its
+  node via `model:` and binds `model[name]` per row — no holders, no delegate routing.
+- **Events** — `radapter.send(msg)` (out) and the `radapter.received(msg)` signal (in), for
+  streams/RPC that aren't state (chat log, request/response). Every inbound message also
+  fires `received`; dashboards ignore it, event UIs ignore the model.
+
+A two-way control (CheckBox/TextField/Slider) bound to external state must use a `Binding`
+element (or imperative set on change) for its display, because a user interaction
+imperatively writes the control's property and **breaks any inline binding** on it — see
+`ModbusTable`'s checkbox.
 
 ### Workers and the message model
 

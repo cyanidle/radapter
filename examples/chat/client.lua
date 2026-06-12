@@ -11,7 +11,7 @@ local URL = args[1] or "ws://127.0.0.1:7654"
 
 local client = WebsocketClient { url = URL }
 
-local view = QML { url = "./client.qml", props = {} }
+local view = QML { url = "./client.qml" }
 
 -- Network → GUI: messages relayed by the server.
 pipe(client, function(msg)

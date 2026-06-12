@@ -19,6 +19,12 @@ ApplicationWindow {
     property alias angle: gauge.angle
     property bool kiosk: false
 
+    // inbound state (e.g. redis-driven) arrives on the event channel
+    Component.onCompleted: radapter.received.connect(function(m) {
+        if (m.angle !== undefined) gauge.angle = m.angle
+        if (m.kiosk !== undefined) root.kiosk = m.kiosk
+    })
+
     MessageDialog {
         id: broke
         title: "SKILL ISSUE"
@@ -34,6 +40,7 @@ ApplicationWindow {
         size: root.height < root.width ? root.height : root.width
         onAngleChanged: {
             spinBox.value = angle
+            radapter.send({ angle: angle })
         }
         SpinBox {
             anchors.centerIn: parent
@@ -88,7 +95,7 @@ ApplicationWindow {
 
             var amount = money.amount * gauge.angle / 360 + 10
             money.in_flight++
-            radapter.sendMsg({gamble_request: {amount}});
+            radapter.send({gamble_request: {amount}});
         }
 
         function onMsg(msg) {
@@ -102,7 +109,7 @@ ApplicationWindow {
         }
 
         Component.onCompleted: {
-            radapter.msg.connect(onMsg);
+            radapter.received.connect(onMsg);
         }
     }
 }

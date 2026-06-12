@@ -5,22 +5,19 @@
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
-#include <QTemporaryFile>
-#include <QHash>
-#include <QTemporaryDir>
+#include <QQmlPropertyMap>
+#include <QDir>
 
-namespace radapter::gui 
+namespace radapter::gui
 {
 
 struct QMLConfig : WorkerConfig {
     QString url;
-    WithDefault<vector<QString>> props;
 };
 
 RAD_DESCRIBE(QMLConfig) {
     PARENT(WorkerConfig);
     MEMBER("url", &_::url);
-    MEMBER("props", &_::props);
 }
 
 static QMLConfig baseConfig(QVariantList const& args) {
@@ -31,43 +28,6 @@ static QMLConfig baseConfig(QVariantList const& args) {
         EnsureName(c, c.url);
     }
     return c;
-}
-
-static void applyToQml(QVariant const& msg, QObject* target) {
-    switch (msg.type()) {
-    case QVariant::Map: {
-        const auto& m = *static_cast<const QVariantMap*>(msg.constData());
-        for (auto it = m.begin(); it != m.end(); ++it) {
-            const auto& k = it.key();
-            const auto& v = it.value();
-            auto key = k.toUtf8();
-            if (auto child = target->findChild<QObject*>(k, Qt::FindChildOption::FindDirectChildrenOnly)) {
-                applyToQml(v, child);
-            } else if (auto nested = target->property(key.constData()).value<QObject*>()) {
-                applyToQml(v, nested);
-            } else {
-                target->setProperty(key.constData(), v);
-            }
-        }
-        break;
-    }
-    case QVariant::List: {
-        const auto& l = *static_cast<const QVariantList*>(msg.constData());
-        auto& children = target->children();
-        auto sz = l.size();
-        for (auto i = 0; i < sz; ++i) {
-            auto& v = l[i];
-            if (v.isValid()) {
-                applyToQml(l[i], children[i]);
-            }
-        }
-        break;
-    }
-    default: {
-        if (target->metaObject()->indexOfProperty("value") != -1)
-            target->setProperty("value", msg);
-    }
-    }
 }
 
 Q_GLOBAL_STATIC(QQmlEngine, g_engine)
@@ -82,33 +42,84 @@ static QVariant unwrapQmlVar(QVariant const& var) {
 
 class QMLWorker;
 
+// A reactive node in the GUI data model, mirroring the radapter message tree:
+// each nested map is a child GuiModel reached via node(). Writes from QML go
+// through updateValue() and auto-emit the change as a path-scoped message;
+// writes from C++ (applyIncoming, via insert) don't, so inbound data delivered
+// by a pipe doesn't echo straight back out.
+class GuiModel : public QQmlPropertyMap {
+    Q_OBJECT
+public:
+    GuiModel(QMLWorker* worker, GuiModel* parentNode, QString key, QObject* parent) :
+        QQmlPropertyMap(this, parent),
+        _worker(worker), _up(parentNode), _key(std::move(key))
+    {}
+
+    // get-or-create the nested node addressed by key
+    Q_INVOKABLE radapter::gui::GuiModel* node(QString const& key) {
+        if (auto existing = qobject_cast<GuiModel*>(value(key).value<QObject*>())) {
+            return existing;
+        }
+        auto* child = new GuiModel(_worker, this, key, this);
+        QQmlPropertyMap::insert(key, QVariant::fromValue<QObject*>(child));
+        return child;
+    }
+
+    // make a leaf key exist so QML bindings to it are reactive, without emitting
+    Q_INVOKABLE void ensure(QString const& key) {
+        if (!contains(key)) QQmlPropertyMap::insert(key, QVariant{});
+    }
+
+    // merge an inbound message into the tree (no outbound echo)
+    void applyIncoming(QVariant const& msg) {
+        auto map = msg.toMap();
+        for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+            if (it.value().type() == QVariant::Map) {
+                node(it.key())->applyIncoming(it.value());
+            } else {
+                QQmlPropertyMap::insert(it.key(), it.value());
+            }
+        }
+    }
+
+protected:
+    QVariant updateValue(QString const& key, QVariant const& input) override;
+
+private:
+    QMLWorker* _worker;
+    GuiModel* _up;
+    QString _key;
+};
+
 class GuiInstanceProxy : public QObject {
     Q_OBJECT
+    Q_PROPERTY(radapter::gui::GuiModel* model READ model CONSTANT)
 
     QMLWorker* w;
 public:
-    GuiInstanceProxy(QMLWorker* w);
+    GuiInstanceProxy(QMLWorker* worker);
+    GuiModel* model() const;
 signals:
-    void msg(QVariant const& msg);
+    void received(QVariant const& msg);   // inbound message (event channel)
 public slots:
     void shutdown(unsigned timeout = 5000);
-    void sendMsg(QVariant const& msg);
+    void send(QVariant const& msg);        // outbound message (event channel)
 };
 
 class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
-private:
     QMLConfig config;
     QQmlComponent* creator;
-    QObject* root;
-    QHash<int, int> sigsToProps;
+    QObject* root = nullptr;
+    GuiModel* model;
     GuiInstanceProxy* proxy;
 public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, baseConfig(args), "qml")
     {
         auto* engine = g_engine();
+        model = new GuiModel(this, nullptr, QString(), this);
         proxy = new GuiInstanceProxy{this};
         auto ctx = new QQmlContext(engine, this);
         ctx->setContextProperty("radapter", proxy);
@@ -127,49 +138,33 @@ public:
             Raise("Could not create qml view: {}", creator->errorString());
         }
         root->setParent(this);
-        auto* meta = root->metaObject();
-        auto handler = metaObject()->indexOfMethod("handlePropChange()");
-        for (auto& prop: config.props.value) {
-            auto idx = meta->indexOfProperty(prop.toStdString().c_str());
-            if (idx != - 1) {
-                auto p = meta->property(idx);
-                auto notif = p.notifySignalIndex();
-                sigsToProps[notif] = idx;
-                meta->connect(root, notif, this, handler);
-                p.read(root); //kinda kostyl to force QML to update prop aliases
-            } else {
-                Warn("No property found in loaded qml component: {}", prop);
-            }
-        }
     }
 	void OnMsg(QVariant const& msg) override {
-        emit proxy->msg(msg);
-        applyToQml(msg, root);
+        model->applyIncoming(msg);
+        emit proxy->received(msg);
     }
-public slots:
-    void handlePropChange() {
-        auto propId = sigsToProps.value(senderSignalIndex(), -1);
-        if (propId != -1) {
-            auto prop = root->metaObject()->property(propId);
-            QVariantMap msg {{prop.name(), unwrapQmlVar(prop.read(root))}};
-            emit SendMsg(msg);
-        }
-    }
-    void handleMsgFromQml(QVariant const& var) {
-        emit SendMsg(unwrapQmlVar(var));
-    }
+    GuiModel* dataModel() const { return model; }
+    void emitModelChange(QVariant const& payload) { emit SendMsg(payload); }
+    void emitEvent(QVariant const& var) { emit SendMsg(unwrapQmlVar(var)); }
 };
 
-
-GuiInstanceProxy::GuiInstanceProxy(QMLWorker *w) : QObject(w), w(w) {}
-
-void GuiInstanceProxy::shutdown(unsigned int timeout) {
-    w->_Inst->Shutdown(timeout);
+QVariant GuiModel::updateValue(QString const& key, QVariant const& input) {
+    QVariantMap leaf;
+    leaf.insert(key, input);
+    QVariant payload = leaf;
+    for (GuiModel* n = this; n->_up; n = n->_up) {
+        QVariantMap wrapped;
+        wrapped.insert(n->_key, payload);
+        payload = wrapped;
+    }
+    _worker->emitModelChange(payload);
+    return input;
 }
 
-void GuiInstanceProxy::sendMsg(const QVariant &msg) {
-    w->handleMsgFromQml(msg);
-}
+GuiInstanceProxy::GuiInstanceProxy(QMLWorker *worker) : QObject(worker), w(worker) {}
+GuiModel* GuiInstanceProxy::model() const { return w->dataModel(); }
+void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeout); }
+void GuiInstanceProxy::send(const QVariant &msg) { w->emitEvent(msg); }
 
 }
 

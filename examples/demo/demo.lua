@@ -33,7 +33,6 @@ end
 
 local view = QML {
     url = "./Demo.qml",
-    props = {"angle"}
 }
 
 local commands = RedisCache {

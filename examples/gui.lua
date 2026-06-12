@@ -37,7 +37,7 @@ Window {
             } else {
                 color = "#0000ff";
             }
-            radapter.sendMsg({
+            radapter.send({
                 flip: flip,
                 color: String(color),
                 nested: {
@@ -54,6 +54,7 @@ Window {
         }
 
         Component.onCompleted: {
+            radapter.received.connect(function(m) { if (m.color !== undefined) rect.color = m.color })
             flip = true
         }
     }
