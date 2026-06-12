@@ -26,7 +26,7 @@ Frame {
     // the GUI model node this table is bound to; rows read/write model[name].
     // required so it is supplied at construction (before bindings evaluate),
     // which keeps row bindings from dereferencing a null model
-    required property var model
+    property var model
 
     function addRow(name, address, regType, dataType = "Word", endianess = "Little") {
         name = (name || "").trim()
