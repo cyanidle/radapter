@@ -1,4 +1,5 @@
 #include <future/future.hpp>
+#include <QPointer>
 
 #include "radapter/radapter.hpp"
 #include "radapter/worker.hpp"
@@ -10,9 +11,11 @@ using namespace fut;
 
 template<typename T>
 void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
-    fut.AtLastSync([worker, cb = std::move(func)](Result<T> res) mutable noexcept {
+    // QPointer: the future may resolve as/after the worker is destroyed (e.g.
+    // Worker::shutdown resolves on destroyed), so never deref a dead worker.
+    fut.AtLastSync([worker = QPointer(worker), cb = std::move(func)](Result<T> res) mutable noexcept {
         if (!cb) {
-            if (!res) worker->Error("Unhandled error (invalid callback): {}");
+            if (!res && worker) worker->Error("Unhandled error (invalid callback): {}");
             return;
         }
         QVariantList args;
@@ -24,7 +27,7 @@ void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
         try {
             cb.Call(std::move(args));
         } catch (std::exception& e) {
-            worker->Error("Error in callback: {}", e.what());
+            if (worker) worker->Error("Error in callback: {}", e.what());
         }
     });
 }

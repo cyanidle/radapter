@@ -1,5 +1,6 @@
 #include "radapter/worker.hpp"
 #include "radapter/async_helpers.hpp"
+#include <QTimer>
 #include "instance_impl.hpp"
 #include "glua/glua.hpp"
 #include "worker_impl.hpp"
@@ -121,10 +122,16 @@ void Worker::Destroy() {
 fut::Future<void> Worker::shutdown() {
     fut::SharedPromise<void> promise;
     auto future = promise.GetFuture();
-    auto conn = std::make_shared<QMetaObject::Connection>();
-    *conn = connect(this, &Worker::ShutdownDone, this, [promise, conn] {
-        QObject::disconnect(*conn);
-        promise();
+    // complete once the worker is actually gone: Destroy() emits ShutdownDone
+    // (possibly deferred for async cleanup), which schedules deleteLater, whose
+    // destroyed() resolves the promise. So await(worker:shutdown()) guarantees
+    // the worker has been freed, not merely stopped.
+    connect(this, &Worker::ShutdownDone, this, &QObject::deleteLater, Qt::UniqueConnection);
+    connect(this, &QObject::destroyed, this, [promise] {
+        // resolve on the next tick, not inside ~QObject: the continuation may
+        // resume a coroutine or trigger more shutdowns, which must not run while
+        // this worker is mid-destruction (it would reenter teardown and crash)
+        QTimer::singleShot(0, [promise] { promise(); });
     });
     Destroy();
     return future;
