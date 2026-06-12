@@ -93,22 +93,11 @@ signals:
 public slots:
     void shutdown(unsigned timeout = 5000);
     void sendMsg(QVariant const& msg);
-    Q_INVOKABLE QVariant call(const QString& name, QVariant args = {});
 };
 
 class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
-public:
-    QMap<QString, LuaFunction> calls;
-
-    QVariant AddCall(std::tuple<QString, LuaFunction> args) {
-        auto& [name, fn] = args;
-        if (name.isEmpty()) Raise("AddCall: arg 1 must be a non-empty string name");
-        if (!fn) Raise("AddCall: arg 2 must be a function");
-        calls[name] = std::move(fn);
-        return {};
-    }
 private:
     QMLConfig config;
     QQmlComponent* creator;
@@ -182,15 +171,6 @@ void GuiInstanceProxy::sendMsg(const QVariant &msg) {
     w->handleMsgFromQml(msg);
 }
 
-QVariant GuiInstanceProxy::call(const QString& name, QVariant rawArgs) {
-    auto it = w->calls.find(name);
-    if (it == w->calls.end()) return {};
-    QVariantList args;
-    if (rawArgs.type() == QVariant::List) args = rawArgs.toList();
-    else if (rawArgs.isValid()) args.push_back(rawArgs);
-    return it.value().Call(args);
-}
-
 }
 
 namespace radapter::builtin {
@@ -202,7 +182,7 @@ void workers::gui(Instance* inst)
     g_engine()->clearComponentCache();
     if (!g_engine()->importPathList().contains(QStringLiteral("qrc:/")))
         g_engine()->addImportPath(QStringLiteral("qrc:/"));
-    inst->RegisterWorker<QMLWorker>("QML", {{"AddCall", AsExtraMethod<&QMLWorker::AddCall>}});
+    inst->RegisterWorker<QMLWorker>("QML");
 	inst->RegisterSchema<QMLConfig>("QML");
 }
 

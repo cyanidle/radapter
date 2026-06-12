@@ -344,11 +344,6 @@ QMLWorker = {}
 ---@return string
 function QMLWorker:dir() end
 
----Register a Lua function callable from QML via radapter.call(name, args)
----@param name string
----@param fn fun(...): any
-function QMLWorker:AddCall(name, fn) end
-
 ---@class QMLParams
 ---@field url string
 ---@field props string[]
