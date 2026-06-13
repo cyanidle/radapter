@@ -38,8 +38,8 @@ local test = TestWorker {
     delay = 1000
 }
 
-local json = __json_decode('{"command":"welcome","arguments":{"stopOnEntry":false,"sourceBasePath":"/home/alexej/repos/radapter/tests/demo","directorySeperator":"/"}}')
-local back = __json_encode(json)
+local json = json_decode('{"command":"welcome","arguments":{"stopOnEntry":false,"sourceBasePath":"/home/alexej/repos/radapter/tests/demo","directorySeperator":"/"}}')
+local back = json_encode(json)
 
 pipe(test, test)
 

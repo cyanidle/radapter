@@ -1548,7 +1548,7 @@ function vscode_debugger.receive_message(sync)
 
   vscode_message_size = nil
 
-  local decoded_message = __json_decode(message)
+  local decoded_message = json_decode(message)
   if not decoded_message then
     return vscode_debugger.proto_error('Invalid message:' .. message)
   end
@@ -1561,7 +1561,7 @@ function vscode_debugger.push_back_message(msg)
 end
 
 function vscode_debugger.send_message(msg)
-  local data = __json_encode(msg)
+  local data = json_encode(msg)
   local ok, err = server:nsend(string_format('#%d\n%s', #data, data))
   if not ok then
     error('[MOBDEUG][SEND ERROR]: ' .. err)

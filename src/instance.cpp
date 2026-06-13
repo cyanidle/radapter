@@ -97,8 +97,8 @@ Instance::Instance(QObject *parent) :
     lua_setglobal(L, "log");
 
     lua_register(L, "__gen_id", _gen_id);
-    lua_register(L, "__json_decode", glua::protect<builtin::json_decode>);
-    lua_register(L, "__json_encode", glua::protect<builtin::json_encode>);
+    lua_register(L, "json_decode", glua::protect<builtin::json_decode>);
+    lua_register(L, "json_encode", glua::protect<builtin::json_encode>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
@@ -119,6 +119,7 @@ Instance::Instance(QObject *parent) :
     lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("async");
+    LoadEmbeddedFile("declare");
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);

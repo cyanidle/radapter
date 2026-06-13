@@ -39,6 +39,65 @@ function call_all(table, ...) end
 ---@return fun(req: any, timeout: number?): asyncThunk
 function make_service(request, responce, timeout) end
 
+-- Declarative config (the `declare` module, required as `require "declare"`).
+
+---A reference to another entry in the `objects` map, resolved at build time.
+---@class RadRef
+---@field ref string
+
+---A buildable object: a worker or shared device.
+---`config` may contain RadRef values (e.g. a Modbus master's `device`).
+---@class RadObjectEntry
+---@field type string -- name of the global factory (e.g. "ModbusMaster", "TcpModbusDevice")
+---@field config table
+
+---A connection between two objects. Optional transform: at most one of
+---wrap/unwrap/on (a field key). With none, it is a direct pipe.
+---@class RadPipe
+---@field from string
+---@field to string
+---@field wrap string?
+---@field unwrap string?
+---@field on string?
+
+---@class RadConfig
+---@field objects table<string, RadObjectEntry>
+---@field pipes RadPipe[]?
+
+---@class RadSaveParams
+---@field config RadConfig
+---@field path string? -- write whole config as JSON to this file
+---@field key string? -- write config as a Redis hash under this key (one field per object)
+---@field host string?
+---@field port number?
+---@field db number?
+
+---@class RadLoadParams
+---@field path string? -- read config JSON from this file
+---@field key string? -- read config from a Redis hash under this key
+---@field host string?
+---@field port number?
+---@field db number?
+
+---@class radapterDeclare
+local declare = {}
+
+---Instantiate every object and wire the declared pipes.
+---@param config RadConfig
+---@return table<string, Worker>
+function declare.build(config) end
+
+---Serialize a config to a file (`path`) and/or a Redis hash (`key`).
+---The Redis path is async: call at script top level or inside `async(...)`.
+---@param params RadSaveParams
+function declare.save_to(params) end
+
+---Read a config (file `path` or Redis `key`) and build it.
+---The Redis path is async: call at script top level or inside `async(...)`.
+---@param params RadLoadParams
+---@return table<string, Worker>
+function declare.load_from(params) end
+
 ---@enum (key) loggingLevel
 loggingLevel = {
     debug = 1,
@@ -155,7 +214,11 @@ function fmt(fmt, ...) end
 
 ---@param data any
 ---@return string
-function __json_encode(data) end
+function json_encode(data) end
+
+---@param json string
+---@return any
+function json_decode(json) end
 
 ---@class promise<T>: { __call: fun(self: promise<T>, callback: fun(result: T, err: string)) }
 

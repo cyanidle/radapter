@@ -99,7 +99,7 @@ db:Exec("CREATE TABLE t (x int)")
 db:Exec("INSERT INTO t VALUES (?)", { 42 })
 db:Exec("SELECT x FROM t", function(rows, err)
     assert(err == nil, err)
-    assert(rows[1][1] == 42, "unexpected select result: " .. __json_encode(rows))
+    assert(rows[1][1] == 42, "unexpected select result: " .. json_encode(rows))
     pass("sql_roundtrip")
 end)
 
