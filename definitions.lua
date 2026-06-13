@@ -238,6 +238,10 @@ function notify_all(worker, msg, sender) end
 ---@return Pipable
 function create_worker(on_msg) end
 
+---Look up a live worker by its unique name; nil if none exists.
+---@type table<string, Worker?>
+workers = {}
+
 ---@type string[]
 args = {}
 
@@ -632,8 +636,11 @@ function Cyphal(params) end
 ---@field quality "good" | "comm_fail"
 ---@field ts number
 
+---@class TagChanged: Pipable
+---@field [string] Pipable  pipe target scoped to one tag: tags.changed["worker:field"]
+
 ---@class TagsApi
----@field changed Pipable  pipe target that fires a TagEvent on every tag update
+---@field changed TagChanged  pipe target firing a TagEvent on every tag update; index by name for one tag
 tags = {}
 
 ---Subscribe to a specific tag by name. Callback fires immediately on each update.

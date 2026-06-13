@@ -21,6 +21,19 @@ static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
     Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
 }
 
+// workers["unique-name"] -> the worker object with that name, or nil
+static int workers_index(lua_State* L) {
+    auto* inst = Instance::FromLua(L);
+    auto name = QString::fromUtf8(luaL_checkstring(L, 2));
+    auto* w = inst->findChild<Worker*>(name, Qt::FindDirectChildrenOnly);
+    if (!w || w->_luaSelfRef == LUA_NOREF) {
+        lua_pushnil(L);
+        return 1;
+    }
+    lua_rawgeti(L, LUA_REGISTRYINDEX, w->_luaSelfRef);
+    return 1;
+}
+
 void Instance::EnableGui() {
     if constexpr (GUI) {
         builtin::workers::gui(this);
@@ -94,6 +107,13 @@ Instance::Instance(QObject *parent) :
     lua_register(L, "get", glua::protect<builtin::api::Get>);
     lua_register(L, "set", glua::protect<builtin::api::Set>);
     lua_register(L, "load_plugin", glua::protect<builtin::api::LoadPlugin>);
+
+    lua_newtable(L);
+    lua_newtable(L); // metatable
+    lua_pushcfunction(L, glua::protect<workers_index>);
+    lua_setfield(L, -2, "__index");
+    lua_setmetatable(L, -2);
+    lua_setglobal(L, "workers");
 
     radapter::compat::prequiref(L, "lfs", luaopen_lfs, 0);
     lua_pop(L, 1);

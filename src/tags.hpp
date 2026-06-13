@@ -30,6 +30,9 @@ public:
     Tag const* GetTag(QString const& tagName) const;
     void Advertise(Worker* w, QStringList const& fields);
 
+    // get-or-create the per-tag listener list behind tags.changed["name"]
+    LuaValue& PerTagListeners(QString const& tagName);
+
     // called from worker_notify before Lua listeners fire
     void onWorkerMsg(Worker* w, QVariant const& msg);
     void onWorkerEvent(Worker* w, QVariant const& msg);
@@ -44,6 +47,7 @@ private:
 
     Instance* _inst;
     QMap<QString, Tag> _tags;
+    QMap<QString, LuaValue> _perTag; // per-tag changed-listener lists
 };
 
 } // namespace radapter

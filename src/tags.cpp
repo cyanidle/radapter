@@ -10,17 +10,48 @@ static int changed_get_listeners(lua_State* L) {
     return 1;
 }
 
+static int changed_index(lua_State* L);
+
+// build a pipable { get_listeners = () -> listeners } on top of the stack
+static void pushPipable(lua_State* L, LuaValue& listeners) {
+    lua_newtable(L);
+    listeners.Push(L);
+    lua_pushcclosure(L, changed_get_listeners, 1);
+    lua_setfield(L, -2, "get_listeners");
+}
+
+static void callListeners(Instance* inst, LuaValue& listeners, QVariant const& ev) {
+    if (!listeners) return;
+    auto* L = inst->LuaState();
+    lua_pushcfunction(L, builtin::traceback);
+    auto msgh = lua_gettop(L);
+    lua_getglobal(L, "call_all");
+    listeners.Push(L);
+    glua::Push(L, ev);
+    lua_pushnil(L);
+    if (lua_pcall(L, 3, 0, msgh) != LUA_OK) {
+        inst->Error("tags", "call_all error: {}", lua_tostring(L, -1));
+    }
+    lua_settop(L, msgh - 1);
+}
+
 TagRegistry::TagRegistry(Instance* inst) : QObject(inst), _inst(inst) {
     auto* L = inst->LuaState();
 
     lua_newtable(L);
     changedListeners = LuaValue(L, ConsumeTop);
 
-    lua_newtable(L);
-    changedListeners.Push(L);
-    lua_pushcclosure(L, changed_get_listeners, 1);
-    lua_setfield(L, -2, "get_listeners");
+    pushPipable(L, changedListeners);
     changedObj = LuaValue(L, ConsumeTop);
+
+    // metatable so `tags.changed["tag-name"]` yields a per-tag pipe target
+    changedObj.Push(L);
+    lua_newtable(L);
+    lua_pushlightuserdata(L, this);
+    lua_pushcclosure(L, glua::protect<changed_index>, 1);
+    lua_setfield(L, -2, "__index");
+    lua_setmetatable(L, -2);
+    lua_pop(L, 1);
 
     connect(inst, &Instance::WorkerCreated, this, &TagRegistry::onWorkerCreated);
 }
@@ -124,24 +155,34 @@ void TagRegistry::notifyTag(QString const& tagName, Tag const& tag) {
         }
     }
 
-    auto* L = _inst->LuaState();
-    if (!changedListeners) return;
-    lua_pushcfunction(L, builtin::traceback);
-    auto msgh = lua_gettop(L);
-    lua_getglobal(L, "call_all");
-    changedListeners.Push(L);
-    glua::Push(L, QVariant(ev));
-    lua_pushnil(L);
-    if (lua_pcall(L, 3, 0, msgh) != LUA_OK) {
-        _inst->Error("tags", "call_all error: {}", lua_tostring(L, -1));
+    QVariant evVar(ev);
+    callListeners(_inst, changedListeners, evVar);       // tags.changed
+    auto it = _perTag.find(tagName);
+    if (it != _perTag.end()) {
+        callListeners(_inst, it.value(), evVar);         // tags.changed["name"]
     }
-    lua_settop(L, msgh - 1);
+}
+
+LuaValue& TagRegistry::PerTagListeners(QString const& tagName) {
+    auto it = _perTag.find(tagName);
+    if (it != _perTag.end()) return it.value();
+    auto* L = _inst->LuaState();
+    lua_newtable(L);
+    return _perTag.insert(tagName, LuaValue(L, ConsumeTop)).value();
 }
 
 // Lua API functions – each captures a TagRegistry* upvalue
 
 static TagRegistry* getRegistry(lua_State* L) {
     return static_cast<TagRegistry*>(lua_touserdata(L, lua_upvalueindex(1)));
+}
+
+// tags.changed[tagName] -> a pipe target scoped to that single tag
+static int changed_index(lua_State* L) {
+    auto* reg = getRegistry(L);
+    auto name = QString::fromUtf8(luaL_checkstring(L, 2));
+    pushPipable(L, reg->PerTagListeners(name));
+    return 1;
 }
 
 static int tags_subscribe(lua_State* L) {
