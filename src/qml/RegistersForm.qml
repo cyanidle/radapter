@@ -34,7 +34,7 @@ ColumnLayout {
             var nm = (r.rname || "").trim()
             if (!nm.length) continue
             if (!out[r.regType]) out[r.regType] = {}
-            out[r.regType][nm] = { index: parseInt(r.addr, 10) || 0, type: r.dataType }
+            out[r.regType][nm] = { index: parseInt(r.addr, 10), type: r.dataType }
         }
         regForm.values[regForm.fkey] = out
         regForm.changed()
@@ -69,7 +69,7 @@ ColumnLayout {
             ComboBox {
                 Layout.preferredWidth: 90
                 model: regForm.regTypes
-                currentIndex: Math.max(0, regForm.regTypes.indexOf(regTypeRole))
+                currentIndex: regForm.regTypes.indexOf(regTypeRole)
                 onActivated: { rows.setProperty(row, "regType", currentText); regForm.rebuild() }
             }
             TextField {
@@ -82,7 +82,7 @@ ColumnLayout {
             ComboBox {
                 Layout.fillWidth: true
                 model: regForm.dataTypes
-                currentIndex: Math.max(0, regForm.dataTypes.indexOf(dataTypeRole))
+                currentIndex: regForm.dataTypes.indexOf(dataTypeRole)
                 onActivated: { rows.setProperty(row, "dataType", currentText); regForm.rebuild() }
             }
             // capture the root id before remove(): removing destroys this delegate, after

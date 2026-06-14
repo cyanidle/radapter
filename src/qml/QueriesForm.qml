@@ -32,8 +32,8 @@ ColumnLayout {
             var r = rows.get(i)
             out.push({
                 type: r.qtype,
-                index: parseInt(r.addr, 10) || 0,
-                count: parseInt(r.cnt, 10) || 1
+                index: parseInt(r.addr, 10),
+                count: parseInt(r.cnt, 10)
             })
         }
         qForm.values[qForm.fkey] = out
@@ -61,7 +61,7 @@ ColumnLayout {
             ComboBox {
                 Layout.preferredWidth: 130
                 model: qForm.queryTypes
-                currentIndex: Math.max(0, qForm.queryTypes.indexOf(qtypeRole))
+                currentIndex: qForm.queryTypes.indexOf(qtypeRole)
                 onActivated: { rows.setProperty(row, "qtype", currentText); qForm.rebuild() }
             }
             TextField {
