@@ -64,14 +64,16 @@ ColumnLayout {
                 placeholderText: "0"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.addr
-                onEditingFinished: { rows.setProperty(index, "addr", text); qForm.rebuild() }
+                // editingFinished can fire during delegate teardown (row removed while
+                // focused), when `index` is stale — skip if the row is already gone
+                onEditingFinished: { if (index < 0 || index >= rows.count) return; rows.setProperty(index, "addr", text); qForm.rebuild() }
             }
             TextField {
                 Layout.fillWidth: true
                 placeholderText: "1"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.cnt
-                onEditingFinished: { rows.setProperty(index, "cnt", text); qForm.rebuild() }
+                onEditingFinished: { if (index < 0 || index >= rows.count) return; rows.setProperty(index, "cnt", text); qForm.rebuild() }
             }
             // capture the root id before remove(): removing destroys this delegate, after
             // which `qForm` no longer resolves through its (torn-down) context
