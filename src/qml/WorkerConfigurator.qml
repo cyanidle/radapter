@@ -2,67 +2,48 @@ import QtQuick 2.7
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 
-// Single-worker configurator: a worker-type picker + name + a schema-driven form.
-// Drives `objects` (the shared configured-objects collection, also used by device
-// RefFields) and, on "Build", emits a declare-compatible fragment
-//   { objects = { <name> = { type, config } [, <device> = {...}] } }
-// via the `emitted` signal (the example wires it to radapter.model.send).
+// Properties panel for a *single* worker of a given `type`: a name field plus a
+// schema-driven form. The type is set externally (so a host can pick which worker
+// to configure, and later reuse this as the per-node panel of a graph editor).
+//
+// - currentWorker() -> { <name> = { type, config } } (just this worker; for preview)
+// - currentFragment() -> declare-compatible { objects = { <name>, <devices…> } }
+//   including any device objects created via a RefField; emitted on Build.
 ColumnLayout {
     id: cfg
     spacing: 8
 
     property var schemas: ({})     // every worker schema, keyed by type name
-    property var types: []         // restrict the type picker (empty = all schemas)
-    property var objects: []       // configured objects, accumulated across builds
+    property string type: ""       // the worker type to configure (set externally)
+    property var objects: []       // shared configured objects (for device refs)
+
+    property var values: ({})      // this worker's config, filled by the form
 
     signal emitted(var fragment)
-    signal changed()               // fires on any edit (type, name, or a form field)
+    signal changed()               // fires on any edit (name or a form field)
 
-    property var values: ({})      // the current worker's config, filled by the form
+    function setName(name) { nameField.text = name }
+    function name() { return nameField.text.trim() }
 
-    function typeNames() {
-        var ks = (types && types.length) ? types.slice() : Object.keys(schemas)
-        ks.sort()
-        return ks
+    function currentWorker() {
+        var e = {}
+        e[name() || "(unnamed)"] = { type: cfg.type, config: values }
+        return e
     }
-    function currentType() { return typeBox.currentText }
-
-    // the declare-compatible fragment for the current state (also used for preview)
+    // worker + any device objects referenced by it, ready for declare.build
     function currentFragment() {
         var objs = {}
         for (var i = 0; i < objects.length; i++)
             objs[objects[i].name] = { type: objects[i].type, config: objects[i].config }
-        var nm = nameField.text.trim() || "(unnamed)"
-        objs[nm] = { type: currentType(), config: values }
+        objs[name() || "(unnamed)"] = { type: cfg.type, config: values }
         return { objects: objs }
     }
-
-    // imperative API (also handy for tests/automation)
-    function selectType(name) {
-        var i = typeNames().indexOf(name)
-        if (i < 0) return
-        typeBox.currentIndex = i
-        values = {}
-        formLoader.reload()
-        changed()
-    }
-    function setName(name) { nameField.text = name }
     function buildNow() {
-        if (!nameField.text.trim().length || !currentType().length) return
-        emitted(currentFragment())
+        if (name().length && cfg.type.length) emitted(currentFragment())
     }
 
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Label { text: "Worker"; font.bold: true }
-        ComboBox {
-            id: typeBox
-            Layout.fillWidth: true
-            model: cfg.typeNames()
-            onActivated: { cfg.values = {}; formLoader.reload(); cfg.changed() }
-        }
-    }
+    // reset the form when the configured type changes
+    onTypeChanged: { values = {}; formLoader.reload(); changed() }
 
     RowLayout {
         Layout.fillWidth: true
@@ -88,7 +69,7 @@ ColumnLayout {
     Component {
         id: formComp
         SchemaForm {
-            schema: cfg.schemas[cfg.currentType()] || ({})
+            schema: cfg.schemas[cfg.type] || ({})
             values: cfg.values
             schemas: cfg.schemas
             objects: cfg.objects
@@ -99,7 +80,7 @@ ColumnLayout {
     Button {
         text: "Build"
         Layout.fillWidth: true
-        enabled: nameField.text.trim().length > 0 && cfg.currentType().length > 0
+        enabled: cfg.name().length > 0 && cfg.type.length > 0
         onClicked: cfg.buildNow()
     }
 

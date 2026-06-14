@@ -4,9 +4,11 @@ import QtQuick.Layouts 1.3
 import radapter 1.0
 
 // Schema-driven worker configurator window. The Lua side sends the worker schemas
-// (filtered to the supported families) over the data channel; this window feeds
-// them to a WorkerConfigurator and, when the user clicks "Build", emits the
-// resulting declare-compatible config back to Lua via radapter.model.send.
+// (filtered to the supported families); a drop-down picks which worker to create,
+// the WorkerConfigurator panel configures that single worker, and a live preview
+// shows just that worker's declarative config. "Build" sends the full (build-ready)
+// fragment back to Lua. The per-worker panel is what a multi-object graph editor
+// will later show when a node is selected.
 ApplicationWindow {
     id: root
     visible: true
@@ -24,6 +26,9 @@ ApplicationWindow {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
     }
+    function refreshPreview() {
+        root.lastJson = JSON.stringify(configurator.currentWorker(), null, 2)
+    }
     Component.onCompleted: radapter.model.received.connect(onMsg)
 
     ColumnLayout {
@@ -31,10 +36,17 @@ ApplicationWindow {
         anchors.margins: 10
         spacing: 8
 
-        Label {
-            text: "Configure a worker"
-            font.bold: true
-            font.pixelSize: 16
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Label { text: "Create worker"; font.bold: true }
+            ComboBox {
+                id: typeBox
+                Layout.fillWidth: true
+                model: root.pickable
+                onActivated: { configurator.type = currentText; root.refreshPreview() }
+                Component.onCompleted: if (count > 0) configurator.type = currentText
+            }
         }
 
         ScrollView {
@@ -47,14 +59,13 @@ ApplicationWindow {
                 id: configurator
                 width: scroll.availableWidth
                 schemas: root.schemas
-                types: root.pickable
-                // live preview: recompute on any edit
-                onChanged: root.lastJson = JSON.stringify(currentFragment(), null, 2)
+                type: typeBox.currentText
+                onChanged: root.refreshPreview()
                 onEmitted: radapter.model.send({ config: fragment })
             }
         }
 
-        Label { text: "Config preview"; font.bold: true }
+        Label { text: "Preview (this worker)"; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
             Layout.preferredHeight: 160
