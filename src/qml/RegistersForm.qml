@@ -60,9 +60,7 @@ ColumnLayout {
                 Layout.preferredWidth: 130
                 placeholderText: "pump_speed"
                 text: model.rname
-                // editingFinished can fire during delegate teardown (row removed while
-                // focused), when `index` is stale — skip if the row is already gone
-                onEditingFinished: { if (index < 0 || index >= rows.count) return; rows.setProperty(index, "rname", text); regForm.rebuild() }
+                onEditingFinished: { rows.setProperty(index, "rname", text); regForm.rebuild() }
             }
             ComboBox {
                 Layout.preferredWidth: 90
@@ -75,7 +73,7 @@ ColumnLayout {
                 placeholderText: "0"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.addr
-                onEditingFinished: { if (index < 0 || index >= rows.count) return; rows.setProperty(index, "addr", text); regForm.rebuild() }
+                onEditingFinished: { rows.setProperty(index, "addr", text); regForm.rebuild() }
             }
             ComboBox {
                 Layout.fillWidth: true
