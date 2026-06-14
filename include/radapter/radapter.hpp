@@ -34,6 +34,9 @@ void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction ope
 namespace detail {
 template<typename Cls, typename Ret, typename... Args>
 Cls* getcls(Ret(Cls::*)(Args...));
+
+template<typename T> struct is_tuple : std::false_type {};
+template<typename...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 }
 
 class Instance;
@@ -61,7 +64,13 @@ struct WorkerArguments
     }
 
     template<typename T>
-    operator T() { return ParseAs<T>(*this); }
+    operator T() {
+        if constexpr (detail::is_tuple<T>::value) {
+            return ParseAs<T>(QVariant(args));
+        } else {
+            return ParseAs<T>(*this);
+        }
+    }
 };
 
 template<typename T>

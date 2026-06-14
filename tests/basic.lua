@@ -84,6 +84,13 @@ assert(pipe(test_func, test_func) ~= test_func, "pipe(func) -> wrapper for func"
 
 -- Extra interop
 -- TestWorker:Call(func), calls func with 3 args
+local called = {}
 test:Call(function(a, b, c)
     log("{} - {} - {}", a, b, c)
+    called = {a, b, c}
 end)
+assert(called[1] == 1 and called[2] == 2 and called[3] == 3,
+    "Call must invoke the function with (1, 2, 3)")
+
+log "Basic test OK"
+shutdown()
