@@ -24,7 +24,6 @@ ColumnLayout {
     property var values: ({})      // this worker's config, filled by the form
     property string registeredName: ""  // the name this editor currently occupies
 
-    signal emitted(var fragment)
     signal changed()               // fires on any edit (name or a form field)
 
     function name() { return nameField.text.trim() }
@@ -67,7 +66,6 @@ ColumnLayout {
         register()
         return { objects: context ? context.objects : currentWorker() }
     }
-    function buildNow() { if (nameOk && cfg.type.length) emitted(currentFragment()) }
 
     // reset the form when the configured type changes
     onTypeChanged: { values = {}; register(); formLoader.reload(); changed() }
@@ -114,13 +112,6 @@ ColumnLayout {
             path: cfg.type + "."
             onChanged: cfg.changed()
         }
-    }
-
-    Button {
-        text: "Build"
-        Layout.fillWidth: true
-        enabled: cfg.nameOk && cfg.type.length > 0
-        onClicked: cfg.buildNow()
     }
 
     Component.onCompleted: formLoader.reload()

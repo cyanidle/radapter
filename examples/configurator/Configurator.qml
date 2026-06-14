@@ -6,7 +6,7 @@ import radapter 1.0
 // Schema-driven worker configurator window. The Lua side sends the worker schemas
 // (filtered to the supported families); a drop-down picks which worker to create,
 // the WorkerConfigurator panel configures that single worker, and a live preview
-// shows just that worker's declarative config. "Build" sends the full (build-ready)
+// shows the authored declarative config. Each edit sends the full (build-ready)
 // fragment back to Lua. The per-worker panel is what a multi-object graph editor
 // will later show when a node is selected.
 ApplicationWindow {
@@ -73,8 +73,10 @@ ApplicationWindow {
                 type: typeBox.currentText
                 context: sharedContext
                 customForms: root.formOverrides
-                onChanged: root.refreshPreview()
-                onEmitted: radapter.model.send({ config: fragment })
+                onChanged: {
+                    root.refreshPreview()
+                    radapter.model.send({ config: configurator.currentFragment() })
+                }
             }
         }
 
