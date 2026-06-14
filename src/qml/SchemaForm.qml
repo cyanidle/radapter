@@ -26,6 +26,10 @@ ColumnLayout {
     property var objects: []              // configured objects, for ref candidates
     property var exclude: ["name", "category"]
 
+    // fires on any edit anywhere in this form (incl. nested sub-forms), so a live
+    // preview can recompute `values`
+    signal changed()
+
     // ---- schema-shape helpers ----------------------------------------------
     readonly property var primitives: ["string", "bool", "int", "uint", "ushort",
         "ulong", "uchar", "qlonglong", "float32", "uuid", "function"]
@@ -45,7 +49,13 @@ ColumnLayout {
     function sortedKeys() {
         var ks = []
         for (var k in schema) if (exclude.indexOf(k) < 0 && leafBase(schema[k]) !== "function") ks.push(k)
-        ks.sort()
+        // required fields first, then alphabetical within each group
+        ks.sort(function (a, b) {
+            var ra = isRequired(schema[a]) ? 0 : 1
+            var rb = isRequired(schema[b]) ? 0 : 1
+            if (ra !== rb) return ra - rb
+            return a < b ? -1 : (a > b ? 1 : 0)
+        })
         return ks
     }
     // referencing `schema` keeps this reactive when the schema arrives/changes
@@ -62,8 +72,8 @@ ColumnLayout {
     }
 
     // ---- value helpers (mutate `values` in place) --------------------------
-    function setVal(key, v) { values[key] = v }
-    function clearVal(key)  { delete values[key] }
+    function setVal(key, v) { values[key] = v; changed() }
+    function clearVal(key)  { delete values[key]; changed() }
     function ensureObj(key) {
         if (!isObj(values[key])) values[key] = {}
         return values[key]
@@ -168,6 +178,7 @@ ColumnLayout {
                 item.schemas = form.schemas
                 item.objects = form.objects
                 item.exclude = []
+                item.changed.connect(form.changed)
             }
         }
     }
@@ -199,6 +210,7 @@ ColumnLayout {
             valueKey: fkey
             schemas: form.schemas
             objects: form.objects
+            onChanged: form.changed()
         }
     }
 
@@ -224,6 +236,7 @@ ColumnLayout {
                 var n = uniqueName()
                 map()[n] = {}
                 rows = rows.concat([{ k: n }])
+                form.changed()
             }
             function rename(i, nk) {
                 nk = (nk || "").trim()
@@ -231,10 +244,12 @@ ColumnLayout {
                 if (!nk.length || nk === ok || m[nk] !== undefined) return
                 m[nk] = m[ok]; delete m[ok]
                 var r = rows.slice(); r[i] = { k: nk }; rows = r
+                form.changed()
             }
             function removeRow(i) {
                 delete map()[rows[i].k]
                 rows = rows.filter(function (_, j) { return j !== i })
+                form.changed()
             }
 
             Repeater {
@@ -280,8 +295,8 @@ ColumnLayout {
                 if (!Array.isArray(form.values[fkey])) form.values[fkey] = []
                 return form.values[fkey]
             }
-            function addRow() { arr().push({}); count = arr().length }
-            function removeRow(i) { arr().splice(i, 1); count = arr().length }
+            function addRow() { arr().push({}); count = arr().length; form.changed() }
+            function removeRow(i) { arr().splice(i, 1); count = arr().length; form.changed() }
 
             Repeater {
                 model: listEd.count

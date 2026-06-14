@@ -16,6 +16,7 @@ ColumnLayout {
     property var objects: []       // configured objects, accumulated across builds
 
     signal emitted(var fragment)
+    signal changed()               // fires on any edit (type, name, or a form field)
 
     property var values: ({})      // the current worker's config, filled by the form
 
@@ -26,6 +27,16 @@ ColumnLayout {
     }
     function currentType() { return typeBox.currentText }
 
+    // the declare-compatible fragment for the current state (also used for preview)
+    function currentFragment() {
+        var objs = {}
+        for (var i = 0; i < objects.length; i++)
+            objs[objects[i].name] = { type: objects[i].type, config: objects[i].config }
+        var nm = nameField.text.trim() || "(unnamed)"
+        objs[nm] = { type: currentType(), config: values }
+        return { objects: objs }
+    }
+
     // imperative API (also handy for tests/automation)
     function selectType(name) {
         var i = typeNames().indexOf(name)
@@ -33,16 +44,12 @@ ColumnLayout {
         typeBox.currentIndex = i
         values = {}
         formLoader.reload()
+        changed()
     }
     function setName(name) { nameField.text = name }
     function buildNow() {
-        var nm = nameField.text.trim()
-        if (!nm.length || !currentType().length) return
-        var objs = {}
-        for (var i = 0; i < objects.length; i++)
-            objs[objects[i].name] = { type: objects[i].type, config: objects[i].config }
-        objs[nm] = { type: currentType(), config: values }
-        emitted({ objects: objs })
+        if (!nameField.text.trim().length || !currentType().length) return
+        emitted(currentFragment())
     }
 
     RowLayout {
@@ -53,7 +60,7 @@ ColumnLayout {
             id: typeBox
             Layout.fillWidth: true
             model: cfg.typeNames()
-            onActivated: { cfg.values = {}; formLoader.reload() }
+            onActivated: { cfg.values = {}; formLoader.reload(); cfg.changed() }
         }
     }
 
@@ -61,7 +68,12 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 6
         Label { text: "Name"; Layout.preferredWidth: 150 }
-        TextField { id: nameField; Layout.fillWidth: true; placeholderText: "my_worker" }
+        TextField {
+            id: nameField
+            Layout.fillWidth: true
+            placeholderText: "my_worker"
+            onTextChanged: cfg.changed()
+        }
     }
 
     Rectangle { Layout.fillWidth: true; height: 1; color: "#bbb" }
@@ -80,6 +92,7 @@ ColumnLayout {
             values: cfg.values
             schemas: cfg.schemas
             objects: cfg.objects
+            onChanged: cfg.changed()
         }
     }
 

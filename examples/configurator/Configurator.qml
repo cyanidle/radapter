@@ -48,14 +48,13 @@ ApplicationWindow {
                 width: scroll.availableWidth
                 schemas: root.schemas
                 types: root.pickable
-                onEmitted: {
-                    root.lastJson = JSON.stringify(fragment, null, 2)
-                    radapter.model.send({ config: fragment })
-                }
+                // live preview: recompute on any edit
+                onChanged: root.lastJson = JSON.stringify(currentFragment(), null, 2)
+                onEmitted: radapter.model.send({ config: fragment })
             }
         }
 
-        Label { text: "Emitted config"; font.bold: true }
+        Label { text: "Config preview"; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
             Layout.preferredHeight: 160

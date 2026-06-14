@@ -18,6 +18,8 @@ RowLayout {
     property var objects: []           // shared configured-objects collection
     property int rev: 0                // bumped to refresh candidate list
 
+    signal changed()                   // a reference was picked or a device created
+
     // which factory types satisfy a given opaque class
     readonly property var allowedMap: ({
         "radapter::modbus::MasterDevice": ["TcpModbusDevice", "RtuModbusDevice"],
@@ -38,7 +40,7 @@ RowLayout {
         model: ref.modelList()
         onActivated: {
             var cands = ref.candidates()
-            if (index < cands.length) ref.values[ref.valueKey] = { ref: cands[index] }
+            if (index < cands.length) { ref.values[ref.valueKey] = { ref: cands[index] }; ref.changed() }
             else newDialog.open()
         }
     }
@@ -61,6 +63,7 @@ RowLayout {
             ref.rev += 1
             ref.values[ref.valueKey] = { ref: nm }
             combo.currentIndex = ref.candidates().indexOf(nm)
+            ref.changed()
         }
 
         ColumnLayout {
