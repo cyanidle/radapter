@@ -139,6 +139,11 @@ public:
         }
         root->setParent(this);
     }
+    ~QMLWorker() override {
+        // tear the view (and its bindings) down first, so they don't re-evaluate
+        // against a half-destroyed `radapter`/model during teardown
+        delete root;
+    }
 	void OnMsg(QVariant const& msg) override {
         model->applyIncoming(msg);   // fires received() on the matching node(s)
     }
