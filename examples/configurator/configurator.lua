@@ -37,18 +37,11 @@ for _, name in ipairs(supported) do
     schemas[name] = assert(all[name], "missing schema for " .. name)
 end
 
--- Bespoke editors for complex fields the auto-generated form handles poorly.
--- Keyed by "<WorkerType>.<field>"; the value is a QML file (loaded by URL). This
--- is the extension point for richer configurators. lfs.currentdir() is the script
--- dir (radapter chdirs there), so we can hand QML absolute file:// URLs.
-local dir = lfs.currentdir()
-local registers_form = "file://" .. dir .. "/RegistersForm.qml"
-local queries_form = "file://" .. dir .. "/QueriesForm.qml"
-local custom_forms = {
-    ["ModbusMaster.registers"] = registers_form,
-    ["ModbusSlave.registers"] = registers_form,
-    ["ModbusMaster.queries"] = queries_form,
-}
+-- Bespoke editors for complex fields can be supplied per "<WorkerType>.<field>" as a
+-- QML file loaded by URL (the extension point for richer configurators). The Modbus
+-- register/query editors ship with radapter and SchemaForm applies them automatically,
+-- so none are needed here; pass extra ones via custom_forms if desired.
+local custom_forms = {}
 
 local view = QML {
     url = "./Configurator.qml",

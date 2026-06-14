@@ -2,12 +2,12 @@ import QtQuick 2.7
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 
-// Custom editor for a ModbusMaster `queries` vector. The auto-generated list-of-forms
-// is clumsy for a handful of identical rows, so this presents a flat table that compiles
-// into the declarative shape:
+// Built-in custom editor for a ModbusMaster `queries` vector. The auto-generated
+// list-of-forms is clumsy for a handful of identical rows, so this presents a flat table
+// that compiles into the declarative shape:
 //   [ { type, index, count }, ... ]
-// Wired in from Lua via the configurator's `customForms`. Contract for a custom field
-// editor:
+// SchemaForm applies it automatically for the queries field (see its builtinForms).
+// Contract for a custom field editor:
 //   properties: fkey, fschema, values, schemas, objects ; signal changed()
 //   it edits values[fkey] and emits changed() on every edit.
 ColumnLayout {
@@ -73,7 +73,9 @@ ColumnLayout {
                 text: model.cnt
                 onEditingFinished: { rows.setProperty(index, "cnt", text); qForm.rebuild() }
             }
-            Button { text: "✕"; implicitWidth: 32; onClicked: { rows.remove(index); qForm.rebuild() } }
+            // capture the root id before remove(): removing destroys this delegate, after
+            // which `qForm` no longer resolves through its (torn-down) context
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = qForm; rows.remove(index); f.rebuild() } }
         }
     }
 

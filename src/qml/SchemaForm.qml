@@ -33,6 +33,14 @@ ColumnLayout {
     property var customForms: ({})
     property string path: ""
 
+    // editors shipped with radapter for fields the auto-generated form handles poorly;
+    // applied automatically, but customForms (above) takes precedence
+    readonly property var builtinForms: ({
+        "ModbusMaster.registers": "qrc:/radapter/RegistersForm.qml",
+        "ModbusSlave.registers":  "qrc:/radapter/RegistersForm.qml",
+        "ModbusMaster.queries":   "qrc:/radapter/QueriesForm.qml",
+    })
+
     // fires on any edit anywhere in this form (incl. nested sub-forms), so a live
     // preview can recompute `values`
     signal changed()
@@ -77,8 +85,14 @@ ColumnLayout {
         if (leafBase(fs) === "bool") return boolComp
         return textComp
     }
+    function customFormFor(key) {
+        var p = path + key
+        if (customForms[p] !== undefined) return customForms[p]
+        if (builtinForms[p] !== undefined) return builtinForms[p]
+        return undefined
+    }
     function chooserFor(key, fs) {
-        if (customForms[path + key] !== undefined) return customComp
+        if (customFormFor(key) !== undefined) return customComp
         return chooser(fs)
     }
 
@@ -94,16 +108,26 @@ ColumnLayout {
         model: form.fieldKeys
         delegate: ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
+            Layout.topMargin: index > 0 ? 6 : 0
+            spacing: 4
             property string fkey: modelData
             property var fschema: form.schema[fkey]
+
+            // separator between fields
+            Rectangle {
+                visible: index > 0
+                Layout.fillWidth: true
+                Layout.bottomMargin: 4
+                implicitHeight: 1
+                color: "#e0e0e0"
+            }
 
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6
                 Label {
                     text: fkey
-                    font.bold: form.isRequired(fschema)
+                    font.bold: true
                     Layout.preferredWidth: 150
                     elide: Text.ElideRight
                 }
@@ -204,8 +228,8 @@ ColumnLayout {
             property string fkey
             property var fschema
             Layout.fillWidth: true
-            source: (fkey && form.customForms[form.path + fkey] !== undefined)
-                    ? form.customForms[form.path + fkey] : ""
+            source: (fkey && form.customFormFor(fkey) !== undefined)
+                    ? form.customFormFor(fkey) : ""
             onLoaded: {
                 item.fkey = fkey
                 item.fschema = fschema

@@ -49,7 +49,7 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         spacing: 6
-        Label { text: "Name"; Layout.preferredWidth: 150 }
+        Label { text: "Name"; font.bold: true; Layout.preferredWidth: 150 }
         TextField {
             id: nameField
             Layout.fillWidth: true

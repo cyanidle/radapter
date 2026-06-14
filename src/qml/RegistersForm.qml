@@ -2,12 +2,12 @@ import QtQuick 2.7
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 
-// Custom editor for a Modbus registers map (ModbusMaster/ModbusSlave `.registers`).
-// The auto-generated nested map-of-maps form is awkward to fill, so this presents a
-// flat table of rows that compiles into the nested declarative shape:
+// Built-in custom editor for a Modbus registers map (ModbusMaster/ModbusSlave
+// `.registers`). The auto-generated nested map-of-maps form is awkward to fill, so this
+// presents a flat table of rows that compiles into the nested declarative shape:
 //   { holding = { <name> = { index, type } }, coils = {...}, di = {...}, input = {...} }
-// It is wired in from Lua via the configurator's `customForms`, demonstrating how
-// complex fields get bespoke editors. Contract for a custom field editor:
+// SchemaForm applies it automatically for the registers field (see its builtinForms).
+// Contract for a custom field editor:
 //   properties: fkey, fschema, values, schemas, objects ; signal changed()
 //   it edits values[fkey] and emits changed() on every edit.
 ColumnLayout {
@@ -81,7 +81,9 @@ ColumnLayout {
                 Component.onCompleted: currentIndex = Math.max(0, regForm.dataTypes.indexOf(model.dataType))
                 onActivated: { rows.setProperty(index, "dataType", currentText); regForm.rebuild() }
             }
-            Button { text: "✕"; implicitWidth: 32; onClicked: { rows.remove(index); regForm.rebuild() } }
+            // capture the root id before remove(): removing destroys this delegate, after
+            // which `regForm` no longer resolves through its (torn-down) context
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = regForm; rows.remove(index); f.rebuild() } }
         }
     }
 
