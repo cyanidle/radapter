@@ -16,6 +16,7 @@ ColumnLayout {
     property var schemas: ({})     // every worker schema, keyed by type name
     property string type: ""       // the worker type to configure (set externally)
     property var objects: []       // shared configured objects (for device refs)
+    property var customForms: ({}) // per-field editor overrides (see SchemaForm)
 
     property var values: ({})      // this worker's config, filled by the form
 
@@ -73,6 +74,8 @@ ColumnLayout {
             values: cfg.values
             schemas: cfg.schemas
             objects: cfg.objects
+            customForms: cfg.customForms
+            path: cfg.type + "."
             onChanged: cfg.changed()
         }
     }

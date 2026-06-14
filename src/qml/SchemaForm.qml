@@ -26,6 +26,13 @@ ColumnLayout {
     property var objects: []              // configured objects, for ref candidates
     property var exclude: ["name", "category"]
 
+    // override editors for specific fields by dotted path (e.g.
+    // { "ModbusSlave.registers": "file:///.../RegistersForm.qml" }); `path` is the
+    // prefix for this (possibly nested) form, so a custom editor is chosen when
+    // customForms[path + fieldName] is set
+    property var customForms: ({})
+    property string path: ""
+
     // fires on any edit anywhere in this form (incl. nested sub-forms), so a live
     // preview can recompute `values`
     signal changed()
@@ -70,6 +77,10 @@ ColumnLayout {
         if (leafBase(fs) === "bool") return boolComp
         return textComp
     }
+    function chooserFor(key, fs) {
+        if (customForms[path + key] !== undefined) return customComp
+        return chooser(fs)
+    }
 
     // ---- value helpers (mutate `values` in place) --------------------------
     function setVal(key, v) { values[key] = v; changed() }
@@ -109,7 +120,7 @@ ColumnLayout {
 
             Loader {
                 Layout.fillWidth: true
-                sourceComponent: form.chooser(fschema)
+                sourceComponent: form.chooserFor(fkey, fschema)
                 onLoaded: { item.fkey = fkey; item.fschema = fschema }
             }
         }
@@ -171,6 +182,7 @@ ColumnLayout {
         Loader {
             property var nSchema
             property var nValues
+            property string nPath: ""
             source: Qt.resolvedUrl("SchemaForm.qml")
             onLoaded: {
                 item.schema = nSchema
@@ -178,7 +190,29 @@ ColumnLayout {
                 item.schemas = form.schemas
                 item.objects = form.objects
                 item.exclude = []
+                item.customForms = form.customForms
+                item.path = nPath
                 item.changed.connect(form.changed)
+            }
+        }
+    }
+
+    // a Lua-provided custom editor for a complex field; edits form.values[fkey]
+    Component {
+        id: customComp
+        Loader {
+            property string fkey
+            property var fschema
+            Layout.fillWidth: true
+            source: (fkey && form.customForms[form.path + fkey] !== undefined)
+                    ? form.customForms[form.path + fkey] : ""
+            onLoaded: {
+                item.fkey = fkey
+                item.fschema = fschema
+                item.values = form.values
+                item.schemas = form.schemas
+                item.objects = form.objects
+                if (item.changed) item.changed.connect(form.changed)
             }
         }
     }
@@ -192,8 +226,11 @@ ColumnLayout {
             Layout.fillWidth: true
             Loader {
                 anchors.left: parent.left; anchors.right: parent.right
+                // wait until the delegate has assigned fkey, else ensureObj("") would
+                // create a stray empty-keyed entry in values
+                active: fkey.length > 0
                 sourceComponent: subFormComp
-                onLoaded: { item.nSchema = fschema; item.nValues = form.ensureObj(fkey) }
+                onLoaded: { item.nSchema = fschema; item.nValues = form.ensureObj(fkey); item.nPath = form.path + fkey + "." }
             }
         }
     }
@@ -270,7 +307,7 @@ ColumnLayout {
                         Loader {
                             Layout.fillWidth: true
                             sourceComponent: subFormComp
-                            onLoaded: { item.nSchema = mapEd.elemSchema; item.nValues = mapEd.map()[mapEd.rows[index].k] }
+                            onLoaded: { item.nSchema = mapEd.elemSchema; item.nValues = mapEd.map()[mapEd.rows[index].k]; item.nPath = form.path + mapEd.fkey + "." }
                         }
                     }
                 }
@@ -312,7 +349,7 @@ ColumnLayout {
                         Loader {
                             Layout.fillWidth: true
                             sourceComponent: subFormComp
-                            onLoaded: { item.nSchema = listEd.elemSchema; item.nValues = listEd.arr()[index] }
+                            onLoaded: { item.nSchema = listEd.elemSchema; item.nValues = listEd.arr()[index]; item.nPath = form.path + listEd.fkey + "." }
                         }
                     }
                 }

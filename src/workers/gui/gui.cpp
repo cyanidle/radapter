@@ -13,11 +13,15 @@ namespace radapter::gui
 
 struct QMLConfig : WorkerConfig {
     QString url;
+    // extra values exposed to the QML as global context properties, e.g.
+    // QML { url=.., properties = { customForms = {...} } } -> `customForms` in QML
+    optional<QVariantMap> properties;
 };
 
 RAD_DESCRIBE(QMLConfig) {
     PARENT(WorkerConfig);
     MEMBER("url", &_::url);
+    MEMBER("properties", &_::properties);
 }
 
 static QMLConfig baseConfig(QVariantList const& args) {
@@ -132,6 +136,13 @@ public:
         } else {
             Parse(config, first);
             creator = new QQmlComponent(engine, config.url);
+        }
+        // expose Lua-provided values as global QML context properties (must be set
+        // before the component is created so bindings see them)
+        if (config.properties) {
+            for (auto it = config.properties->constBegin(); it != config.properties->constEnd(); ++it) {
+                ctx->setContextProperty(it.key(), it.value());
+            }
         }
         root = creator->create(ctx);
         if (!root) {

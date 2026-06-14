@@ -1,0 +1,92 @@
+import QtQuick 2.7
+import QtQuick.Controls 2.2
+import QtQuick.Layouts 1.3
+
+// Custom editor for a Modbus registers map (ModbusMaster/ModbusSlave `.registers`).
+// The auto-generated nested map-of-maps form is awkward to fill, so this presents a
+// flat table of rows that compiles into the nested declarative shape:
+//   { holding = { <name> = { index, type } }, coils = {...}, di = {...}, input = {...} }
+// It is wired in from Lua via the configurator's `customForms`, demonstrating how
+// complex fields get bespoke editors. Contract for a custom field editor:
+//   properties: fkey, fschema, values, schemas, objects ; signal changed()
+//   it edits values[fkey] and emits changed() on every edit.
+ColumnLayout {
+    id: regForm
+    spacing: 4
+
+    property string fkey
+    property var fschema
+    property var values: ({})
+    property var schemas: ({})
+    property var objects: []
+    signal changed()
+
+    readonly property var regTypes: ["holding", "coils", "di", "input"]
+    readonly property var dataTypes: ["uint16", "uint32", "float32"]
+
+    ListModel { id: rows }
+
+    // compile the table into values[fkey] and notify
+    function rebuild() {
+        var out = {}
+        for (var i = 0; i < rows.count; i++) {
+            var r = rows.get(i)
+            var nm = (r.rname || "").trim()
+            if (!nm.length) continue
+            if (!out[r.regType]) out[r.regType] = {}
+            var entry = { index: parseInt(r.addr, 10) || 0 }
+            if (r.dataType !== "uint16") entry.type = r.dataType
+            out[r.regType][nm] = entry
+        }
+        regForm.values[regForm.fkey] = out
+        regForm.changed()
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        Label { text: "Name"; font.bold: true; Layout.preferredWidth: 130 }
+        Label { text: "Type"; font.bold: true; Layout.preferredWidth: 90 }
+        Label { text: "Index"; font.bold: true; Layout.preferredWidth: 70 }
+        Label { text: "Data"; font.bold: true; Layout.fillWidth: true }
+        Item { Layout.preferredWidth: 32 }
+    }
+
+    Repeater {
+        model: rows
+        delegate: RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            TextField {
+                Layout.preferredWidth: 130
+                placeholderText: "pump_speed"
+                text: model.rname
+                onEditingFinished: { rows.setProperty(index, "rname", text); regForm.rebuild() }
+            }
+            ComboBox {
+                Layout.preferredWidth: 90
+                model: regForm.regTypes
+                Component.onCompleted: currentIndex = Math.max(0, regForm.regTypes.indexOf(model.regType))
+                onActivated: { rows.setProperty(index, "regType", currentText); regForm.rebuild() }
+            }
+            TextField {
+                Layout.preferredWidth: 70
+                placeholderText: "0"
+                inputMethodHints: Qt.ImhDigitsOnly
+                text: model.addr
+                onEditingFinished: { rows.setProperty(index, "addr", text); regForm.rebuild() }
+            }
+            ComboBox {
+                Layout.fillWidth: true
+                model: regForm.dataTypes
+                Component.onCompleted: currentIndex = Math.max(0, regForm.dataTypes.indexOf(model.dataType))
+                onActivated: { rows.setProperty(index, "dataType", currentText); regForm.rebuild() }
+            }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { rows.remove(index); regForm.rebuild() } }
+        }
+    }
+
+    Button {
+        text: "＋ Add register"
+        onClicked: rows.append({ rname: "", regType: "holding", addr: "0", dataType: "uint16" })
+    }
+}

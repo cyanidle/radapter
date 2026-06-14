@@ -18,6 +18,7 @@ ApplicationWindow {
 
     property var schemas: ({})
     property var pickable: []
+    property var formOverrides: ({})   // per-field custom editors, from Lua
     property string lastJson: ""
 
     // schemas arrive as a plain { schemas: {...} } message; received() delivers the
@@ -29,7 +30,11 @@ ApplicationWindow {
     function refreshPreview() {
         root.lastJson = JSON.stringify(configurator.currentWorker(), null, 2)
     }
-    Component.onCompleted: radapter.model.received.connect(onMsg)
+    Component.onCompleted: {
+        radapter.model.received.connect(onMsg)
+        // custom_forms is a global context property set from Lua (QML properties=...)
+        if (typeof custom_forms !== "undefined") root.formOverrides = custom_forms
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -60,6 +65,7 @@ ApplicationWindow {
                 width: scroll.availableWidth
                 schemas: root.schemas
                 type: typeBox.currentText
+                customForms: root.formOverrides
                 onChanged: root.refreshPreview()
                 onEmitted: radapter.model.send({ config: fragment })
             }

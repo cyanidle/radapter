@@ -37,8 +37,22 @@ for _, name in ipairs(supported) do
     schemas[name] = assert(all[name], "missing schema for " .. name)
 end
 
+-- Bespoke editors for complex fields the auto-generated form handles poorly.
+-- Keyed by "<WorkerType>.<field>"; the value is a QML file (loaded by URL). This
+-- is the extension point for richer configurators. lfs.currentdir() is the script
+-- dir (radapter chdirs there), so we can hand QML absolute file:// URLs.
+local dir = lfs.currentdir()
+local registers_form = "file://" .. dir .. "/RegistersForm.qml"
+local custom_forms = {
+    ["ModbusMaster.registers"] = registers_form,
+    ["ModbusSlave.registers"] = registers_form,
+}
+
 local view = QML {
     url = "./Configurator.qml",
+    properties = {
+        custom_forms = custom_forms,
+    },
 }
 
 -- restrict the type picker to the pickable set
