@@ -10,7 +10,8 @@ import QtQuick.Layouts 1.3
 // engine's defaults apply.
 //
 // Field shapes handled (see the chooser below):
-//   "string [optional]" / "ushort [has_default]" / "bool" ...  -> leaf editor
+//   "ushort [has_default]" / "bool" / "string" ...             -> leaf editor
+//   { ["[optional]"] = <schema> }                              -> optional wrapper, unwrapped
 //   ["json","msgpack"]                                         -> enum ComboBox
 //   { field = <schema>, ... }                                  -> nested SchemaForm
 //   { ["<key>"] = <schema> }                                   -> map editor
@@ -49,7 +50,11 @@ ColumnLayout {
     readonly property var primitives: ["string", "bool", "int", "uint", "ushort",
         "ulong", "uchar", "qlonglong", "float32", "uuid", "function"]
 
-    function isObj(fs)    { return fs !== null && typeof fs === "object" && !Array.isArray(fs) }
+    function isObj(fs)      { return fs !== null && typeof fs === "object" && !Array.isArray(fs) }
+    // optional fields come wrapped as { "[optional]": <inner schema> }; unwrap before
+    // dispatching so the inner shape (leaf/enum/object/map/vector/opaque) is rendered
+    function isOptional(fs) { return isObj(fs) && fs["[optional]"] !== undefined }
+    function unwrapOpt(fs)  { return isOptional(fs) ? fs["[optional]"] : fs }
     function isMap(fs)    { return isObj(fs) && fs["<key>"] !== undefined }
     function isVector(fs) { return Array.isArray(fs) && fs.length === 1 && isObj(fs[0]) }
     function isEnum(fs)   { return Array.isArray(fs) && !isVector(fs) }
@@ -63,7 +68,7 @@ ColumnLayout {
 
     function sortedKeys() {
         var ks = []
-        for (var k in schema) if (exclude.indexOf(k) < 0 && leafBase(schema[k]) !== "function") ks.push(k)
+        for (var k in schema) if (exclude.indexOf(k) < 0 && leafBase(unwrapOpt(schema[k])) !== "function") ks.push(k)
         // required fields first, then alphabetical within each group
         ks.sort(function (a, b) {
             var ra = isRequired(schema[a]) ? 0 : 1
@@ -111,7 +116,10 @@ ColumnLayout {
             Layout.topMargin: index > 0 ? 6 : 0
             spacing: 4
             property string fkey: modelData
-            property var fschema: form.schema[fkey]
+            property bool foptional: form.isOptional(form.schema[fkey])
+            // dispatch and editors see the unwrapped (inner) schema; optionality is
+            // carried separately in `foptional` for the hint label
+            property var fschema: form.unwrapOpt(form.schema[fkey])
 
             // separator between fields
             Rectangle {
@@ -132,12 +140,13 @@ ColumnLayout {
                     elide: Text.ElideRight
                 }
                 Label {
-                    visible: typeof fschema === "string"
-                    text: typeof fschema === "string"
-                          ? (form.leafAnno(fschema) ? "(" + form.leafAnno(fschema) + ")"
-                                                    : (form.isRequired(fschema) ? "required" : ""))
-                          : ""
-                    color: form.isRequired(fschema) ? "#b00" : "#888"
+                    visible: text.length > 0
+                    text: foptional ? "(optional)"
+                          : (typeof fschema === "string"
+                             ? (form.leafAnno(fschema) ? "(" + form.leafAnno(fschema) + ")"
+                                                       : (form.isRequired(fschema) ? "required" : ""))
+                             : "")
+                    color: (!foptional && form.isRequired(fschema)) ? "#b00" : "#888"
                     font.pixelSize: 11
                 }
             }
@@ -145,7 +154,10 @@ ColumnLayout {
             Loader {
                 Layout.fillWidth: true
                 sourceComponent: form.chooserFor(fkey, fschema)
-                onLoaded: { item.fkey = fkey; item.fschema = fschema }
+                onLoaded: {
+                    item.fkey = fkey; item.fschema = fschema
+                    if (item.foptional !== undefined) item.foptional = foptional
+                }
             }
         }
     }
@@ -188,14 +200,23 @@ ColumnLayout {
         ComboBox {
             property string fkey
             property var fschema
+            // optional enums get a leading "(none)" entry so the field can stay unset
+            // (engine default); selecting it clears the value
+            property bool foptional: false
             Layout.fillWidth: true
-            model: fschema
+            model: fschema ? (foptional ? ["(none)"].concat(fschema) : fschema) : []
             // show a previously-set value if any; reactive so it resolves once the
             // Loader assigns fschema. Leave `values` unset until the user picks, so
             // engine defaults apply to untouched fields.
-            currentIndex: (fschema && form.values[fkey] !== undefined)
-                          ? Math.max(0, fschema.indexOf(form.values[fkey])) : 0
-            onActivated: form.setVal(fkey, currentText)
+            currentIndex: {
+                if (!fschema || form.values[fkey] === undefined) return 0
+                var i = fschema.indexOf(form.values[fkey])
+                return foptional ? i + 1 : i
+            }
+            onActivated: {
+                if (foptional && currentIndex === 0) form.clearVal(fkey)
+                else form.setVal(fkey, currentText)
+            }
         }
     }
 
