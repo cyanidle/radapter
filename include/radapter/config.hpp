@@ -402,11 +402,7 @@ template<typename T>
 void PopulateSchema(std::optional<T>& in, QVariant& schema) {
     QVariant nested;
     PopulateSchema(in.emplace(), nested);
-    if (nested.canConvert<QString>()) {
-        schema = nested.toString() + " [optional]";
-    } else {
-        schema = nested;
-    }
+    schema = QVariantMap{{"[optional]", nested}};
 }
 
 template<typename T>
