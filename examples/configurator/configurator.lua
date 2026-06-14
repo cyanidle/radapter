@@ -43,9 +43,11 @@ end
 -- dir (radapter chdirs there), so we can hand QML absolute file:// URLs.
 local dir = lfs.currentdir()
 local registers_form = "file://" .. dir .. "/RegistersForm.qml"
+local queries_form = "file://" .. dir .. "/QueriesForm.qml"
 local custom_forms = {
     ["ModbusMaster.registers"] = registers_form,
     ["ModbusSlave.registers"] = registers_form,
+    ["ModbusMaster.queries"] = queries_form,
 }
 
 local view = QML {

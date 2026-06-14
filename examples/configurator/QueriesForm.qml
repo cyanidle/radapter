@@ -1,0 +1,84 @@
+import QtQuick 2.7
+import QtQuick.Controls 2.2
+import QtQuick.Layouts 1.3
+
+// Custom editor for a ModbusMaster `queries` vector. The auto-generated list-of-forms
+// is clumsy for a handful of identical rows, so this presents a flat table that compiles
+// into the declarative shape:
+//   [ { type, index, count }, ... ]
+// Wired in from Lua via the configurator's `customForms`. Contract for a custom field
+// editor:
+//   properties: fkey, fschema, values, schemas, objects ; signal changed()
+//   it edits values[fkey] and emits changed() on every edit.
+ColumnLayout {
+    id: qForm
+    spacing: 4
+
+    property string fkey
+    property var fschema
+    property var values: ({})
+    property var schemas: ({})
+    property var objects: []
+    signal changed()
+
+    readonly property var queryTypes: ["holding", "coil", "di", "discrete_input", "input"]
+
+    ListModel { id: rows }
+
+    // compile the table into values[fkey] (an array) and notify
+    function rebuild() {
+        var out = []
+        for (var i = 0; i < rows.count; i++) {
+            var r = rows.get(i)
+            out.push({
+                type: r.qtype,
+                index: parseInt(r.addr, 10) || 0,
+                count: parseInt(r.cnt, 10) || 1
+            })
+        }
+        qForm.values[qForm.fkey] = out
+        qForm.changed()
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        Label { text: "Type"; font.bold: true; Layout.preferredWidth: 130 }
+        Label { text: "Index"; font.bold: true; Layout.preferredWidth: 90 }
+        Label { text: "Count"; font.bold: true; Layout.fillWidth: true }
+        Item { Layout.preferredWidth: 32 }
+    }
+
+    Repeater {
+        model: rows
+        delegate: RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            ComboBox {
+                Layout.preferredWidth: 130
+                model: qForm.queryTypes
+                Component.onCompleted: currentIndex = Math.max(0, qForm.queryTypes.indexOf(model.qtype))
+                onActivated: { rows.setProperty(index, "qtype", currentText); qForm.rebuild() }
+            }
+            TextField {
+                Layout.preferredWidth: 90
+                placeholderText: "0"
+                inputMethodHints: Qt.ImhDigitsOnly
+                text: model.addr
+                onEditingFinished: { rows.setProperty(index, "addr", text); qForm.rebuild() }
+            }
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: "1"
+                inputMethodHints: Qt.ImhDigitsOnly
+                text: model.cnt
+                onEditingFinished: { rows.setProperty(index, "cnt", text); qForm.rebuild() }
+            }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { rows.remove(index); qForm.rebuild() } }
+        }
+    }
+
+    Button {
+        text: "＋ Add query"
+        onClicked: rows.append({ qtype: "holding", addr: "0", cnt: "1" })
+    }
+}

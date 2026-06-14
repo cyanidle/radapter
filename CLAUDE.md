@@ -75,6 +75,9 @@ slave/master loopback, services, worker naming). `tests/modbus_loopback.lua` is 
 ModbusSlave <-> ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pipe/get/set);
 `tests/tags.lua` covers the tag system (run with `--tags`).
 
+When writing a short test/`-e` snippet, always end it with `shutdown()` — otherwise the
+event loop keeps running and the process hangs instead of exiting on success.
+
 **Examples (`examples/`)** are documentation-grade demos; most need live hardware/services:
 `modbus.lua` (a Modbus TCP device on :1502), `redis.lua` (a Redis server),
 `serial/serial.lua` (a serial port arg), `can.lua`/`cyphal.lua` (a CAN interface — see
