@@ -55,18 +55,3 @@ view {
     schemas = schemas,
     pickable = pickable,
 }
-
--- receive the built config fragment ({ objects = { ... } }) and act on it
-pipe(view, unwrap("config"), function(cfg)
-    log.info("Built config: {}", json_encode(cfg))
-    local ok, err = pcall(function() declare.build(cfg) end)
-    if ok then
-        log.info("Instantiated {} object(s)", (function()
-            local n = 0
-            for _ in pairs(cfg.objects or {}) do n = n + 1 end
-            return n
-        end)())
-    else
-        log.error("Could not build config: {}", err)
-    end
-end)

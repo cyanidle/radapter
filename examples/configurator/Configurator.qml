@@ -75,7 +75,6 @@ ApplicationWindow {
                 customForms: root.formOverrides
                 onChanged: {
                     root.refreshPreview()
-                    radapter.model.send({ config: configurator.currentFragment() })
                 }
             }
         }
