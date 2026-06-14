@@ -34,9 +34,7 @@ ColumnLayout {
             var nm = (r.rname || "").trim()
             if (!nm.length) continue
             if (!out[r.regType]) out[r.regType] = {}
-            var entry = { index: parseInt(r.addr, 10) || 0 }
-            if (r.dataType !== "uint16") entry.type = r.dataType
-            out[r.regType][nm] = entry
+            out[r.regType][nm] = { index: parseInt(r.addr, 10) || 0, type: r.dataType }
         }
         regForm.values[regForm.fkey] = out
         regForm.changed()
