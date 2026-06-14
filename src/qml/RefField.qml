@@ -57,7 +57,10 @@ RowLayout {
             return ""
         }
 
-        onOpened: { devValues = {}; nameField.text = ""; typeBox.currentIndex = 0; subLoader.reload() }
+        // the standard button box may not exist yet when nameError first changes
+        function syncOk() { var b = standardButton(Dialog.Ok); if (b) b.enabled = (nameError.length === 0) }
+
+        onOpened: { devValues = {}; nameField.text = ""; typeBox.currentIndex = 0; subLoader.reload(); syncOk() }
         onAccepted: {
             var nm = nameField.text.trim()
             ref.context.put(nm, typeBox.currentText, devValues)
@@ -65,8 +68,8 @@ RowLayout {
             combo.currentIndex = ref.candidates().indexOf(nm)
             ref.changed()
         }
-        Component.onCompleted: standardButton(Dialog.Ok).enabled = false
-        onNameErrorChanged: standardButton(Dialog.Ok).enabled = (nameError.length === 0)
+        Component.onCompleted: syncOk()
+        onNameErrorChanged: syncOk()
 
         ColumnLayout {
             anchors.fill: parent
