@@ -8,7 +8,7 @@ import QtQuick.Layouts 1.3
 //   [ { type, index, count }, ... ]
 // SchemaForm applies it automatically for the queries field (see its builtinForms).
 // Contract for a custom field editor:
-//   properties: fkey, fschema, values, schemas, objects ; signal changed()
+//   properties: fkey, fschema, values, schemas, context ; signal changed()
 //   it edits values[fkey] and emits changed() on every edit.
 ColumnLayout {
     id: qForm
@@ -18,7 +18,7 @@ ColumnLayout {
     property var fschema
     property var values: ({})
     property var schemas: ({})
-    property var objects: []
+    property var context: null
     signal changed()
 
     readonly property var queryTypes: ["holding", "coil", "di", "discrete_input", "input"]

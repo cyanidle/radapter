@@ -23,7 +23,7 @@ ColumnLayout {
     property var schema: ({})
     property var values: ({})
     property var schemas: ({})            // every worker schema, for ref sub-forms
-    property var objects: []              // configured objects, for ref candidates
+    property var context: null            // shared ConfigContext, for ref candidates
     property var exclude: ["name", "category"]
 
     // override editors for specific fields by dotted path (e.g.
@@ -212,7 +212,7 @@ ColumnLayout {
                 item.schema = nSchema
                 item.values = nValues
                 item.schemas = form.schemas
-                item.objects = form.objects
+                item.context = form.context
                 item.exclude = []
                 item.customForms = form.customForms
                 item.path = nPath
@@ -235,7 +235,7 @@ ColumnLayout {
                 item.fschema = fschema
                 item.values = form.values
                 item.schemas = form.schemas
-                item.objects = form.objects
+                item.context = form.context
                 if (item.changed) item.changed.connect(form.changed)
             }
         }
@@ -270,7 +270,7 @@ ColumnLayout {
             values: form.values
             valueKey: fkey
             schemas: form.schemas
-            objects: form.objects
+            context: form.context
             onChanged: form.changed()
         }
     }

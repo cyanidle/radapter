@@ -5,8 +5,8 @@ import QtQuick.Layouts 1.3
 // Editor for an opaque-object config field (e.g. a Modbus master's `device`). In
 // the declarative model such a field is a reference: { ref = "<object name>" }.
 // Pick an already-configured object of a compatible type, or build a new one via
-// a dialog driven by that type's own schema. New objects are appended to the
-// shared `objects` collection so the emitted config carries them too.
+// a dialog driven by that type's own schema. New objects are added to the shared
+// ConfigContext so the emitted config carries them and their names stay unique.
 RowLayout {
     id: ref
     spacing: 6
@@ -15,8 +15,7 @@ RowLayout {
     property var values: ({})          // parent config object to write into
     property string valueKey           // field name in `values`
     property var schemas: ({})         // every worker schema (for the new-object form)
-    property var objects: []           // shared configured-objects collection
-    property int rev: 0                // bumped to refresh candidate list
+    property var context: null         // shared ConfigContext (configured objects)
 
     signal changed()                   // a reference was picked or a device created
 
@@ -26,13 +25,9 @@ RowLayout {
         "radapter::modbus::SlaveDevice":  ["TcpModbusServer", "RtuModbusServer"]
     })
     function allowedTypes() { return allowedMap[className] || Object.keys(schemas) }
-    function candidates() {
-        var t = allowedTypes(), out = []
-        for (var i = 0; i < objects.length; i++)
-            if (t.indexOf(objects[i].type) >= 0) out.push(objects[i].name)
-        return out
-    }
-    function modelList() { return (rev >= 0 ? candidates() : []).concat(["＋ New…"]) }
+    function candidates() { return context ? context.ofTypes(allowedTypes()) : [] }
+    // read context.revision so the model refreshes when objects change
+    function modelList() { return ((context ? context.revision : 0) >= 0 ? candidates() : []).concat(["＋ New…"]) }
 
     ComboBox {
         id: combo
@@ -54,17 +49,24 @@ RowLayout {
         x: (ApplicationWindow.window ? ApplicationWindow.window.width - width : 0) / 2
         y: 40
         property var devValues: ({})
+        readonly property string nameError: {
+            var n = nameField.text.trim()
+            var _rev = ref.context ? ref.context.revision : 0
+            if (!n.length) return "Name is required"
+            if (ref.context && ref.context.has(n)) return "Name already in use"
+            return ""
+        }
 
         onOpened: { devValues = {}; nameField.text = ""; typeBox.currentIndex = 0; subLoader.reload() }
         onAccepted: {
             var nm = nameField.text.trim()
-            if (!nm.length) return
-            ref.objects.push({ name: nm, type: typeBox.currentText, config: devValues })
-            ref.rev += 1
+            ref.context.put(nm, typeBox.currentText, devValues)
             ref.values[ref.valueKey] = { ref: nm }
             combo.currentIndex = ref.candidates().indexOf(nm)
             ref.changed()
         }
+        Component.onCompleted: standardButton(Dialog.Ok).enabled = false
+        onNameErrorChanged: standardButton(Dialog.Ok).enabled = (nameError.length === 0)
 
         ColumnLayout {
             anchors.fill: parent
@@ -74,7 +76,17 @@ RowLayout {
                 Layout.fillWidth: true
                 columnSpacing: 8
                 Label { text: "Name" }
-                TextField { id: nameField; Layout.fillWidth: true; placeholderText: "plc1" }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+                    TextField { id: nameField; Layout.fillWidth: true; placeholderText: "plc1" }
+                    Label {
+                        text: newDialog.nameError
+                        visible: newDialog.nameError.length > 0
+                        color: "#b00"
+                        font.pixelSize: 11
+                    }
+                }
                 Label { text: "Type" }
                 ComboBox {
                     id: typeBox
@@ -100,7 +112,7 @@ RowLayout {
                         item.schema = ref.schemas[typeBox.currentText] || ({})
                         item.values = newDialog.devValues
                         item.schemas = ref.schemas
-                        item.objects = ref.objects
+                        item.context = ref.context
                     }
                 }
             }

@@ -27,11 +27,17 @@ ApplicationWindow {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
     }
+    // shared authoring state: all WorkerConfigurators (here just one, but the multi-node
+    // editor will host many) register their workers/devices here, keeping names unique.
+    ConfigContext { id: sharedContext }
+
     function refreshPreview() {
-        root.lastJson = JSON.stringify(configurator.currentWorker(), null, 2)
+        var _rev = sharedContext.revision   // re-run when the shared set changes
+        root.lastJson = JSON.stringify(sharedContext.objects, null, 2)
     }
     Component.onCompleted: {
         radapter.model.received.connect(onMsg)
+        sharedContext.changed.connect(refreshPreview)
         // custom_forms is a global context property set from Lua (QML properties=...)
         if (typeof custom_forms !== "undefined") root.formOverrides = custom_forms
     }
@@ -65,13 +71,14 @@ ApplicationWindow {
                 width: scroll.availableWidth
                 schemas: root.schemas
                 type: typeBox.currentText
+                context: sharedContext
                 customForms: root.formOverrides
                 onChanged: root.refreshPreview()
                 onEmitted: radapter.model.send({ config: fragment })
             }
         }
 
-        Label { text: "Preview (this worker)"; font.bold: true }
+        Label { text: "Preview (all objects)"; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
             Layout.preferredHeight: 160
