@@ -30,6 +30,8 @@ static std::vector<std::string> g_argv;
 // a reload that is already in flight.
 static bool g_reloading = false;
 
+static bool g_exited = false;
+
 // Replace the running process image with a fresh launch of the (possibly
 // rebuilt) executable. POSIX only; returns only on failure.
 static void reexec() {
@@ -88,6 +90,14 @@ public:
 
         QObject::connect(inst, &radapter::Instance::ShutdownDone, this, &QObject::deleteLater);
 
+        QObject::connect(inst, &radapter::Instance::ShutdownDone, []{
+            if (!g_reloading)
+            {
+                g_exited = true;
+                qApp->quit();
+            }
+        });
+
         QObject::connect(config->sigs, &QCtrlSignalHandler::sigInt, this, [this]{
             sigint = true;
             shutdown();
@@ -136,19 +146,16 @@ public:
         }
         if (config->listener) {
             QObject::connect(config->listener, &Listener::FileChanged, this, [this] {
-                if (g_reloading) return;          // a reload is already in flight
+                if (g_reloading)
+                    return;
                 g_reloading = true;
-                // release the guard (and retry on the next change) if the reload
-                // bails out, e.g. because the pre-reload command failed
-                if (!reload()) g_reloading = false;
+                if (!reload())
+                    g_reloading = false;
             });
-        } else {
-            QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
         }
     }
 
     void shutdown() {
-        QObject::connect(inst, &radapter::Instance::ShutdownDone, qApp, &QCoreApplication::quit, Qt::UniqueConnection);
         inst->Shutdown(sigterm ? 500 : 5000);
         return;
     }
@@ -165,9 +172,11 @@ public:
         bool execMode = config->cli["reload-exec"] == true;
         std::cerr << (execMode ? "# Restart..." : "# Hot reload...") << std::endl;
         QObject::connect(inst, &QObject::destroyed, [config = config, execMode]{
-            if (execMode) reexec();   // on success the image is replaced and never returns
+            if (execMode)
+                reexec();   // on success the image is replaced and never returns
             try {
                 new AppState{config};
+                config->listener->elapsed.restart();
                 std::cerr << "# Hot reload done." << std::endl;
             } catch (std::exception& e) {
                 std::cerr << "# Hot reload error: " << e.what() << std::endl;
@@ -313,7 +322,7 @@ int main (int argc, char **argv) try {
         watcher->watch();
     }
 
-    return app->exec();
+    return g_exited ? 0 : app->exec();
 } catch (std::exception& exc) {
     std::cerr << "Critical: " << exc.what() << std::endl;
     return 1;
