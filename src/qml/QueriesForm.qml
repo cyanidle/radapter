@@ -53,13 +53,15 @@ ColumnLayout {
         delegate: RowLayout {
             Layout.fillWidth: true
             spacing: 4
-            // alias the delegate row index: ComboBox.onActivated(index) shadows the
-            // context `index` with the activated item's index
+            // capture index + the combo role here, where the delegate's `model` context
+            // isn't shadowed: inside a ComboBox `model` is its own item model, and
+            // `onActivated(index)` shadows the context index with the activated item's
             property int row: index
+            property string qtypeRole: model.qtype
             ComboBox {
                 Layout.preferredWidth: 130
                 model: qForm.queryTypes
-                Component.onCompleted: currentIndex = Math.max(0, qForm.queryTypes.indexOf(model.qtype))
+                currentIndex: Math.max(0, qForm.queryTypes.indexOf(qtypeRole))
                 onActivated: { rows.setProperty(row, "qtype", currentText); qForm.rebuild() }
             }
             TextField {

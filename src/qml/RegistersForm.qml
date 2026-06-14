@@ -56,9 +56,12 @@ ColumnLayout {
         delegate: RowLayout {
             Layout.fillWidth: true
             spacing: 4
-            // alias the delegate row index: ComboBox.onActivated(index) shadows the
-            // context `index` with the activated item's index
+            // capture index + the combo roles here, where the delegate's `model` context
+            // isn't shadowed: inside a ComboBox `model` is its own item model, and
+            // `onActivated(index)` shadows the context index with the activated item's
             property int row: index
+            property string regTypeRole: model.regType
+            property string dataTypeRole: model.dataType
             TextField {
                 Layout.preferredWidth: 130
                 placeholderText: "pump_speed"
@@ -68,7 +71,7 @@ ColumnLayout {
             ComboBox {
                 Layout.preferredWidth: 90
                 model: regForm.regTypes
-                Component.onCompleted: currentIndex = Math.max(0, regForm.regTypes.indexOf(model.regType))
+                currentIndex: Math.max(0, regForm.regTypes.indexOf(regTypeRole))
                 onActivated: { rows.setProperty(row, "regType", currentText); regForm.rebuild() }
             }
             TextField {
@@ -81,7 +84,7 @@ ColumnLayout {
             ComboBox {
                 Layout.fillWidth: true
                 model: regForm.dataTypes
-                Component.onCompleted: currentIndex = Math.max(0, regForm.dataTypes.indexOf(model.dataType))
+                currentIndex: Math.max(0, regForm.dataTypes.indexOf(dataTypeRole))
                 onActivated: { rows.setProperty(row, "dataType", currentText); regForm.rebuild() }
             }
             // capture the root id before remove(): removing destroys this delegate, after
