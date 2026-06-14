@@ -53,6 +53,19 @@ static int _gen_id(lua_State* L) {
     return 1;
 }
 
+// schema()            -> table of every worker's config schema (as --schema prints)
+// schema("RedisCache") -> that worker's schema, or nil
+static int lua_schema(lua_State* L) {
+    auto all = Instance::FromLua(L)->GetSchemas();
+    if (lua_type(L, 1) == LUA_TSTRING) {
+        auto it = all.find(QString::fromUtf8(lua_tostring(L, 1)));
+        glua::Push(L, it == all.end() ? QVariant{} : *it);
+    } else {
+        glua::Push(L, all);
+    }
+    return 1;
+}
+
 Instance::Instance(QObject *parent) :
     QObject(parent),
     d(new Impl)
@@ -106,6 +119,7 @@ Instance::Instance(QObject *parent) :
     lua_register(L, "after", glua::protect<builtin::api::After>);
     lua_register(L, "get", glua::protect<builtin::api::Get>);
     lua_register(L, "set", glua::protect<builtin::api::Set>);
+    lua_register(L, "schema", glua::protect<lua_schema>);
     lua_register(L, "load_plugin", glua::protect<builtin::api::LoadPlugin>);
 
     lua_newtable(L);

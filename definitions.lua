@@ -3,6 +3,10 @@
 ---@param path string
 function load_plugin(path, ...) end
 
+---@param name string?
+---@return table
+function schema(name) end
+
 ---@param table table
 ---@param key string
 ---@param sep string?

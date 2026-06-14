@@ -1,2 +1,5 @@
 module radapter
 ModbusTable 1.0 ModbusTable.qml
+SchemaForm 1.0 SchemaForm.qml
+RefField 1.0 RefField.qml
+WorkerConfigurator 1.0 WorkerConfigurator.qml
