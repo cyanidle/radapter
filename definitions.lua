@@ -3,9 +3,12 @@
 ---@param path string
 function load_plugin(path, ...) end
 
----@param name string?
+---Config schema of registered workers (as printed by `--schema`). No args -> a
+---map of every worker; one name -> that worker's schema (or nil); several names
+----> a map of just those.
+---@param ... string
 ---@return table
-function schema(name) end
+function schema(...) end
 
 ---@param table table
 ---@param key string

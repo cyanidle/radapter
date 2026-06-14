@@ -53,15 +53,20 @@ static int _gen_id(lua_State* L) {
     return 1;
 }
 
-// schema()            -> table of every worker's config schema (as --schema prints)
-// schema("RedisCache") -> that worker's schema, or nil
+// schema()                  -> table of every worker's config schema (as --schema prints)
+// schema("RedisCache")       -> that worker's schema, or nil
+// schema("RedisCache","Sql") -> map of just the named workers' schemas
 static int lua_schema(lua_State* L) {
-    auto all = Instance::FromLua(L)->GetSchemas();
-    if (lua_type(L, 1) == LUA_TSTRING) {
-        auto it = all.find(QString::fromUtf8(lua_tostring(L, 1)));
-        glua::Push(L, it == all.end() ? QVariant{} : *it);
+    QStringList only;
+    for (int i = 1, n = lua_gettop(L); i <= n; ++i) {
+        if (lua_type(L, i) == LUA_TSTRING) only << QString::fromUtf8(lua_tostring(L, i));
+    }
+    auto res = Instance::FromLua(L)->GetSchemas(only);
+    if (only.size() == 1) {
+        auto it = res.find(only.front());
+        glua::Push(L, it == res.end() ? QVariant{} : *it);
     } else {
-        glua::Push(L, all);
+        glua::Push(L, res);
     }
     return 1;
 }
@@ -205,11 +210,14 @@ Instance *Instance::FromLua(lua_State *L)
     return static_cast<Instance*>(res);
 }
 
-QVariantMap Instance::GetSchemas()
+QVariantMap Instance::GetSchemas(QStringList const& only)
 {
     QVariantMap res;
     for (auto& [k, v]: d->schemas) {
-        res[QString::fromStdString(k)] = v();
+        auto key = QString::fromStdString(k);
+        if (only.isEmpty() || only.contains(key)) {
+            res[key] = v();
+        }
     }
     return res;
 }

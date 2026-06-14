@@ -121,7 +121,8 @@ public:
         RegisterSchema(name, SchemaFor<T>);
     }
 
-    QVariantMap GetSchemas();
+    // schemas of all registered workers, or only the named ones when `only` is non-empty
+    QVariantMap GetSchemas(QStringList const& only = {});
     QSet<Worker*> GetWorkers();
     Worker* GetWorker(QString const& name);
 

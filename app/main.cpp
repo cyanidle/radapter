@@ -105,8 +105,12 @@ public:
             inst->EnableTags();
         }
 
-        if (config->cli["schema"] == true) {
-            std::cerr << QJsonDocument::fromVariant(inst->GetSchemas()).toJson().toStdString() << std::endl;
+        if (config->cli.is_used("schema")) {
+            QStringList only;
+            for (auto& n: config->cli.get<std::vector<std::string>>("schema")) {
+                only << QString::fromStdString(n);
+            }
+            std::cerr << QJsonDocument::fromVariant(inst->GetSchemas(only)).toJson().toStdString() << std::endl;
             std::exit(0);
         }
 
@@ -245,8 +249,9 @@ int main (int argc, char **argv) try {
               "the instance in-process (POSIX only); picks up changes baked into "
               "the executable such as embedded QML/scripts");
     cli.add_argument("--schema")
-        .flag()
-        .help("Print config schema");
+        .nargs(argparse::nargs_pattern::any)
+        .default_value(std::vector<std::string>{})
+        .help("Print config schema (optionally only for the given worker names)");
     cli.add_argument("--tags")
         .flag()
         .help("Enable the tag registry (tags.subscribe/get/source/changed)");
