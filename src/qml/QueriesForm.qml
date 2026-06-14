@@ -53,29 +53,32 @@ ColumnLayout {
         delegate: RowLayout {
             Layout.fillWidth: true
             spacing: 4
+            // alias the delegate row index: ComboBox.onActivated(index) shadows the
+            // context `index` with the activated item's index
+            property int row: index
             ComboBox {
                 Layout.preferredWidth: 130
                 model: qForm.queryTypes
                 Component.onCompleted: currentIndex = Math.max(0, qForm.queryTypes.indexOf(model.qtype))
-                onActivated: { rows.setProperty(index, "qtype", currentText); qForm.rebuild() }
+                onActivated: { rows.setProperty(row, "qtype", currentText); qForm.rebuild() }
             }
             TextField {
                 Layout.preferredWidth: 90
                 placeholderText: "0"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.addr
-                onEditingFinished: { rows.setProperty(index, "addr", text); qForm.rebuild() }
+                onEditingFinished: { rows.setProperty(row, "addr", text); qForm.rebuild() }
             }
             TextField {
                 Layout.fillWidth: true
                 placeholderText: "1"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.cnt
-                onEditingFinished: { rows.setProperty(index, "cnt", text); qForm.rebuild() }
+                onEditingFinished: { rows.setProperty(row, "cnt", text); qForm.rebuild() }
             }
             // capture the root id before remove(): removing destroys this delegate, after
             // which `qForm` no longer resolves through its (torn-down) context
-            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = qForm; rows.remove(index); f.rebuild() } }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = qForm; rows.remove(row); f.rebuild() } }
         }
     }
 

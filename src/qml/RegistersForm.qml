@@ -56,34 +56,37 @@ ColumnLayout {
         delegate: RowLayout {
             Layout.fillWidth: true
             spacing: 4
+            // alias the delegate row index: ComboBox.onActivated(index) shadows the
+            // context `index` with the activated item's index
+            property int row: index
             TextField {
                 Layout.preferredWidth: 130
                 placeholderText: "pump_speed"
                 text: model.rname
-                onEditingFinished: { rows.setProperty(index, "rname", text); regForm.rebuild() }
+                onEditingFinished: { rows.setProperty(row, "rname", text); regForm.rebuild() }
             }
             ComboBox {
                 Layout.preferredWidth: 90
                 model: regForm.regTypes
                 Component.onCompleted: currentIndex = Math.max(0, regForm.regTypes.indexOf(model.regType))
-                onActivated: { rows.setProperty(index, "regType", currentText); regForm.rebuild() }
+                onActivated: { rows.setProperty(row, "regType", currentText); regForm.rebuild() }
             }
             TextField {
                 Layout.preferredWidth: 70
                 placeholderText: "0"
                 inputMethodHints: Qt.ImhDigitsOnly
                 text: model.addr
-                onEditingFinished: { rows.setProperty(index, "addr", text); regForm.rebuild() }
+                onEditingFinished: { rows.setProperty(row, "addr", text); regForm.rebuild() }
             }
             ComboBox {
                 Layout.fillWidth: true
                 model: regForm.dataTypes
                 Component.onCompleted: currentIndex = Math.max(0, regForm.dataTypes.indexOf(model.dataType))
-                onActivated: { rows.setProperty(index, "dataType", currentText); regForm.rebuild() }
+                onActivated: { rows.setProperty(row, "dataType", currentText); regForm.rebuild() }
             }
             // capture the root id before remove(): removing destroys this delegate, after
             // which `regForm` no longer resolves through its (torn-down) context
-            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = regForm; rows.remove(index); f.rebuild() } }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = regForm; rows.remove(row); f.rebuild() } }
         }
     }
 
