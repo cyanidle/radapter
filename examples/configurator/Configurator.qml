@@ -1,5 +1,5 @@
 import QtQuick 2.7
-import QtQuick.Controls 2.2
+import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 import radapter 1.0
 
@@ -9,7 +9,7 @@ import radapter 1.0
 // Clicking a node opens it in the WorkerConfigurator panel below; dragging a node's nub
 // onto another worker links them into a pipe. A live preview shows the authored
 // declarative config (objects + pipes), ready for declare.build / declare.save_to.
-// The canvas, editor and preview panes are separated by draggable Splitters.
+// The canvas, editor and preview are arranged in SplitViews so the panes are resizable.
 ApplicationWindow {
     id: root
     visible: true
@@ -63,7 +63,6 @@ ApplicationWindow {
     }
 
     ColumnLayout {
-        id: mainCol
         anchors.fill: parent
         anchors.margins: 10
         spacing: 8
@@ -90,87 +89,89 @@ ApplicationWindow {
             }
         }
 
-        WorkerGraph {
-            id: graph
-            Layout.fillWidth: true
-            Layout.preferredHeight: 240
-            context: sharedContext
-            connectableTypes: root.pickable   // workers connect; devices (refs) don't
-            onNodeClicked: configurator.select(name)
-            onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
-        }
-
-        // drag to resize the canvas vs. the editor below it
-        Splitter { target: graph; reference: mainCol; minimum: 100 }
-
-        Label {
-            text: configurator.registeredName.length
-                  ? ("Editing: " + configurator.registeredName)
-                  : "Select or add a worker to edit"
-            font.bold: true
-        }
-
-        RowLayout {
-            id: editorRow
+        // resizable canvas / editor / preview panes
+        SplitView {
+            orientation: Qt.Vertical
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 0
 
-            ScrollView {
-                id: scroll
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
+            WorkerGraph {
+                id: graph
+                SplitView.preferredHeight: 240
+                SplitView.minimumHeight: 100
+                context: sharedContext
+                connectableTypes: root.pickable   // workers connect; devices (refs) don't
+                onNodeClicked: configurator.select(name)
+                onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
+            }
 
-                WorkerConfigurator {
-                    id: configurator
-                    width: scroll.availableWidth
-                    schemas: root.schemas
-                    context: sharedContext
-                    customForms: root.formOverrides
-                    onChanged: root.refreshPreview()
+            ColumnLayout {
+                SplitView.fillHeight: true
+                SplitView.minimumHeight: 120
+                spacing: 6
+
+                Label {
+                    text: configurator.registeredName.length
+                          ? ("Editing: " + configurator.registeredName)
+                          : "Select or add a worker to edit"
+                    font.bold: true
+                }
+
+                // resizable config form / connections panel
+                SplitView {
+                    orientation: Qt.Horizontal
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ScrollView {
+                        id: scroll
+                        SplitView.fillWidth: true
+                        SplitView.minimumWidth: 200
+                        clip: true
+
+                        WorkerConfigurator {
+                            id: configurator
+                            width: scroll.availableWidth
+                            schemas: root.schemas
+                            context: sharedContext
+                            customForms: root.formOverrides
+                            onChanged: root.refreshPreview()
+                        }
+                    }
+
+                    // connections of the selected worker, alongside its config form
+                    Frame {
+                        id: connFrame
+                        visible: configurator.registeredName.length > 0
+                        SplitView.preferredWidth: 240
+                        SplitView.minimumWidth: 160
+                        ConnectionsList {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            context: sharedContext
+                            worker: configurator.registeredName
+                        }
+                    }
                 }
             }
 
-            // drag to resize the config form vs. the connections panel
-            Splitter {
-                target: connFrame
-                reference: editorRow
-                vertical: false
-                after: true
-                minimum: 140
-                visible: connFrame.visible
-            }
+            ColumnLayout {
+                SplitView.preferredHeight: 160
+                SplitView.minimumHeight: 60
+                spacing: 4
 
-            // connections of the selected worker, alongside its config form
-            Frame {
-                id: connFrame
-                Layout.preferredWidth: 230
-                Layout.fillHeight: true
-                visible: configurator.registeredName.length > 0
-                ConnectionsList {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    context: sharedContext
-                    worker: configurator.registeredName
+                Label { text: "Preview (objects + pipes)"; font.bold: true }
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    TextArea {
+                        readOnly: true
+                        wrapMode: TextEdit.NoWrap
+                        text: root.lastJson
+                        font.family: "monospace"
+                    }
                 }
-            }
-        }
-
-        // drag to resize the preview vs. the editor above it
-        Splitter { target: previewScroll; reference: mainCol; after: true; minimum: 60 }
-
-        Label { text: "Preview (objects + pipes)"; font.bold: true }
-        ScrollView {
-            id: previewScroll
-            Layout.fillWidth: true
-            Layout.preferredHeight: 150
-            clip: true
-            TextArea {
-                readOnly: true
-                wrapMode: TextEdit.NoWrap
-                text: root.lastJson
-                font.family: "monospace"
             }
         }
     }
