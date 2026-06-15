@@ -18,6 +18,13 @@ Item {
     property string selected: ""          // highlighted node (host-driven)
     property var connectableTypes: []     // worker types; empty = all objects connect
 
+    // live rubber-band line drawn from the drag source to the cursor while connecting
+    property bool linking: false
+    property real linkX1: 0
+    property real linkY1: 0
+    property real linkX2: 0
+    property real linkY2: 0
+
     signal nodeClicked(string name)       // a node was selected
     signal nodeRemoved(string name)        // a node was deleted from the canvas
 
@@ -106,6 +113,32 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // rubber-band line overlay (above the cards; the dragged nub reparents to the
+    // graph and is appended after this, so the dot stays painted on top of the line)
+    Canvas {
+        id: linkCanvas
+        anchors.fill: parent
+        visible: graph.linking
+        onPaint: {
+            var c = getContext("2d")
+            c.clearRect(0, 0, width, height)
+            if (!graph.linking) return
+            c.strokeStyle = "#fb8c00"
+            c.lineWidth = 2
+            c.lineCap = "round"
+            c.beginPath()
+            c.moveTo(graph.linkX1, graph.linkY1)
+            c.lineTo(graph.linkX2, graph.linkY2)
+            c.stroke()
+        }
+        Connections {
+            target: graph
+            onLinkX2Changed: linkCanvas.requestPaint()
+            onLinkY2Changed: linkCanvas.requestPaint()
+            onLinkingChanged: linkCanvas.requestPaint()
         }
     }
 
@@ -214,6 +247,21 @@ Item {
                 Drag.keys: ["rad-pipe"]
                 Drag.hotSpot.x: width / 2
                 Drag.hotSpot.y: height / 2
+
+                // drive the rubber-band line: anchor at the source card, follow the nub
+                property bool dragging: dragMA.drag.active
+                onDraggingChanged: {
+                    if (dragging) {
+                        var p = card.mapToItem(graph, card.width, card.height / 2)
+                        graph.linkX1 = p.x; graph.linkY1 = p.y
+                        graph.linkX2 = p.x; graph.linkY2 = p.y
+                        graph.linking = true
+                    } else {
+                        graph.linking = false
+                    }
+                }
+                onXChanged: if (dragging) graph.linkX2 = x + width / 2
+                onYChanged: if (dragging) graph.linkY2 = y + height / 2
 
                 states: State {
                     when: dragMA.drag.active

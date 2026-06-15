@@ -6,9 +6,10 @@ import radapter 1.0
 // Multi-object graph configurator. The Lua side sends the worker schemas (filtered to
 // the supported families). The toolbar adds workers; the WorkerGraph canvas shows every
 // configured object grouped by type, each with a badge of how many pipes touch it.
-// Clicking a node opens it in the WorkerConfigurator panel below; "Connect" mode links
-// two nodes into a pipe. A live preview shows the authored declarative config (objects +
-// pipes), ready for declare.build / declare.save_to on the Lua side.
+// Clicking a node opens it in the WorkerConfigurator panel below; dragging a node's nub
+// onto another worker links them into a pipe. A live preview shows the authored
+// declarative config (objects + pipes), ready for declare.build / declare.save_to.
+// The canvas, editor and preview panes are separated by draggable Splitters.
 ApplicationWindow {
     id: root
     visible: true
@@ -62,6 +63,7 @@ ApplicationWindow {
     }
 
     ColumnLayout {
+        id: mainCol
         anchors.fill: parent
         anchors.margins: 10
         spacing: 8
@@ -98,7 +100,8 @@ ApplicationWindow {
             onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
         }
 
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#bbb" }
+        // drag to resize the canvas vs. the editor below it
+        Splitter { target: graph; reference: mainCol; minimum: 100 }
 
         Label {
             text: configurator.registeredName.length
@@ -108,9 +111,10 @@ ApplicationWindow {
         }
 
         RowLayout {
+            id: editorRow
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 8
+            spacing: 0
 
             ScrollView {
                 id: scroll
@@ -128,8 +132,19 @@ ApplicationWindow {
                 }
             }
 
+            // drag to resize the config form vs. the connections panel
+            Splitter {
+                target: connFrame
+                reference: editorRow
+                vertical: false
+                after: true
+                minimum: 140
+                visible: connFrame.visible
+            }
+
             // connections of the selected worker, alongside its config form
             Frame {
+                id: connFrame
                 Layout.preferredWidth: 230
                 Layout.fillHeight: true
                 visible: configurator.registeredName.length > 0
@@ -142,8 +157,12 @@ ApplicationWindow {
             }
         }
 
+        // drag to resize the preview vs. the editor above it
+        Splitter { target: previewScroll; reference: mainCol; after: true; minimum: 60 }
+
         Label { text: "Preview (objects + pipes)"; font.bold: true }
         ScrollView {
+            id: previewScroll
             Layout.fillWidth: true
             Layout.preferredHeight: 150
             clip: true
