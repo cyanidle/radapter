@@ -42,6 +42,7 @@ Rectangle {
             startPos = at(mouse)
         }
         onPositionChanged: {
+            if (!pressed) return   // hoverEnabled also fires this on plain hover
             var d = at(mouse) - startPos
             if (sp.after) d = -d
             var v = Math.max(sp.minimum, startSize + d)
