@@ -2,23 +2,30 @@ import QtQuick 2.7
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 
-// Canvas view of the objects in a ConfigContext, grouped by worker type. Each node
-// shows its name, its type and a badge with how many pipes touch it. Clicking a node
-// selects it (nodeClicked) so a host can open its editor; the ✕ removes it. In
-// `connectMode` the first click picks a pipe source and the second creates the pipe
-// (context.addPipe), so the connection counts update live.
+// Canvas view of the objects in a ConfigContext, grouped by type. Each node shows its
+// name, type and a badge with how many pipes touch it. Clicking a node selects it
+// (nodeClicked) so a host can open its editor; the ✕ removes it. To connect two
+// workers, drag the blue nub on a node's right edge onto another worker — that opens
+// a popup to pick the pipe directive and adds the pipe (counts update live).
+//
+// `connectableTypes` lists the types that are pipe endpoints (workers). Objects of any
+// other type (e.g. Modbus devices, which are referenced, not piped) are shown as
+// non-connectable: no nub, no badge, and they reject drops. Empty = everything connects.
 Item {
     id: graph
 
     property var context: null
     property string selected: ""          // highlighted node (host-driven)
-    property bool connectMode: false      // clicks build pipes instead of selecting
-    property string connectFrom: ""       // pending pipe source while connecting
+    property var connectableTypes: []     // worker types; empty = all objects connect
 
-    onConnectModeChanged: if (!connectMode) connectFrom = ""
-
-    signal nodeClicked(string name)       // a node was selected (not in connect mode)
+    signal nodeClicked(string name)       // a node was selected
     signal nodeRemoved(string name)        // a node was deleted from the canvas
+
+    function isConnectable(name) {
+        if (connectableTypes.length === 0) return true
+        return connectableTypes.indexOf(context.get(name).type) >= 0
+    }
+    function beginPipe(from, to) { dirPopup.begin(from, to) }
 
     // re-read the (deeply-mutated) context whenever it bumps its revision; the
     // revision is used in a branch (not a dead local) so the dependency survives
@@ -42,28 +49,20 @@ Item {
     }
 
     function nodeActivated(name) {
-        if (connectMode) {
-            if (connectFrom.length === 0) { connectFrom = name; return }
-            // second click picks the target; choose the pipe directive in a popup
-            if (connectFrom !== name) dirPopup.begin(connectFrom, name)
-            else connectFrom = ""   // re-clicking the source cancels it
-            return
-        }
         graph.selected = name
         nodeClicked(name)
     }
     function removeNode(name) {
         context.remove(name)
         if (selected === name) selected = ""
-        if (connectFrom === name) connectFrom = ""
         nodeRemoved(name)
     }
 
     Rectangle {
         anchors.fill: parent
         color: "#f4f4f4"
-        border.color: graph.connectMode ? "#fb8c00" : "#ccc"
-        border.width: graph.connectMode ? 2 : 1
+        border.color: "#ccc"
+        border.width: 1
         radius: 4
 
         Label {
@@ -115,6 +114,7 @@ Item {
         Rectangle {
             id: card
             property string nodeName: modelData
+            property bool connectable: graph.isConnectable(nodeName)
             // recompute when pipes change (revision used in a branch so it stays a dep)
             property int conns: (graph.context && graph.context.revision >= 0)
                                 ? graph.context.connectionCount(nodeName) : 0
@@ -122,13 +122,25 @@ Item {
             width: 168
             height: 58
             radius: 6
-            color: graph.connectFrom === nodeName ? "#fff3e0" : "#ffffff"
+            color: card.connectable ? "#ffffff" : "#f0f0f5"
             border.width: nodeName === graph.selected ? 2 : 1
-            border.color: nodeName === graph.selected ? "#1e88e5"
-                          : (graph.connectFrom === nodeName ? "#fb8c00" : "#ccc")
+            border.color: (dropArea.containsDrag && card.connectable) ? "#fb8c00"
+                          : (nodeName === graph.selected ? "#1e88e5" : "#ccc")
+
+            // accept a nub dragged from another worker -> a pipe into this node
+            DropArea {
+                id: dropArea
+                anchors.fill: parent
+                keys: ["rad-pipe"]
+                onDropped: {
+                    var src = drop.source ? drop.source.sourceName : ""
+                    if (src && src !== card.nodeName && card.connectable)
+                        graph.beginPipe(src, card.nodeName)
+                }
+            }
 
             // below the content, so clicks on labels select the node while the ✕
-            // button (interactive, painted on top) still gets its own clicks
+            // button and the drag nub (painted on top) still get their own events
             MouseArea {
                 anchors.fill: parent
                 onClicked: graph.nodeActivated(card.nodeName)
@@ -137,6 +149,7 @@ Item {
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 8
+                anchors.rightMargin: card.connectable ? 20 : 8   // leave room for the nub
                 spacing: 6
 
                 ColumnLayout {
@@ -149,7 +162,7 @@ Item {
                         Layout.fillWidth: true
                     }
                     Label {
-                        text: graph.context.get(card.nodeName).type
+                        text: graph.context.get(card.nodeName).type + (card.connectable ? "" : "  · device")
                         font.pixelSize: 10
                         color: "#888"
                         elide: Text.ElideRight
@@ -157,8 +170,9 @@ Item {
                     }
                 }
 
-                // connection-count badge
+                // connection-count badge (workers only; devices aren't pipe endpoints)
                 Rectangle {
+                    visible: card.connectable
                     Layout.alignment: Qt.AlignVCenter
                     implicitWidth: Math.max(20, countLabel.implicitWidth + 8)
                     implicitHeight: 20
@@ -180,6 +194,43 @@ Item {
                     implicitHeight: 24
                     padding: 0
                     onClicked: graph.removeNode(card.nodeName)
+                }
+            }
+
+            // drag this onto another worker to create a pipe (reparents to the graph
+            // while dragging so it floats over other cards; snaps back on release)
+            Rectangle {
+                id: nub
+                visible: card.connectable
+                width: 14; height: 14; radius: 7
+                color: dragMA.drag.active ? "#fb8c00" : "#1e88e5"
+                border.color: "white"; border.width: 2
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right
+                anchors.rightMargin: 3
+
+                property string sourceName: card.nodeName
+                Drag.active: dragMA.drag.active
+                Drag.keys: ["rad-pipe"]
+                Drag.hotSpot.x: width / 2
+                Drag.hotSpot.y: height / 2
+
+                states: State {
+                    when: dragMA.drag.active
+                    ParentChange { target: nub; parent: graph }
+                    AnchorChanges {
+                        target: nub
+                        anchors.verticalCenter: undefined
+                        anchors.right: undefined
+                    }
+                }
+
+                MouseArea {
+                    id: dragMA
+                    anchors.fill: parent
+                    cursorShape: Qt.CrossCursor
+                    drag.target: nub
+                    onReleased: nub.Drag.drop()
                 }
             }
         }
@@ -205,8 +256,6 @@ Item {
             keyField.text = ""; kindBox.currentIndex = 0
             open()
         }
-
-        onClosed: graph.connectFrom = ""
 
         ColumnLayout {
             anchors.fill: parent

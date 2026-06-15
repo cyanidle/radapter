@@ -79,30 +79,10 @@ ApplicationWindow {
                 onClicked: root.addWorker(typeBox.currentText)
             }
             Item { Layout.fillWidth: true }
-            // custom contentItem/background so the label stays legible in the active
-            // (checked) state regardless of the Qt Quick Controls style in use
-            Button {
-                id: connectBtn
-                checkable: true
-                checked: graph.connectMode
-                onToggled: graph.connectMode = checked
-                implicitWidth: Math.max(110, contentLabel.implicitWidth + 24)
-                text: graph.connectMode
-                      ? (graph.connectFrom.length ? "Pick target…" : "Pick source…")
-                      : "Connect"
-                contentItem: Label {
-                    id: contentLabel
-                    text: connectBtn.text
-                    color: connectBtn.checked ? "white" : "#222"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    radius: 4
-                    color: connectBtn.checked ? "#fb8c00"
-                           : (connectBtn.down ? "#d0d0d0" : "#e4e4e4")
-                    border.color: "#bbb"
-                }
+            Label {
+                text: "Drag the ● on a worker onto another to connect"
+                color: "#888"
+                font.pixelSize: 11
             }
         }
 
@@ -111,6 +91,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.preferredHeight: 240
             context: sharedContext
+            connectableTypes: root.pickable   // workers connect; devices (refs) don't
             onNodeClicked: configurator.select(name)
             onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
         }

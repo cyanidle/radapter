@@ -28,6 +28,13 @@ RowLayout {
     function candidates() { return context ? context.ofTypes(allowedTypes()) : [] }
     // read context.revision so the model refreshes when objects change
     function modelList() { return ((context ? context.revision : 0) >= 0 ? candidates() : []).concat(["＋ New…"]) }
+    // index of the currently-referenced object in the candidate list (-1 if unset),
+    // so the combo shows the saved ref when the form is rebuilt on reselect
+    function currentRefIndex() {
+        var cur = ref.values[ref.valueKey]
+        if (cur === undefined || cur.ref === undefined) return -1
+        return ref.candidates().indexOf(cur.ref)
+    }
 
     ComboBox {
         id: combo
@@ -38,6 +45,14 @@ RowLayout {
             if (index < cands.length) { ref.values[ref.valueKey] = { ref: cands[index] }; ref.changed() }
             else newDialog.open()
         }
+    }
+    // restore/keep the display in sync with values[valueKey]: a user pick imperatively
+    // sets currentIndex (breaking an inline binding), so a Binding element reasserts it,
+    // and it re-applies after the form reloads on reselect (revision keeps it reactive)
+    Binding {
+        target: combo
+        property: "currentIndex"
+        value: (ref.context ? ref.context.revision : 0) >= 0 ? ref.currentRefIndex() : -1
     }
 
     Dialog {
