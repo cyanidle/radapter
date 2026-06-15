@@ -3,17 +3,17 @@ import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 import radapter 1.0
 
-// Schema-driven worker configurator window. The Lua side sends the worker schemas
-// (filtered to the supported families); a drop-down picks which worker to create,
-// the WorkerConfigurator panel configures that single worker, and a live preview
-// shows the authored declarative config. Each edit sends the full (build-ready)
-// fragment back to Lua. The per-worker panel is what a multi-object graph editor
-// will later show when a node is selected.
+// Multi-object graph configurator. The Lua side sends the worker schemas (filtered to
+// the supported families). The toolbar adds workers; the WorkerGraph canvas shows every
+// configured object grouped by type, each with a badge of how many pipes touch it.
+// Clicking a node opens it in the WorkerConfigurator panel below; "Connect" mode links
+// two nodes into a pipe. A live preview shows the authored declarative config (objects +
+// pipes), ready for declare.build / declare.save_to on the Lua side.
 ApplicationWindow {
     id: root
     visible: true
-    width: 560
-    height: 720
+    width: 720
+    height: 860
     title: "Radapter Configurator"
 
     property var schemas: ({})
@@ -27,14 +27,31 @@ ApplicationWindow {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
     }
-    // shared authoring state: all WorkerConfigurators (here just one, but the multi-node
-    // editor will host many) register their workers/devices here, keeping names unique.
+
+    // shared authoring state: the WorkerConfigurator and the WorkerGraph both read/write
+    // this single set of objects (+ pipes), keeping names unique and edges consistent.
     ConfigContext { id: sharedContext }
 
     function refreshPreview() {
         var _rev = sharedContext.revision   // re-run when the shared set changes
-        root.lastJson = JSON.stringify(sharedContext.objects, null, 2)
+        root.lastJson = JSON.stringify({ objects: sharedContext.objects,
+                                         pipes: sharedContext.pipes }, null, 2)
     }
+
+    function uniqueName(type) {
+        var base = type.charAt(0).toLowerCase() + type.slice(1)
+        var i = 1, n
+        do { n = base + i; i++ } while (sharedContext.has(n))
+        return n
+    }
+    function addWorker(type) {
+        if (!type.length) return
+        var n = uniqueName(type)
+        sharedContext.put(n, type, {})
+        configurator.select(n)
+        graph.selected = n
+    }
+
     Component.onCompleted: {
         radapter.model.received.connect(onMsg)
         sharedContext.changed.connect(refreshPreview)
@@ -50,14 +67,44 @@ ApplicationWindow {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
-            Label { text: "Create worker"; font.bold: true }
+            Label { text: "Add worker"; font.bold: true }
             ComboBox {
                 id: typeBox
-                Layout.fillWidth: true
+                Layout.preferredWidth: 200
                 model: root.pickable
-                onActivated: { configurator.type = currentText; root.refreshPreview() }
-                Component.onCompleted: if (count > 0) configurator.type = currentText
             }
+            Button {
+                text: "＋ Add"
+                enabled: typeBox.currentText.length > 0
+                onClicked: root.addWorker(typeBox.currentText)
+            }
+            Item { Layout.fillWidth: true }
+            Button {
+                text: graph.connectMode
+                      ? (graph.connectFrom.length ? "Pick target…" : "Pick source…")
+                      : "Connect"
+                checkable: true
+                checked: graph.connectMode
+                onToggled: { graph.connectMode = checked; if (!checked) graph.connectFrom = "" }
+            }
+        }
+
+        WorkerGraph {
+            id: graph
+            Layout.fillWidth: true
+            Layout.preferredHeight: 240
+            context: sharedContext
+            onNodeClicked: configurator.select(name)
+            onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
+        }
+
+        Rectangle { Layout.fillWidth: true; height: 1; color: "#bbb" }
+
+        Label {
+            text: configurator.registeredName.length
+                  ? ("Editing: " + configurator.registeredName)
+                  : "Select or add a worker to edit"
+            font.bold: true
         }
 
         ScrollView {
@@ -70,19 +117,16 @@ ApplicationWindow {
                 id: configurator
                 width: scroll.availableWidth
                 schemas: root.schemas
-                type: typeBox.currentText
                 context: sharedContext
                 customForms: root.formOverrides
-                onChanged: {
-                    root.refreshPreview()
-                }
+                onChanged: root.refreshPreview()
             }
         }
 
-        Label { text: "Preview (all objects)"; font.bold: true }
+        Label { text: "Preview (objects + pipes)"; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
-            Layout.preferredHeight: 160
+            Layout.preferredHeight: 150
             clip: true
             TextArea {
                 readOnly: true

@@ -23,6 +23,7 @@ ColumnLayout {
 
     property var values: ({})      // this worker's config, filled by the form
     property string registeredName: ""  // the name this editor currently occupies
+    property bool loading: false   // suppress the type-change reset while loading a node
 
     signal changed()               // fires on any edit (name or a form field)
 
@@ -44,16 +45,40 @@ ColumnLayout {
     // Validity is recomputed here from the current name rather than read off the nameOk
     // binding, which may still be stale when called synchronously from onTextChanged.
     function register() {
-        if (!context) return
+        if (!context || loading) return   // select()/clear() drive the context directly
         var n = name()
         var ok = n.length > 0 && (!context.has(n) || n === registeredName)
         if (!ok) {
             if (registeredName.length) { context.remove(registeredName); registeredName = "" }
             return
         }
-        if (registeredName.length && registeredName !== n) context.remove(registeredName)
+        if (registeredName.length && registeredName !== n) context.rename(registeredName, n)
         context.put(n, cfg.type, values)
         registeredName = n
+    }
+
+    // load an existing context object into this editor (graph node selection)
+    function select(name) {
+        var o = context.get(name)
+        loading = true
+        registeredName = name
+        setName(name)
+        values = o.config
+        cfg.type = o.type
+        loading = false
+        formLoader.reload()
+        changed()
+    }
+    // detach from any node, leaving an empty editor
+    function clear() {
+        loading = true
+        registeredName = ""
+        setName("")
+        values = {}
+        cfg.type = ""
+        loading = false
+        formLoader.reload()
+        changed()
     }
 
     function currentWorker() {
@@ -61,14 +86,16 @@ ColumnLayout {
         e[name() || "(unnamed)"] = { type: cfg.type, config: values }
         return e
     }
-    // the whole authored set (this worker + any device objects), ready for declare.build
+    // the whole authored set (objects + pipes), ready for declare.build
     function currentFragment() {
         register()
-        return { objects: context ? context.objects : currentWorker() }
+        return { objects: context ? context.objects : currentWorker(),
+                 pipes: context ? context.pipes : [] }
     }
 
-    // reset the form when the configured type changes
-    onTypeChanged: { values = {}; register(); formLoader.reload(); changed() }
+    // reset the form when the user changes the configured type (but not while a
+    // node is being loaded via select()/clear(), which sets type deliberately)
+    onTypeChanged: { if (loading) return; values = {}; register(); formLoader.reload(); changed() }
 
     RowLayout {
         Layout.fillWidth: true
