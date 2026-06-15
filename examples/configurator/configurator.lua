@@ -51,8 +51,24 @@ local view = QML {
     },
 }
 
--- restrict the type picker to the pickable set
+-- a default set to start from: 2 Modbus masters (each pointing at a device), a
+-- slave, the 2 referenced Tcp devices, and a Redis client. The masters reference
+-- the devices the same way the GUI's "New device" flow does ({ ref = "<name>" }).
+local default_config = {
+    objects = {
+        master1 = { type = "ModbusMaster", config = { device = { ref = "plc1" } } },
+        master2 = { type = "ModbusMaster", config = { device = { ref = "plc2" } } },
+        slave1  = { type = "ModbusSlave",  config = {} },
+        plc1    = { type = "TcpModbusDevice", config = {} },
+        plc2    = { type = "TcpModbusDevice", config = {} },
+        cache1  = { type = "RedisCache",   config = {} },
+    },
+    pipes = {},
+}
+
+-- restrict the type picker to the pickable set, and seed the canvas
 view {
     schemas = schemas,
     pickable = pickable,
+    config = default_config,
 }

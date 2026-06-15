@@ -26,6 +26,8 @@ ApplicationWindow {
     function onMsg(msg) {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
+        // a declare-style { objects, pipes } config to seed/replace the editor's set
+        if (msg.config !== undefined) sharedContext.load(msg.config)
     }
 
     // shared authoring state: the WorkerConfigurator and the WorkerGraph both read/write

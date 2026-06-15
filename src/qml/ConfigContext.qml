@@ -27,6 +27,23 @@ QtObject {
     }
 
     function put(name, type, config) { objects[name] = { type: type, config: config }; bump() }
+
+    // replace the whole authored set from a declare-style config ({ objects, pipes }),
+    // e.g. to seed the editor or load an existing config for editing
+    function load(config) {
+        var newObjects = ({})
+        if (config.objects !== undefined)
+            for (var name in config.objects) {
+                var e = config.objects[name]
+                newObjects[name] = { type: e.type, config: e.config !== undefined ? e.config : ({}) }
+            }
+        var newPipes = []
+        if (config.pipes !== undefined)
+            for (var i = 0; i < config.pipes.length; i++) newPipes.push(config.pipes[i])
+        objects = newObjects
+        pipes = newPipes
+        bump()
+    }
     function remove(name) {
         if (!has(name)) return
         delete objects[name]
