@@ -105,6 +105,20 @@ function declare.save_to(params) end
 ---@return table<string, Worker>
 function declare.load_from(params) end
 
+---@class RadRunnerOpts
+---@field port integer -- TCP port to host the WebSocket runner on
+---@field name string? -- worker name (default "runner")
+
+---@class radapterRunner
+local runner = {}
+
+---Host a WebSocket server that accepts a declarative config from a peer, builds
+---it, and streams every log line back to that peer (as { log = loggingMsg }).
+---Used by the GUI configurator's "Run" to launch and observe an instance.
+---@param opts RadRunnerOpts
+---@return Worker server
+function runner.serve(opts) end
+
 ---@enum (key) loggingLevel
 loggingLevel = {
     debug = 1,
@@ -210,7 +224,7 @@ function lfs.unlock (filehandle, start, length) end
 
 
 ---@class loggingMsg
----@field levl loggingLevel
+---@field level loggingLevel
 ---@field msg string
 ---@field category string
 ---@field timestamp number

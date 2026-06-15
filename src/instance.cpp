@@ -139,6 +139,7 @@ Instance::Instance(QObject *parent) :
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("async");
     LoadEmbeddedFile("declare");
+    LoadEmbeddedFile("runner");
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);

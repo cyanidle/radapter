@@ -21,6 +21,7 @@ ApplicationWindow {
     property var pickable: []
     property var formOverrides: ({})   // per-field custom editors, from Lua
     property string lastJson: ""
+    property string runState: "—"      // runner connection state, shown in the log window
 
     // schemas arrive as a plain { schemas: {...} } message; received() delivers the
     // raw tree as native JS (so Object.keys / arrays work, unlike the model tree)
@@ -29,6 +30,9 @@ ApplicationWindow {
         if (msg.pickable !== undefined) root.pickable = msg.pickable
         // a declare-style { objects, pipes } config to seed/replace the editor's set
         if (msg.config !== undefined) sharedContext.load(msg.config)
+        // streamed back from the headless runner launched by "Run"
+        if (msg.run_state !== undefined) root.runState = String(msg.run_state)
+        if (msg.log !== undefined) logWindow.append(msg.log)
     }
 
     // shared authoring state: the WorkerConfigurator and the WorkerGraph both read/write
@@ -80,6 +84,19 @@ ApplicationWindow {
                 text: "＋ Add"
                 enabled: typeBox.currentText.length > 0
                 onClicked: root.addWorker(typeBox.currentText)
+            }
+            ToolSeparator {}
+            Button {
+                text: "▶ Run"
+                // depend on revision so it re-evaluates as objects are added/removed
+                enabled: sharedContext.revision >= 0
+                         && Object.keys(sharedContext.objects).length > 0
+                onClicked: {
+                    radapter.model.send({ run: { objects: sharedContext.objects,
+                                                 pipes: sharedContext.pipes } })
+                    logWindow.show()
+                    logWindow.raise()
+                }
             }
             Item { Layout.fillWidth: true }
             Label {
@@ -170,6 +187,75 @@ ApplicationWindow {
                         wrapMode: TextEdit.NoWrap
                         text: root.lastJson
                         font.family: "monospace"
+                    }
+                }
+            }
+        }
+    }
+
+    // Separate window showing the logs streamed back from the headless runner
+    // launched by "Run". Closing it (or pressing Stop) shuts the runner down.
+    ApplicationWindow {
+        id: logWindow
+        visible: false
+        width: 660
+        height: 440
+        title: "Runner — " + root.runState
+
+        function append(entry) {
+            logModel.append({ lvl: String(entry.level),
+                              body: String(entry.msg),
+                              cat: String(entry.category) })
+            logList.positionViewAtEnd()
+        }
+
+        onClosing: radapter.model.send({ stop: true })
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 6
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Label { text: "State: " + root.runState; font.bold: true }
+                Item { Layout.fillWidth: true }
+                Button { text: "Clear"; onClicked: logModel.clear() }
+                Button {
+                    text: "■ Stop"
+                    onClicked: { radapter.model.send({ stop: true }); root.runState = "stopped" }
+                }
+            }
+
+            ListView {
+                id: logList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: ListModel { id: logModel }
+                onCountChanged: positionViewAtEnd()
+
+                delegate: Row {
+                    width: logList.width
+                    spacing: 8
+                    Text {
+                        text: model.cat
+                        color: "#999"
+                        font.family: "monospace"
+                        font.pixelSize: 11
+                        width: 160
+                        elide: Text.ElideLeft
+                    }
+                    Text {
+                        text: model.body
+                        width: logList.width - 168
+                        wrapMode: Text.Wrap
+                        font.family: "monospace"
+                        font.pixelSize: 11
+                        color: model.lvl === "error" ? "#c62828"
+                             : model.lvl === "warn"  ? "#ef6c00"
+                             : model.lvl === "debug" ? "#9e9e9e" : "#222"
                     }
                 }
             }

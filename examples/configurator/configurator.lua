@@ -72,3 +72,65 @@ view {
     pickable = pickable,
     config = default_config,
 }
+
+-- ── Run: launch the authored config in a separate headless adapter ───────────
+--
+-- Pressing "Run" in the GUI sends { run = <config> }. We spawn a headless
+-- radapter that hosts runner.serve{} on a fresh port, connect to it, push the
+-- config, and forward the runner's streamed logs back to the GUI's log window.
+-- "Stop" (or a re-run) shuts the previous runner down.
+
+math.randomseed(os.time())
+
+local function self_exe()
+    -- $PPID is the radapter process (the popen child's parent), so its /proc/PID/exe
+    -- resolves to *our* binary — /proc/self/exe would point at the forked readlink.
+    local f = io.popen("readlink -f /proc/$PPID/exe 2>/dev/null")
+    local p = f and f:read("*l")
+    if f then f:close() end
+    assert(p and #p > 0, "could not resolve the radapter executable")
+    return p
+end
+
+local runner_client = nil
+
+local function stop_runner()
+    if not runner_client then return end
+    runner_client { shutdown = true }   -- ask the headless runner to quit
+    runner_client:destroy()
+    runner_client = nil
+end
+
+local function start_runner(config)
+    stop_runner()
+
+    local port = math.random(20000, 60000)
+    local exe = self_exe()
+    local logf = string.format("/tmp/radapter-runner-%d.log", port)
+    -- headless: require the embedded runner module and serve on `port`
+    local expr = "require([[runner]]).serve{port=" .. port .. "}"
+    local cmd = '"' .. exe .. '" -e ' .. "'" .. expr .. "' > \"" .. logf .. "\" 2>&1 &"
+    log.info("configurator: launching runner on port {} (stderr -> {})", port, logf)
+    os.execute(cmd)
+
+    local client = WebsocketClient { url = "ws://127.0.0.1:" .. port, reconnect_timeout = 300 }
+    runner_client = client
+
+    pipe(client.events, function(ev)
+        view { run_state = ev.state }
+        if ev.state == "ConnectedState" then
+            client { config = config }
+        end
+    end)
+    pipe(client, function(msg)
+        if msg.log then view { log = msg.log } end
+    end)
+end
+
+pipe(view, function(msg)
+    if msg.run then
+        start_runner(msg.run)
+    elseif msg.stop then
+        stop_runner()
+    end
+end)
