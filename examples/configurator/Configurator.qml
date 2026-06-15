@@ -79,13 +79,30 @@ ApplicationWindow {
                 onClicked: root.addWorker(typeBox.currentText)
             }
             Item { Layout.fillWidth: true }
+            // custom contentItem/background so the label stays legible in the active
+            // (checked) state regardless of the Qt Quick Controls style in use
             Button {
+                id: connectBtn
+                checkable: true
+                checked: graph.connectMode
+                onToggled: graph.connectMode = checked
+                implicitWidth: Math.max(110, contentLabel.implicitWidth + 24)
                 text: graph.connectMode
                       ? (graph.connectFrom.length ? "Pick target…" : "Pick source…")
                       : "Connect"
-                checkable: true
-                checked: graph.connectMode
-                onToggled: { graph.connectMode = checked; if (!checked) graph.connectFrom = "" }
+                contentItem: Label {
+                    id: contentLabel
+                    text: connectBtn.text
+                    color: connectBtn.checked ? "white" : "#222"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 4
+                    color: connectBtn.checked ? "#fb8c00"
+                           : (connectBtn.down ? "#d0d0d0" : "#e4e4e4")
+                    border.color: "#bbb"
+                }
             }
         }
 
@@ -107,19 +124,38 @@ ApplicationWindow {
             font.bold: true
         }
 
-        ScrollView {
-            id: scroll
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
+            spacing: 8
 
-            WorkerConfigurator {
-                id: configurator
-                width: scroll.availableWidth
-                schemas: root.schemas
-                context: sharedContext
-                customForms: root.formOverrides
-                onChanged: root.refreshPreview()
+            ScrollView {
+                id: scroll
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+
+                WorkerConfigurator {
+                    id: configurator
+                    width: scroll.availableWidth
+                    schemas: root.schemas
+                    context: sharedContext
+                    customForms: root.formOverrides
+                    onChanged: root.refreshPreview()
+                }
+            }
+
+            // connections of the selected worker, alongside its config form
+            Frame {
+                Layout.preferredWidth: 230
+                Layout.fillHeight: true
+                visible: configurator.registeredName.length > 0
+                ConnectionsList {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    context: sharedContext
+                    worker: configurator.registeredName
+                }
             }
         }
 

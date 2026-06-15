@@ -7,3 +7,4 @@ RegistersForm 1.0 RegistersForm.qml
 QueriesForm 1.0 QueriesForm.qml
 WorkerConfigurator 1.0 WorkerConfigurator.qml
 WorkerGraph 1.0 WorkerGraph.qml
+ConnectionsList 1.0 ConnectionsList.qml

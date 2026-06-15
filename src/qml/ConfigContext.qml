@@ -53,14 +53,35 @@ QtObject {
     }
 
     // ---- pipes (graph edges) ----------------------------------------------
-    function hasPipe(from, to) {
+    // a pipe is { from, to } plus at most one declare directive field:
+    // wrap=<key> / unwrap=<key> / on=<field> (absent = a plain pipe)
+    function pipeDir(p) {
+        if (p.wrap !== undefined)   return "wrap"
+        if (p.unwrap !== undefined) return "unwrap"
+        if (p.on !== undefined)     return "on"
+        return ""
+    }
+    function pipeKey(p) { var f = pipeDir(p); return f === "" ? "" : p[f] }
+    function samePipe(a, b) {
+        return a.from === b.from && a.to === b.to
+            && pipeDir(a) === pipeDir(b) && pipeKey(a) === pipeKey(b)
+    }
+    function hasPipe(p) {
         for (var i = 0; i < pipes.length; i++)
-            if (pipes[i].from === from && pipes[i].to === to) return true
+            if (samePipe(pipes[i], p)) return true
         return false
     }
-    function addPipe(from, to) {
-        if (from === to || hasPipe(from, to)) return false
-        pipes = pipes.concat([{ from: from, to: to }])
+    // directive: undefined / { kind: "pipe" } -> plain; { kind, key } for wrap|unwrap|on
+    function addPipe(from, to, directive) {
+        if (from === to) return false
+        var p = { from: from, to: to }
+        if (directive !== undefined && directive.kind !== undefined && directive.kind !== "pipe") {
+            var key = directive.key === undefined ? "" : String(directive.key).trim()
+            if (key.length === 0) return false   // wrap/unwrap/on require a key
+            p[directive.kind] = key
+        }
+        if (hasPipe(p)) return false
+        pipes = pipes.concat([p])
         bump()
         return true
     }

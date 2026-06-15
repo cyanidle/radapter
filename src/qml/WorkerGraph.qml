@@ -15,6 +15,8 @@ Item {
     property bool connectMode: false      // clicks build pipes instead of selecting
     property string connectFrom: ""       // pending pipe source while connecting
 
+    onConnectModeChanged: if (!connectMode) connectFrom = ""
+
     signal nodeClicked(string name)       // a node was selected (not in connect mode)
     signal nodeRemoved(string name)        // a node was deleted from the canvas
 
@@ -42,8 +44,9 @@ Item {
     function nodeActivated(name) {
         if (connectMode) {
             if (connectFrom.length === 0) { connectFrom = name; return }
-            if (connectFrom !== name) context.addPipe(connectFrom, name)
-            connectFrom = ""
+            // second click picks the target; choose the pipe directive in a popup
+            if (connectFrom !== name) dirPopup.begin(connectFrom, name)
+            else connectFrom = ""   // re-clicking the source cancels it
             return
         }
         graph.selected = name
@@ -177,6 +180,85 @@ Item {
                     implicitHeight: 24
                     padding: 0
                     onClicked: graph.removeNode(card.nodeName)
+                }
+            }
+        }
+    }
+
+    // picks the directive for a pipe being drawn (from -> to). The kinds map onto
+    // declare's pipe fields: plain / wrap(key) / unwrap(key) / on(field).
+    Popup {
+        id: dirPopup
+        modal: true
+        focus: true
+        padding: 12
+        width: 320
+        x: (graph.width - width) / 2
+        y: 40
+        closePolicy: Popup.CloseOnEscape
+
+        property string fromName: ""
+        property string toName: ""
+
+        function begin(from, to) {
+            fromName = from; toName = to
+            keyField.text = ""; kindBox.currentIndex = 0
+            open()
+        }
+
+        onClosed: graph.connectFrom = ""
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 8
+
+            Label {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: "Pipe  " + dirPopup.fromName + "  →  " + dirPopup.toName
+                font.bold: true
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Label { text: "Directive"; Layout.preferredWidth: 70 }
+                ComboBox {
+                    id: kindBox
+                    Layout.fillWidth: true
+                    textRole: "label"
+                    model: [
+                        { kind: "pipe",   label: "plain pipe" },
+                        { kind: "wrap",   label: "wrap(key)" },
+                        { kind: "unwrap", label: "unwrap(key)" },
+                        { kind: "on",     label: "on(field)" }
+                    ]
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                visible: kindBox.currentIndex > 0
+                Label {
+                    text: kindBox.currentIndex === 3 ? "Field" : "Key"
+                    Layout.preferredWidth: 70
+                }
+                TextField {
+                    id: keyField
+                    Layout.fillWidth: true
+                    placeholderText: kindBox.currentIndex === 3 ? "field" : "a:b:[2]"
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Button { text: "Cancel"; onClicked: dirPopup.close() }
+                Button {
+                    text: "Connect"
+                    enabled: kindBox.currentIndex === 0 || keyField.text.trim().length > 0
+                    onClicked: {
+                        var d = kindBox.model[kindBox.currentIndex]
+                        graph.context.addPipe(dirPopup.fromName, dirPopup.toName,
+                                              { kind: d.kind, key: keyField.text })
+                        dirPopup.close()
+                    }
                 }
             }
         }
