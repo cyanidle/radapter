@@ -498,6 +498,26 @@ function WebsocketServer(params) end
 ---@return Worker
 function WebsocketClient(params) end
 
+---@class LocalServerConfig : WorkerConfig
+---@field socket string -- local socket / named-pipe name to listen on
+
+---@class LocalClientConfig : WorkerConfig
+---@field socket string -- server socket name to connect to
+---@field reconnect_timeout integer? -- ms between reconnect attempts (default 300)
+
+---Per-client routed local-IPC server (QLocalServer). Inbound arrives as
+---{ ["<clientId>"] = payload }; send { ["<clientId>"] = payload } to reply to one.
+---Events: { connected = id } / { disconnected = id }.
+---@param params LocalServerConfig
+---@return Worker
+function LocalServer(params) end
+
+---Local-IPC client (QLocalSocket) that reconnects on drop. Inbound messages are
+---written to the socket; received frames are emitted; state on the event channel.
+---@param params LocalClientConfig
+---@return Worker
+function LocalClient(params) end
+
 ---Fields common to every worker config.
 ---@class WorkerConfig
 ---@field name string? -- explicit worker name (else one is generated)

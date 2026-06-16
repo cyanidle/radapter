@@ -199,6 +199,7 @@ void serial(Instance* inst);
 void can(Instance* inst);
 void cyphal(Instance* inst);
 void process(Instance* inst);
+void local(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
