@@ -30,7 +30,7 @@ build/bin/radapter tests/basic.lua
 build/bin/radapter --schema
 
 # Other useful flags
-build/bin/radapter --watch-dir . examples/modbus.lua        # hot reload on file change
+build/bin/radapter --watch-dir . examples/modbus/modbus.lua  # hot reload on file change
 build/bin/radapter --gui --gui-auto-quit examples/chat/client.lua  # quit when window closes
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
@@ -79,11 +79,13 @@ When writing a short test/`-e` snippet, always end it with `shutdown()` — othe
 event loop keeps running and the process hangs instead of exiting on success.
 
 **Examples (`examples/`)** are documentation-grade demos; most need live hardware/services:
-`modbus.lua` (a Modbus TCP device on :1502), `redis.lua` (a Redis server),
-`serial/serial.lua` (a serial port arg), `can.lua`/`cyphal.lua` (a CAN interface — see
-`examples/setup_vcan.sh` for a virtual one), `plugin.lua` (pass the plugins build dir),
-`ros.lua` (ROS2 plugin). `examples/demo/` is a small QML dashboard example and
-`examples/chat/` a headless server + QML client.
+`modbus/modbus.lua` (a Modbus TCP device on :1502) and `modbus/modbus_table.lua` (a GUI
+table, self-contained loopback), `redis.lua` (a Redis server), `serial/serial.lua` (a
+serial port arg), `can.lua`/`cyphal.lua` (a CAN interface — see `examples/setup_vcan.sh`
+for a virtual one), `plugin.lua` (pass the plugins build dir), `ros.lua` (ROS2 plugin).
+`examples/demo/` is a small QML dashboard example and `examples/chat/` a headless server +
+QML client. **Projects (`projects/`)** are full apps built on radapter: `projects/scada/`
+is the schema-driven configurator (`--gui projects/scada/configurator.lua`).
 
 ## Architecture
 
@@ -114,21 +116,25 @@ event loop keeps running and the process hangs instead of exiting on success.
 and the live set of `Worker`s. On construction it opens the Lua libs, registers the global
 Lua API, loads the embedded scripts, then calls every entry in `builtin::workers::all`
 (the `_all[]` array in `src/builtin.cpp`: `test, modbus, websocket, redis, sql, serial,
-can, cyphal`) to register built-in workers. `Instance::FromLua(L)` recovers the instance
+can, cyphal, process, local`) to register built-in workers. `Instance::FromLua(L)` recovers the instance
 from any `lua_State` via a registry lightuserdata key. Shutdown is cooperative: it emits
 `ShutdownRequest`, waits for each worker's `ShutdownDone` (or a timeout), then
 `ShutdownDone`.
 
-Embedded Lua scripts live in `src/scripts/*.lua`, are compiled to bytecode by the
-`radapter-luac` host tool, and baked into a Qt resource (`:/scripts/...`) at build time —
-except under JIT/cross builds, where they ship as source. `builtins.lua` defines the
-pipeline primitives; `async.lua` provides coroutine-based promises (`await`);
-`mobdebug*.lua` is the remote debugger; `socket.lua` is luasocket glue.
+Only **fundamental** Lua scripts are embedded: they live in `src/scripts/*.lua`, are
+compiled to bytecode by the `radapter-luac` host tool, and baked into a Qt resource
+(`:/scripts/...`) at build time — except under JIT/cross builds, where they ship as source.
+`builtins.lua` defines the pipeline primitives; `async.lua` provides coroutine-based
+promises (`await`); `mobdebug*.lua` is the remote debugger; `socket.lua` is luasocket glue.
+Non-fundamental modules (e.g. `declare`) are **not** embedded — they live next to the
+project that uses them and are `require`d from disk: `EvalFile` prepends the running
+script's directory to `package.path`, so a script resolves sibling modules.
 
-Reusable QML components live in `src/qml/*.qml` with a `qmldir` (module `radapter`). The
-same `radapter_scripts` CMake function bakes them into the resource under `:/radapter/`,
-and the GUI worker adds `qrc:/` to the QML import path, so scripts can `import radapter`
-(e.g. `ModbusTable`).
+**No QML is embedded.** Reusable QML components live with the project/example that uses
+them and resolve by **same-directory** lookup — sibling `.qml` files are usable as types
+without any import (no `qmldir`, no `qrc:/`). `projects/scada/` holds the schema-driven
+configurator (its QML + the `declare`/`runner` Lua); `examples/modbus/` holds `ModbusTable`
+and the Modbus demos. Load a project's window from Lua with `QML { url = "./Foo.qml" }`.
 
 The GUI worker (`src/workers/gui/gui.cpp`) exposes a `radapter` context object whose
 `radapter.model` is the root of a tree of `GuiModel` nodes (a `QQmlPropertyMap` subclass).

@@ -209,8 +209,6 @@ void workers::gui(Instance* inst)
 {
 	using namespace radapter::gui;
     g_engine()->clearComponentCache();
-    if (!g_engine()->importPathList().contains(QStringLiteral("qrc:/")))
-        g_engine()->addImportPath(QStringLiteral("qrc:/"));
     inst->RegisterWorker<QMLWorker>("QML");
 	inst->RegisterSchema<QMLConfig>("QML");
 }

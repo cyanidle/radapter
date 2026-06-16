@@ -66,7 +66,6 @@ if (NOT RADAPTER_GUI)
 endif()
 
 file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua)
-file(GLOB RADAPTER_QML CONFIGURE_DEPENDS src/qml/*.qml src/qml/qmldir)
 
 file(CONFIGURE OUTPUT ${CMAKE_BINARY_DIR}/_info/_embedded_scripts.h @ONLY CONTENT [[
     constexpr std::string_view _embed_path = "@CMAKE_SOURCE_DIR@/src/scripts/";
@@ -98,24 +97,6 @@ function(radapter_scripts)
     endforeach()
 
     file(APPEND ${scripts_qrc} "</qresource>\n")
-
-    # QML modules importable as `import radapter` (qrc:/radapter/qmldir).
-    if (RADAPTER_GUI AND RADAPTER_QML)
-        file(APPEND ${scripts_qrc} "<qresource prefix=\"/radapter\">\n")
-        foreach(file ${RADAPTER_QML})
-            get_filename_component(name ${file} NAME)
-            message(STATUS "Embedding qml => radapter/${name}")
-            set(out ${scripts_dir}/qml/${name})
-            add_custom_command(
-                OUTPUT ${out}
-                DEPENDS ${file}
-                COMMAND ${CMAKE_COMMAND} -E copy ${file} ${out}
-                COMMENT "Embedding qml => ${out}"
-            )
-            file(APPEND ${scripts_qrc} "<file alias=\"${name}\">qml/${name}</file>\n")
-        endforeach()
-        file(APPEND ${scripts_qrc} "</qresource>\n")
-    endif()
 
     file(APPEND ${scripts_qrc} "</RCC>\n")
 
