@@ -326,6 +326,21 @@ void Instance::EvalFile(fs::path path)
     if (!dir.empty()) {
         QDir::setCurrent(QString::fromUtf8(dir.u8string().c_str()));
     }
+    // let `require` find modules sitting next to the script (absolute, so it holds
+    // regardless of cwd or when the require runs). Prepend once.
+    {
+        auto absdir = fs::absolute(path).parent_path().u8string();
+        auto entry = fmt::format("{0}/?.lua;{0}/?/init.lua;", absdir);
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "path");
+        std::string cur = lua_tostring(L, -1) ? lua_tostring(L, -1) : "";
+        lua_pop(L, 1);
+        if (cur.compare(0, entry.size(), entry) != 0) {
+            lua_pushstring(L, (entry + cur).c_str());
+            lua_setfield(L, -2, "path");
+        }
+        lua_pop(L, 1);
+    }
     lua_getglobal(L, "__eval_async");
     lua_insert(L, -2);
     lua_pushstring(L, path.string().c_str());
