@@ -13,12 +13,14 @@ struct ServerConfig : WorkerConfig {
     QString socket;
     WithDefault<wire::Protocol> protocol = wire::json;
     std::optional<wire::Compression> compression;
+    WithDefault<bool> per_client = false;   // route per connection (see OnMsg)
 };
 RAD_DESCRIBE(ServerConfig) {
     PARENT(WorkerConfig);
     RAD_MEMBER(socket);
     RAD_MEMBER(protocol);
     RAD_MEMBER(compression);
+    RAD_MEMBER(per_client);
 }
 
 struct ClientConfig : WorkerConfig {
@@ -45,8 +47,10 @@ static QString stateName(QLocalSocket::LocalSocketState st) {
     return QStringLiteral("Unknown");
 }
 
-// Per-client routed local-socket server: inbound from a client arrives as
-// { "<clientId>" = payload }; send { "<clientId>" = payload } to reply to one.
+// Local-socket server. With per_client = false (default) it broadcasts: inbound
+// emits the raw payload, OnMsg sends to every client. With per_client = true it
+// routes per connection: inbound arrives as { "<clientId>" = payload } and a map
+// keyed by clientId targets those clients (unknown keys fall back to broadcast).
 // Events: { connected = id } / { disconnected = id }.
 class Server : public Worker {
     Q_OBJECT
@@ -86,7 +90,10 @@ public:
             auto& buf = bufs[sock];
             buf += sock->readAll();
             wire::DrainFrames(buf, config.protocol.value, config.compression,
-                [this, &id](QVariant const& v){ emit SendMsg(QVariantMap{{id, v}}); },
+                [this, &id](QVariant const& v){
+                    if (config.per_client.value) emit SendMsg(QVariantMap{{id, v}});
+                    else emit SendMsg(v);
+                },
                 [this](QString e){ Error("receive parse error: {}", e); });
         };
         connect(sock, &QLocalSocket::readyRead, this, onRead);
@@ -103,13 +110,23 @@ public:
     }
 
     void OnMsg(QVariant const& msg) override {
-        if (msg.type() != QVariant::Map) return;
-        auto m = msg.toMap();
-        for (auto it = m.begin(); it != m.end(); ++it) {
-            auto sit = socks.find(it.key());
-            if (sit != socks.end()) {
-                sit->second->write(wire::Frame(config.protocol.value, config.compression, it.value()));
+        if (!msg.isValid()) return;
+        if (config.per_client.value && msg.type() == QVariant::Map) {
+            auto m = msg.toMap();
+            bool targeted = false;
+            for (auto it = m.begin(); it != m.end(); ++it) {
+                auto sit = socks.find(it.key());
+                if (sit != socks.end()) {
+                    targeted = true;
+                    sit->second->write(wire::Frame(config.protocol.value, config.compression, it.value()));
+                }
             }
+            if (targeted) return;
+        }
+        auto framed = wire::Frame(config.protocol.value, config.compression, msg);
+        for (auto& [id, s] : socks) {
+            (void)id;
+            s->write(framed);
         }
     }
 

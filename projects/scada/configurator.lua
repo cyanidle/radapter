@@ -80,7 +80,8 @@ view {
 -- the GUI's log window. "Stop" (or a re-run) shuts the previous runner down.
 
 local SERVER = "radapter-scada-" .. tostring(__gen_id())
-local server = LocalServer { socket = SERVER }
+-- per_client: address each runner individually (send its config, read its hello/logs)
+local server = LocalServer { socket = SERVER, per_client = true }
 
 -- this script's directory, to locate the sibling runner.lua for spawning
 local here = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"

@@ -227,6 +227,10 @@ function json_encode(data) end
 ---@return any
 function json_decode(json) end
 
+---Return a process-unique, monotonically increasing integer id.
+---@return integer
+function __gen_id() end
+
 ---@class promise<T>: { __call: fun(self: promise<T>, callback: fun(result: T, err: string)) }
 
 ---@alias asyncThunk<TIn, TOut> fun(input: TIn): promise<TOut>
@@ -488,6 +492,7 @@ function WebsocketClient(params) end
 ---@field socket string -- local socket / named-pipe name to listen on
 ---@field protocol ("json"|"msgpack")? -- frame payload encoding (default "json")
 ---@field compression "zlib"? -- optional payload compression
+---@field per_client boolean? -- route per connection ({id=msg}); else broadcast (default false)
 
 ---@class LocalClientConfig : WorkerConfig
 ---@field socket string -- server socket name to connect to

@@ -8,7 +8,7 @@ local TOKEN  = "tok-" .. tostring(__gen_id())
 -- spawns now, so this resolves to projects/scada/runner.lua
 local RUNNER = "../projects/scada/runner.lua"
 
-local server = LocalServer { socket = SERVER }
+local server = LocalServer { socket = SERVER, per_client = true }
 
 local client_id = nil
 local got_built = false
