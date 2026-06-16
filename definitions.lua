@@ -498,6 +498,56 @@ function WebsocketServer(params) end
 ---@return Worker
 function WebsocketClient(params) end
 
+---Fields common to every worker config.
+---@class WorkerConfig
+---@field name string? -- explicit worker name (else one is generated)
+---@field category string? -- log category override
+
+---@class ProcessConfig : WorkerConfig
+---@field program string -- executable to run
+---@field arguments string[]? -- argv (no shell; passed literally)
+---@field working_dir string? -- cwd for the child
+---@field autostart boolean? -- start on construction (default true)
+---@field merge_stderr boolean? -- fold stderr into the stdout data channel
+
+---A child process. stdout is the data channel (`pipe(proc, fn)`); stderr and
+---lifecycle land on `proc.events`: { stderr }, { started }, { finished, crashed },
+---{ error }. Inbound strings/bytes are written to stdin. Destroying the worker
+---terminates the child.
+---@class ProcessWorker : Worker
+ProcessWorker = {}
+
+---Start the process if it is not already running.
+function ProcessWorker:Start() end
+---Write bytes to the child's stdin; returns the number of bytes written.
+---@param data string
+---@return integer
+function ProcessWorker:Write(data) end
+---Request graceful termination (SIGTERM).
+function ProcessWorker:Terminate() end
+---Force-kill the child (SIGKILL).
+function ProcessWorker:Kill() end
+---Close the child's stdin (EOF).
+function ProcessWorker:CloseStdin() end
+---@return integer -- the child's PID (0 if not running)
+function ProcessWorker:Pid() end
+---@return "not_running"|"starting"|"running"
+function ProcessWorker:State() end
+
+---@param params ProcessConfig
+---@return ProcessWorker
+function Process(params) end
+
+---@class AppInfo
+---@field executable string -- absolute path to the running radapter binary
+---@field dir string -- directory containing the binary
+---@field name string -- application name
+---@field pid integer -- this process's PID
+
+---Info about the running process, via Qt's QCoreApplication.
+---@return AppInfo
+function app_info() end
+
 ---@class BinaryParams
 ---@field framing "slip"
 ---@field protocol "msgpack"

@@ -198,6 +198,7 @@ void sql(Instance* inst);
 void serial(Instance* inst);
 void can(Instance* inst);
 void cyphal(Instance* inst);
+void process(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 

@@ -82,43 +82,52 @@ view {
 
 math.randomseed(os.time())
 
-local function self_exe()
-    -- $PPID is the radapter process (the popen child's parent), so its /proc/PID/exe
-    -- resolves to *our* binary — /proc/self/exe would point at the forked readlink.
-    local f = io.popen("readlink -f /proc/$PPID/exe 2>/dev/null")
-    local p = f and f:read("*l")
-    if f then f:close() end
-    assert(p and #p > 0, "could not resolve the radapter executable")
-    return p
-end
-
+local runner_proc = nil
 local runner_client = nil
 
 local function stop_runner()
-    if not runner_client then return end
-    runner_client { shutdown = true }   -- ask the headless runner to quit
-    runner_client:destroy()
-    runner_client = nil
+    if runner_client then
+        runner_client { shutdown = true }   -- ask the runner to quit gracefully
+        runner_client:destroy()
+        runner_client = nil
+    end
+    if runner_proc then
+        runner_proc:destroy()               -- terminates the child if still alive
+        runner_proc = nil
+    end
 end
 
 local function start_runner(config)
     stop_runner()
 
     local port = math.random(20000, 60000)
-    local exe = self_exe()
-    local logf = string.format("/tmp/radapter-runner-%d.log", port)
-    -- headless: require the embedded runner module and serve on `port`
-    local expr = "require([[runner]]).serve{port=" .. port .. "}"
-    local cmd = '"' .. exe .. '" -e ' .. "'" .. expr .. "' > \"" .. logf .. "\" 2>&1 &"
-    log.info("configurator: launching runner on port {} (stderr -> {})", port, logf)
-    os.execute(cmd)
+    -- app_info().executable is *this* radapter binary (Qt's applicationFilePath)
+    local exe = app_info().executable
+    log.info("configurator: launching runner on port {}", port)
+
+    -- headless sibling adapter hosting runner.serve{port}. No shell: args are literal,
+    -- so no quoting games. The Process worker terminates it when we :destroy() it.
+    runner_proc = Process {
+        program = exe,
+        arguments = { "-e", "require([[runner]]).serve{port=" .. port .. "}" },
+    }
+
+    local connected = false
+    pipe(runner_proc.events, function(ev)
+        if ev.finished ~= nil then
+            view { run_state = "exited(" .. tostring(ev.finished) .. ")" }
+        elseif ev.stderr and not connected then
+            -- boot diagnostics, until the socket takes over as the log source
+            view { log = { level = "warn", category = "runner.boot", msg = tostring(ev.stderr) } }
+        end
+    end)
 
     local client = WebsocketClient { url = "ws://127.0.0.1:" .. port, reconnect_timeout = 300 }
     runner_client = client
-
     pipe(client.events, function(ev)
         view { run_state = ev.state }
         if ev.state == "ConnectedState" then
+            connected = true
             client { config = config }
         end
     end)
