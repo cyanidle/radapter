@@ -401,6 +401,9 @@ Instance::~Instance()
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
     luaL_unref(d->L, LUA_REGISTRYINDEX, d->luaLogHandler);
+    // the tag registry holds LuaFunctions whose destructors luaL_unref into L, so it
+    // must be torn down before lua_close (else it unrefs into a freed state -> crash)
+    d->tagRegistry.reset();
     lua_close(d->L);
 }
 
