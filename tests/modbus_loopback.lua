@@ -89,7 +89,7 @@ pipe(slave, function(msg)
     for k, v in pairs(msg) do
         got[k] = v
     end
-    if got.to_slave == 9 and got.flag == 1 then
+    if got.to_slave == 9 and got.flag == true then
         pass("master_to_slave")
     end
 end)
