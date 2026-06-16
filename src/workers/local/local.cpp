@@ -1,9 +1,9 @@
 #include "radapter/radapter.hpp"
 #include "builtin.hpp"
+#include "workers/wire.hpp"
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QTimer>
-#include <QJsonDocument>
 #include <map>
 
 namespace radapter::local {
@@ -11,45 +11,28 @@ namespace radapter::local {
 // `socket` is the local socket / named-pipe name (the base `name` is the worker name).
 struct ServerConfig : WorkerConfig {
     QString socket;
+    WithDefault<wire::Protocol> protocol = wire::json;
+    std::optional<wire::Compression> compression;
 };
 RAD_DESCRIBE(ServerConfig) {
     PARENT(WorkerConfig);
     RAD_MEMBER(socket);
+    RAD_MEMBER(protocol);
+    RAD_MEMBER(compression);
 }
 
 struct ClientConfig : WorkerConfig {
     QString socket;
+    WithDefault<wire::Protocol> protocol = wire::json;
+    std::optional<wire::Compression> compression;
     WithDefault<unsigned> reconnect_timeout = 300u;
 };
 RAD_DESCRIBE(ClientConfig) {
     PARENT(WorkerConfig);
     RAD_MEMBER(socket);
+    RAD_MEMBER(protocol);
+    RAD_MEMBER(compression);
     RAD_MEMBER(reconnect_timeout);
-}
-
-// newline-delimited compact JSON: a compact document never contains a raw '\n',
-// so it is a safe frame delimiter (upgraded to length-prefixed binary later).
-static QByteArray frame(QVariant const& v) {
-    auto data = QJsonDocument::fromVariant(v).toJson(QJsonDocument::Compact);
-    data.append('\n');
-    return data;
-}
-
-template<typename F>
-static void drainLines(QByteArray& buf, Worker* self, F&& emitOne) {
-    int nl;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-        auto line = buf.left(nl);
-        buf.remove(0, nl + 1);
-        if (line.isEmpty()) continue;
-        QJsonParseError err;
-        auto doc = QJsonDocument::fromJson(line, &err);
-        if (err.error) {
-            self->Error("receive parse error: {}", err.errorString());
-            continue;
-        }
-        emitOne(doc.toVariant());
-    }
 }
 
 static QString stateName(QLocalSocket::LocalSocketState st) {
@@ -102,9 +85,9 @@ public:
         auto onRead = [this, sock, id]{
             auto& buf = bufs[sock];
             buf += sock->readAll();
-            drainLines(buf, this, [this, &id](QVariant const& v){
-                emit SendMsg(QVariantMap{{id, v}});
-            });
+            wire::DrainFrames(buf, config.protocol.value, config.compression,
+                [this, &id](QVariant const& v){ emit SendMsg(QVariantMap{{id, v}}); },
+                [this](QString e){ Error("receive parse error: {}", e); });
         };
         connect(sock, &QLocalSocket::readyRead, this, onRead);
         connect(sock, &QLocalSocket::disconnected, this, [this, sock, id]{
@@ -125,7 +108,7 @@ public:
         for (auto it = m.begin(); it != m.end(); ++it) {
             auto sit = socks.find(it.key());
             if (sit != socks.end()) {
-                sit->second->write(frame(it.value()));
+                sit->second->write(wire::Frame(config.protocol.value, config.compression, it.value()));
             }
         }
     }
@@ -169,13 +152,15 @@ public:
         });
         connect(sock, &QLocalSocket::readyRead, this, [this]{
             buf += sock->readAll();
-            drainLines(buf, this, [this](QVariant const& v){ emit SendMsg(v); });
+            wire::DrainFrames(buf, config.protocol.value, config.compression,
+                [this](QVariant const& v){ emit SendMsg(v); },
+                [this](QString e){ Error("receive parse error: {}", e); });
         });
         sock->connectToServer(config.socket);
     }
 
     void OnMsg(QVariant const& msg) override {
-        sock->write(frame(msg));
+        sock->write(wire::Frame(config.protocol.value, config.compression, msg));
     }
 };
 

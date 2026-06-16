@@ -486,9 +486,13 @@ function WebsocketClient(params) end
 
 ---@class LocalServerConfig : WorkerConfig
 ---@field socket string -- local socket / named-pipe name to listen on
+---@field protocol ("json"|"msgpack")? -- frame payload encoding (default "json")
+---@field compression "zlib"? -- optional payload compression
 
 ---@class LocalClientConfig : WorkerConfig
 ---@field socket string -- server socket name to connect to
+---@field protocol ("json"|"msgpack")? -- frame payload encoding (default "json")
+---@field compression "zlib"? -- optional payload compression
 ---@field reconnect_timeout integer? -- ms between reconnect attempts (default 300)
 
 ---Per-client routed local-IPC server (QLocalServer). Inbound arrives as
