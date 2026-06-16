@@ -8,7 +8,7 @@
 --   di / discrete inputs (read-only bits, shown as a read-only checkbox).
 --
 -- Run with:
---   build/bin/radapter --gui examples/modbus_table.lua
+--   build/bin/radapter --gui examples/modbus/modbus_table.lua
 
 local PORT = 15020
 
@@ -45,33 +45,9 @@ each(1000, function()
     slave { uptime = up, running = (up % 2 == 0) }
 end)
 
--- Build a window with a ModbusTable pre-populated with one row per register.
+-- Build a window from the sibling Table.qml (which hosts the ModbusTable and its rows).
 local function make_window(title)
-    return QML([[
-import QtQuick 2.7
-import QtQuick.Controls 2.2
-import radapter 1.0
-
-ApplicationWindow {
-    visible: true
-    width: 560; height: 300
-    title: "]] .. title .. [["
-
-    ModbusTable {
-        model: radapter.model.node("regs")   // the "regs" sub-tree
-        anchors.fill: parent
-        anchors.margins: 8
-        Component.onCompleted: {
-            addRow("speed",      0, "Holding", "Float32")
-            addRow("setpoint",   2, "Holding")
-            addRow("uptime",     0, "Input")
-            addRow("enable",     0, "Coil")
-            addRow("valve_open", 1, "Coil")
-            addRow("running",    0, "Discrete")
-        }
-    }
-}
-]])
+    return QML { url = "./Table.qml", properties = { win_title = title } }
 end
 
 -- Connect a fresh master to the slave and wire it to a table window.
