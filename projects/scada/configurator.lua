@@ -9,9 +9,7 @@
 -- a declare-compatible config — ready for declare.build / declare.save_to.
 --
 -- Run (needs a Qt GUI):
---   build/bin/radapter --gui examples/configurator/configurator.lua
-
-local declare = require "declare"
+--   build/bin/radapter --gui projects/scada/configurator.lua
 
 -- worker families this configurator offers (devices included so Modbus masters
 -- can reference / create one)
@@ -75,66 +73,77 @@ view {
 
 -- ── Run: launch the authored config in a separate headless adapter ───────────
 --
--- Pressing "Run" in the GUI sends { run = <config> }. We spawn a headless
--- radapter that hosts runner.serve{} on a fresh port, connect to it, push the
--- config, and forward the runner's streamed logs back to the GUI's log window.
--- "Stop" (or a re-run) shuts the previous runner down.
+-- We stand up ONE local-IPC server. Pressing "Run" (the GUI sends { run = config })
+-- spawns a headless `runner.lua`, passing it the server's socket name and a fresh
+-- token. The runner connects back, announces its token ({hello=token}); we match it
+-- to the pending config, send the config to that client, and stream its logs back to
+-- the GUI's log window. "Stop" (or a re-run) shuts the previous runner down.
 
-math.randomseed(os.time())
+local SERVER = "radapter-scada-" .. tostring(__gen_id())
+local server = LocalServer { socket = SERVER }
 
-local runner_proc = nil
-local runner_client = nil
+-- this script's directory, to locate the sibling runner.lua for spawning
+local here = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"
+local RUNNER = here .. "runner.lua"
+
+local pending = {}      -- token -> config awaiting its runner's hello
+local active = nil      -- { proc, token, client } for the current run
 
 local function stop_runner()
-    if runner_client then
-        runner_client { shutdown = true }   -- ask the runner to quit gracefully
-        runner_client:destroy()
-        runner_client = nil
+    if not active then return end
+    if active.client then
+        server { [active.client] = { shutdown = true } }   -- ask it to quit gracefully
     end
-    if runner_proc then
-        runner_proc:destroy()               -- terminates the child if still alive
-        runner_proc = nil
-    end
+    if active.proc then active.proc:destroy() end          -- terminate the child too
+    active = nil
 end
 
 local function start_runner(config)
     stop_runner()
 
-    local port = math.random(20000, 60000)
+    local token = tostring(__gen_id())
+    pending[token] = config
     -- app_info().executable is *this* radapter binary (Qt's applicationFilePath)
-    local exe = app_info().executable
-    log.info("configurator: launching runner on port {}", port)
-
-    -- headless sibling adapter hosting runner.serve{port}. No shell: args are literal,
-    -- so no quoting games. The Process worker terminates it when we :destroy() it.
-    runner_proc = Process {
-        program = exe,
-        arguments = { "-e", "require([[runner]]).serve{port=" .. port .. "}" },
+    local proc = Process {
+        program = app_info().executable,
+        arguments = { RUNNER, SERVER, token },
     }
+    active = { proc = proc, token = token, client = nil }
+    view { run_state = "starting" }
 
-    local connected = false
-    pipe(runner_proc.events, function(ev)
+    pipe(proc.events, function(ev)
         if ev.finished ~= nil then
             view { run_state = "exited(" .. tostring(ev.finished) .. ")" }
-        elseif ev.stderr and not connected then
+        elseif ev.stderr and active and not active.client then
             -- boot diagnostics, until the socket takes over as the log source
             view { log = { level = "warn", category = "runner.boot", msg = tostring(ev.stderr) } }
         end
     end)
-
-    local client = WebsocketClient { url = "ws://127.0.0.1:" .. port, reconnect_timeout = 300 }
-    runner_client = client
-    pipe(client.events, function(ev)
-        view { run_state = ev.state }
-        if ev.state == "ConnectedState" then
-            connected = true
-            client { config = config }
-        end
-    end)
-    pipe(client, function(msg)
-        if msg.log then view { log = msg.log } end
-    end)
 end
+
+pipe(server.events, function(ev)
+    if ev.disconnected and active and active.client == ev.disconnected then
+        view { run_state = "disconnected" }
+    end
+end)
+
+-- inbound from runners arrives as { ["<clientId>"] = message }
+pipe(server, function(wrapped)
+    for id, msg in pairs(wrapped) do
+        if msg.hello ~= nil then
+            local token = tostring(msg.hello)
+            if active and active.token == token then
+                active.client = id
+                view { run_state = "ConnectedState" }
+                local cfg = pending[token]
+                pending[token] = nil
+                if cfg then server { [id] = { config = cfg } } end
+            end
+        elseif msg.log ~= nil then
+            view { log = msg.log }
+        end
+    end
+end)
 
 pipe(view, function(msg)
     if msg.run then

@@ -1,7 +1,8 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import radapter 1.0
+// configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are
+// sibling .qml files in this directory and resolve by name without an import.
 
 // Multi-object graph configurator. The Lua side sends the worker schemas (filtered to
 // the supported families). The toolbar adds workers; the WorkerGraph canvas shows every

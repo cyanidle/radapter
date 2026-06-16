@@ -138,8 +138,6 @@ Instance::Instance(QObject *parent) :
     lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("async");
-    LoadEmbeddedFile("declare");
-    LoadEmbeddedFile("runner");
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);

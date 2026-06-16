@@ -37,9 +37,9 @@ ColumnLayout {
     // editors shipped with radapter for fields the auto-generated form handles poorly;
     // applied automatically, but customForms (above) takes precedence
     readonly property var builtinForms: ({
-        "ModbusMaster.registers": "qrc:/radapter/RegistersForm.qml",
-        "ModbusSlave.registers":  "qrc:/radapter/RegistersForm.qml",
-        "ModbusMaster.queries":   "qrc:/radapter/QueriesForm.qml",
+        "ModbusMaster.registers": Qt.resolvedUrl("RegistersForm.qml"),
+        "ModbusSlave.registers":  Qt.resolvedUrl("RegistersForm.qml"),
+        "ModbusMaster.queries":   Qt.resolvedUrl("QueriesForm.qml"),
     })
 
     // fires on any edit anywhere in this form (incl. nested sub-forms), so a live
