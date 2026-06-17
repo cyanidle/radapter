@@ -107,44 +107,44 @@ ApplicationWindow {
             }
         }
 
-        // resizable canvas / editor / preview panes
+        // graph canvas on the left; the three editor panes docked on the right
         SplitView {
-            orientation: Qt.Vertical
+            orientation: Qt.Horizontal
             Layout.fillWidth: true
             Layout.fillHeight: true
 
             WorkerGraph {
                 id: graph
-                SplitView.preferredHeight: 240
-                SplitView.minimumHeight: 100
+                SplitView.fillWidth: true
+                SplitView.minimumWidth: 240
                 context: sharedContext
                 connectableTypes: root.pickable   // workers connect; devices (refs) don't
                 onNodeClicked: configurator.select(name)
                 onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
             }
 
-            ColumnLayout {
-                SplitView.fillHeight: true
-                SplitView.minimumHeight: 120
-                spacing: 6
+            // worker config / pipe list / preview, stacked and snapped to the right
+            SplitView {
+                orientation: Qt.Vertical
+                SplitView.preferredWidth: 340
+                SplitView.minimumWidth: 220
 
-                Label {
-                    text: configurator.registeredName.length
-                          ? ("Editing: " + configurator.registeredName)
-                          : "Select or add a worker to edit"
-                    font.bold: true
-                }
+                ColumnLayout {
+                    SplitView.fillHeight: true
+                    SplitView.minimumHeight: 120
+                    spacing: 6
 
-                // resizable config form / connections panel
-                SplitView {
-                    orientation: Qt.Horizontal
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    Label {
+                        text: configurator.registeredName.length
+                              ? ("Editing: " + configurator.registeredName)
+                              : "Select or add a worker to edit"
+                        font.bold: true
+                    }
 
                     ScrollView {
                         id: scroll
-                        SplitView.fillWidth: true
-                        SplitView.minimumWidth: 200
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                         clip: true
 
                         WorkerConfigurator {
@@ -156,13 +156,22 @@ ApplicationWindow {
                             onChanged: root.refreshPreview()
                         }
                     }
+                }
 
-                    // connections of the selected worker, alongside its config form
+                // connections (pipes) of the selected worker — devices (anything not in
+                // the pickable/connectable set) have no pipes, so don't show the panel
+                ColumnLayout {
+                    SplitView.preferredHeight: 200
+                    SplitView.minimumHeight: 80
+                    visible: configurator.registeredName.length > 0
+                             && root.pickable.indexOf(configurator.type) !== -1
+                    spacing: 4
+
+                    Label { text: "Connections"; font.bold: true }
                     Frame {
                         id: connFrame
-                        visible: configurator.registeredName.length > 0
-                        SplitView.preferredWidth: 240
-                        SplitView.minimumWidth: 160
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                         ConnectionsList {
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -171,23 +180,23 @@ ApplicationWindow {
                         }
                     }
                 }
-            }
 
-            ColumnLayout {
-                SplitView.preferredHeight: 160
-                SplitView.minimumHeight: 60
-                spacing: 4
+                ColumnLayout {
+                    SplitView.preferredHeight: 200
+                    SplitView.minimumHeight: 60
+                    spacing: 4
 
-                Label { text: "Preview (objects + pipes)"; font.bold: true }
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    TextArea {
-                        readOnly: true
-                        wrapMode: TextEdit.NoWrap
-                        text: root.lastJson
-                        font.family: "monospace"
+                    Label { text: "Preview (objects + pipes)"; font.bold: true }
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        TextArea {
+                            readOnly: true
+                            wrapMode: TextEdit.NoWrap
+                            text: root.lastJson
+                            font.family: "monospace"
+                        }
                     }
                 }
             }
