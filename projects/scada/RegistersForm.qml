@@ -26,6 +26,28 @@ ColumnLayout {
 
     ListModel { id: rows }
 
+    // populate rows from existing values[fkey] (e.g. pre-seeded or loaded config)
+    onValuesChanged: if (fkey.length > 0) _load()
+    function _load() {
+        rows.clear()
+        var regs = values[fkey]
+        if (!regs || typeof regs !== "object") return
+        for (var i = 0; i < regTypes.length; i++) {
+            var rt = regTypes[i]
+            var group = regs[rt]
+            if (!group || typeof group !== "object") continue
+            for (var nm in group) {
+                var reg = group[nm]
+                rows.append({
+                    rname: nm,
+                    regType: rt,
+                    addr: String(reg && reg.index !== undefined ? reg.index : 0),
+                    dataType: reg && reg.type ? String(reg.type) : "uint16"
+                })
+            }
+        }
+    }
+
     // compile the table into values[fkey] and notify
     function rebuild() {
         var out = {}
