@@ -49,19 +49,24 @@ local view = QML {
     },
 }
 
--- a default set to start from: 2 Modbus masters (each pointing at a device), a
--- slave, the 2 referenced Tcp devices, and a Redis client. The masters reference
--- the devices the same way the GUI's "New device" flow does ({ ref = "<name>" }).
+-- Default topology: one TCP Modbus slave (port 5020) with two masters reading it,
+-- each forwarding its data to a Redis stream under a distinct key.
+-- All required fields are pre-filled so the Run button is enabled immediately.
 local default_config = {
     objects = {
-        master1 = { type = "ModbusMaster", config = { device = { ref = "plc1" } } },
-        master2 = { type = "ModbusMaster", config = { device = { ref = "plc2" } } },
-        slave1  = { type = "ModbusSlave",  config = {} },
-        plc1    = { type = "TcpModbusDevice", config = {} },
-        plc2    = { type = "TcpModbusDevice", config = {} },
-        cache1  = { type = "RedisCache",   config = {} },
+        srv1    = { type = "TcpModbusServer", config = { host = "0.0.0.0", port = 5020 } },
+        slave1  = { type = "ModbusSlave",     config = { device = { ref = "srv1" }, slave_id = 1 } },
+        dev1    = { type = "TcpModbusDevice", config = { host = "127.0.0.1", port = 5020 } },
+        dev2    = { type = "TcpModbusDevice", config = { host = "127.0.0.1", port = 5020 } },
+        master1 = { type = "ModbusMaster",    config = { device = { ref = "dev1" }, slave_id = 1 } },
+        master2 = { type = "ModbusMaster",    config = { device = { ref = "dev2" }, slave_id = 1 } },
+        stream1 = { type = "RedisStream",     config = { stream_key = "modbus/master1" } },
+        stream2 = { type = "RedisStream",     config = { stream_key = "modbus/master2" } },
     },
-    pipes = {},
+    pipes = {
+        { from = "master1", to = "stream1" },
+        { from = "master2", to = "stream2" },
+    },
 }
 
 -- restrict the type picker to the pickable set, and seed the canvas
