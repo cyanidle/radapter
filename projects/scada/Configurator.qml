@@ -38,7 +38,7 @@ ApplicationWindow {
 
     // shared authoring state: the WorkerConfigurator and the WorkerGraph both read/write
     // this single set of objects (+ pipes), keeping names unique and edges consistent.
-    ConfigContext { id: sharedContext }
+    ConfigContext { id: sharedContext; schemas: root.schemas }
 
     function refreshPreview() {
         var _rev = sharedContext.revision   // re-run when the shared set changes
@@ -89,9 +89,15 @@ ApplicationWindow {
             ToolSeparator {}
             Button {
                 text: "▶ Run"
-                // depend on revision so it re-evaluates as objects are added/removed
+                // depend on revision (objects/config edits) and schemas (arrive async)
+                // so it re-evaluates; disabled while any worker has a required field unset
                 enabled: sharedContext.revision >= 0
+                         && sharedContext.schemas !== undefined
                          && Object.keys(sharedContext.objects).length > 0
+                         && sharedContext.allComplete()
+                ToolTip.visible: hovered && !enabled
+                                 && Object.keys(sharedContext.objects).length > 0
+                ToolTip.text: "Some workers are missing required fields"
                 onClicked: {
                     radapter.model.send({ run: { objects: sharedContext.objects,
                                                  pipes: sharedContext.pipes } })

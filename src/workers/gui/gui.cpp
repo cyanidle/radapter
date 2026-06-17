@@ -7,6 +7,7 @@
 #include <QQmlContext>
 #include <QQmlPropertyMap>
 #include <QDir>
+#include <memory>
 
 namespace radapter::gui
 {
@@ -34,7 +35,7 @@ static QMLConfig baseConfig(QVariantList const& args) {
     return c;
 }
 
-Q_GLOBAL_STATIC(QQmlEngine, g_engine)
+static std::weak_ptr<QQmlEngine> g_engineWeak;
 
 static QVariant unwrapQmlVar(QVariant const& var) {
     if (var.type() >= QVariant::UserType) {
@@ -114,6 +115,7 @@ class QMLWorker final : public radapter::Worker
 {
 	Q_OBJECT
     QMLConfig config;
+    std::shared_ptr<QQmlEngine> _engine;
     QQmlComponent* creator;
     QObject* root = nullptr;
     GuiModel* model;
@@ -122,7 +124,12 @@ public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, baseConfig(args), "qml")
     {
-        auto* engine = g_engine();
+        _engine = g_engineWeak.lock();
+        if (!_engine) {
+            _engine = std::make_shared<QQmlEngine>();
+            g_engineWeak = _engine;
+        }
+        auto* engine = _engine.get();
         model = new GuiModel(this, nullptr, QString(), this);
         proxy = new GuiInstanceProxy{this};
         auto ctx = new QQmlContext(engine, this);
@@ -208,7 +215,6 @@ namespace radapter::builtin {
 void workers::gui(Instance* inst)
 {
 	using namespace radapter::gui;
-    g_engine()->clearComponentCache();
     inst->RegisterWorker<QMLWorker>("QML");
 	inst->RegisterSchema<QMLConfig>("QML");
 }

@@ -151,14 +151,24 @@ Item {
             // recompute when pipes change (revision used in a branch so it stays a dep)
             property int conns: (graph.context && graph.context.revision >= 0)
                                 ? graph.context.connectionCount(nodeName) : 0
+            // missing required fields -> flagged with a red border (reads revision and
+            // schemas so it re-evaluates on edits and once the schemas arrive)
+            property var missing: (graph.context && graph.context.revision >= 0
+                                   && graph.context.schemas !== undefined)
+                                  ? graph.context.missingRequired(nodeName) : []
+            property bool invalid: missing.length > 0
 
             width: 168
             height: 58
             radius: 6
             color: card.connectable ? "#ffffff" : "#f0f0f5"
-            border.width: nodeName === graph.selected ? 2 : 1
+            border.width: (nodeName === graph.selected || card.invalid) ? 2 : 1
             border.color: (dropArea.containsDrag && card.connectable) ? "#fb8c00"
+                          : card.invalid ? "#d32f2f"
                           : (nodeName === graph.selected ? "#1e88e5" : "#ccc")
+
+            ToolTip.visible: clickMA.containsMouse && card.invalid
+            ToolTip.text: "Missing required: " + card.missing.join(", ")
 
             // accept a nub dragged from another worker -> a pipe into this node
             DropArea {
@@ -175,7 +185,9 @@ Item {
             // below the content, so clicks on labels select the node while the ✕
             // button and the drag nub (painted on top) still get their own events
             MouseArea {
+                id: clickMA
                 anchors.fill: parent
+                hoverEnabled: true
                 onClicked: graph.nodeActivated(card.nodeName)
             }
 

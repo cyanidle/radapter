@@ -10,6 +10,8 @@ QtObject {
 
     // name -> { type, config }; config is the live values object the editor mutates
     property var objects: ({})
+    // every worker/device schema (type -> schema), for completeness validation
+    property var schemas: ({})
     // pipes between objects, as [ { from, to } ] (the graph editor's edges)
     property var pipes: []
     // QML can't observe deep mutation of a var map, so observers bind to `revision`
@@ -67,6 +69,38 @@ QtObject {
         var out = []
         for (var k in objects) if (types.indexOf(objects[k].type) >= 0) out.push(k)
         return out
+    }
+
+    // ---- completeness validation -------------------------------------------
+    // a required field is a top-level leaf with no [optional]/[has_default]
+    // annotation (mirrors SchemaForm.isRequired); name/category aren't authored
+    // here (the object key is the name), so they're excluded
+    function requiredKeys(type) {
+        var s = schemas[type], out = []
+        if (s === undefined) return out
+        for (var k in s) {
+            if (k === "name" || k === "category") continue
+            var fs = s[k]
+            if (typeof fs === "string" && fs.indexOf("[") < 0 && fs.split(" ")[0] !== "function")
+                out.push(k)
+        }
+        return out
+    }
+    // names of required fields left unset on `name` (empty = the object is complete)
+    function missingRequired(name) {
+        var o = objects[name]
+        if (o === undefined) return []
+        var req = requiredKeys(o.type), miss = []
+        for (var i = 0; i < req.length; i++) {
+            var v = o.config[req[i]]
+            if (v === undefined || v === "") miss.push(req[i])
+        }
+        return miss
+    }
+    function isComplete(name) { return missingRequired(name).length === 0 }
+    function allComplete() {
+        for (var k in objects) if (!isComplete(k)) return false
+        return true
     }
 
     // ---- pipes (graph edges) ----------------------------------------------
