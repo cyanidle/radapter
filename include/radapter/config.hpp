@@ -391,11 +391,16 @@ template<typename T>
 void PopulateSchema(WithDefault<T>& in, QVariant& schema) {
     QVariant nested;
     PopulateSchema(in.value, nested);
-    if (nested.canConvert<QString>()) {
-        schema = nested.toString() + " [has_default]";
-    } else {
-        schema = nested;
-    }
+    QVariantMap map{{"[has_default]", nested}};
+    // Some fields use a sentinel value (e.g. an unregistered 0) to mean "leave at
+    // engine default"; Dump raises for those. Omit "default" in that case — the
+    // schema consumer still knows the field has a default, just not what it is.
+    try {
+        QVariant def;
+        Dump(in.value, def);
+        map.insert("default", def);
+    } catch (...) {}
+    schema = map;
 }
 
 template<typename T>

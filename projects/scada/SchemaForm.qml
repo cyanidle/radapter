@@ -66,6 +66,15 @@ ColumnLayout {
     }
     function isRequired(fs) { return typeof fs === "string" && leafAnno(fs) === "" && leafBase(fs) !== "function" }
 
+    function isDefault(fs)    { return isObj(fs) && fs["[has_default]"] !== undefined }
+    function unwrapDefault(fs){ return isDefault(fs) ? fs["[has_default]"] : fs }
+    function defaultVal(fs)   { return isDefault(fs) ? fs["default"] : undefined }
+    function defaultStr(v) {
+        if (v === undefined || v === null) return ""
+        if (typeof v === "object") return JSON.stringify(v)
+        return String(v)
+    }
+
     function sortedKeys() {
         var ks = []
         for (var k in schema) if (exclude.indexOf(k) < 0 && leafBase(unwrapOpt(schema[k])) !== "function") ks.push(k)
@@ -116,10 +125,12 @@ ColumnLayout {
             Layout.topMargin: index > 0 ? 6 : 0
             spacing: 4
             property string fkey: modelData
-            property bool foptional: form.isOptional(form.schema[fkey])
-            // dispatch and editors see the unwrapped (inner) schema; optionality is
-            // carried separately in `foptional` for the hint label
-            property var fschema: form.unwrapOpt(form.schema[fkey])
+            property bool foptional:    form.isOptional(form.schema[fkey])
+            property bool fhasdefault:  form.isDefault(form.unwrapOpt(form.schema[fkey]))
+            property var  fdefault:     form.defaultVal(form.unwrapOpt(form.schema[fkey]))
+            // dispatch and editors see the fully-unwrapped inner schema; optionality and
+            // default are carried separately for the hint label and editor placeholders
+            property var fschema: form.unwrapDefault(form.unwrapOpt(form.schema[fkey]))
 
             // separator between fields
             Rectangle {
@@ -141,12 +152,11 @@ ColumnLayout {
                 }
                 Label {
                     visible: text.length > 0
-                    text: foptional ? "(optional)"
-                          : (typeof fschema === "string"
-                             ? (form.leafAnno(fschema) ? "(" + form.leafAnno(fschema) + ")"
-                                                       : (form.isRequired(fschema) ? "required" : ""))
-                             : "")
-                    color: (!foptional && form.isRequired(fschema)) ? "#b00" : "#888"
+                    text: foptional   ? "(optional)"
+                        : fhasdefault ? (fdefault !== undefined ? ("default: " + form.defaultStr(fdefault)) : "(has default)")
+                        : (typeof fschema === "string" && form.isRequired(fschema)) ? "required" : ""
+                    color: (!foptional && !fhasdefault && typeof fschema === "string"
+                            && form.isRequired(fschema)) ? "#b00" : "#888"
                     font.pixelSize: 11
                 }
             }
@@ -156,7 +166,9 @@ ColumnLayout {
                 sourceComponent: form.chooserFor(fkey, fschema)
                 onLoaded: {
                     item.fkey = fkey; item.fschema = fschema
-                    if (item.foptional !== undefined) item.foptional = foptional
+                    if (item.foptional   !== undefined) item.foptional   = foptional
+                    if (item.fhasdefault !== undefined) item.fhasdefault = fhasdefault
+                    if (item.fhasdefault !== undefined) item.fdefault    = fdefault
                 }
             }
         }
@@ -168,8 +180,10 @@ ColumnLayout {
         TextField {
             property string fkey
             property var fschema
+            property bool fhasdefault: false
+            property var fdefault: undefined
             Layout.fillWidth: true
-            placeholderText: form.leafAnno(fschema) ? "default" : form.leafBase(fschema)
+            placeholderText: fhasdefault ? form.defaultStr(fdefault) : form.leafBase(fschema)
             inputMethodHints: form.isNumeric(form.leafBase(fschema)) ? Qt.ImhFormattedNumbersOnly : Qt.ImhNone
             text: form.values[fkey] !== undefined ? String(form.values[fkey]) : ""
             onEditingFinished: {
@@ -202,16 +216,24 @@ ColumnLayout {
             property var fschema
             // optional enums get a leading "(none)" entry so the field can stay unset
             // (engine default); selecting it clears the value
-            property bool foptional: false
+            property bool foptional:   false
+            property bool fhasdefault: false
+            property var fdefault:     undefined
             Layout.fillWidth: true
             model: fschema ? (foptional ? ["(none)"].concat(fschema) : fschema) : []
-            // show a previously-set value if any; reactive so it resolves once the
-            // Loader assigns fschema. Leave `values` unset until the user picks, so
-            // engine defaults apply to untouched fields.
+            // prefer an explicitly-set value, then fall back to showing the default;
+            // `values` stays unset until the user activates, so engine defaults apply
             currentIndex: {
-                if (!fschema || form.values[fkey] === undefined) return 0
-                var i = fschema.indexOf(form.values[fkey])
-                return foptional ? i + 1 : i
+                if (!fschema) return 0
+                if (form.values[fkey] !== undefined) {
+                    var i = fschema.indexOf(form.values[fkey])
+                    return foptional ? i + 1 : i
+                }
+                if (fhasdefault && fdefault !== undefined) {
+                    var di = fschema.indexOf(String(fdefault))
+                    if (di >= 0) return foptional ? di + 1 : di
+                }
+                return 0
             }
             onActivated: {
                 if (foptional && currentIndex === 0) form.clearVal(fkey)
