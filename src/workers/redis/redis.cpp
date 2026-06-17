@@ -322,8 +322,10 @@ public:
             });
     }
     void parseReply(QVariant resp) {
+        if (!resp.isValid())
+            return;
         if (resp.type() != QVariant::List) {
-            Error("error reading stream: {}", resp.toString());
+            Error("error reading stream: non list received {}", resp.typeName() ? resp.typeName() : "<unk>");
             return;
         }
         auto entries = resp.toList().value(0).toList().value(1).toList();
