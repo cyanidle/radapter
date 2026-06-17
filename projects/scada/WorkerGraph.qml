@@ -83,8 +83,10 @@ Item {
             anchors.fill: parent
             anchors.margins: 8
             clip: true
+            contentHeight: nodeColumns.implicitHeight
 
             ColumnLayout {
+                id: nodeColumns
                 width: graph.width - 32
                 spacing: 10
 
@@ -136,9 +138,9 @@ Item {
         }
         Connections {
             target: graph
-            onLinkX2Changed: linkCanvas.requestPaint()
-            onLinkY2Changed: linkCanvas.requestPaint()
-            onLinkingChanged: linkCanvas.requestPaint()
+            function onLinkX2Changed()  { linkCanvas.requestPaint() }
+            function onLinkY2Changed()  { linkCanvas.requestPaint() }
+            function onLinkingChanged() { linkCanvas.requestPaint() }
         }
     }
 
