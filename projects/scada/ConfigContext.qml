@@ -81,7 +81,12 @@ QtObject {
         for (var k in s) {
             if (k === "name" || k === "category") continue
             var fs = s[k]
+            // plain string leaf with no annotation
             if (typeof fs === "string" && fs.indexOf("[") < 0 && fs.split(" ")[0] !== "function")
+                out.push(k)
+            // plain container/struct (no [optional]/[has_default] wrapper) — must be non-empty
+            else if (fs !== null && typeof fs === "object"
+                     && fs["[optional]"] === undefined && fs["[has_default]"] === undefined)
                 out.push(k)
         }
         return out
@@ -94,6 +99,7 @@ QtObject {
         for (var i = 0; i < req.length; i++) {
             var v = o.config[req[i]]
             if (v === undefined || v === "") miss.push(req[i])
+            else if (v !== null && typeof v === "object" && Object.keys(v).length === 0) miss.push(req[i])
         }
         return miss
     }

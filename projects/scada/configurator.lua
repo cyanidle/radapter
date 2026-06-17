@@ -55,11 +55,20 @@ local view = QML {
 local default_config = {
     objects = {
         srv1    = { type = "TcpModbusServer", config = { host = "0.0.0.0", port = 5020 } },
-        slave1  = { type = "ModbusSlave",     config = { device = { ref = "srv1" }, slave_id = 1 } },
+        slave1  = { type = "ModbusSlave",  config = {
+            device = { ref = "srv1" }, slave_id = 1,
+            registers = { holding = { status = { index = 0 }, setpoint = { index = 1 } } },
+        } },
         dev1    = { type = "TcpModbusDevice", config = { host = "127.0.0.1", port = 5020 } },
         dev2    = { type = "TcpModbusDevice", config = { host = "127.0.0.1", port = 5020 } },
-        master1 = { type = "ModbusMaster",    config = { device = { ref = "dev1" }, slave_id = 1 } },
-        master2 = { type = "ModbusMaster",    config = { device = { ref = "dev2" }, slave_id = 1 } },
+        master1 = { type = "ModbusMaster", config = {
+            device = { ref = "dev1" }, slave_id = 1,
+            registers = { holding = { status = { index = 0 } } },
+        } },
+        master2 = { type = "ModbusMaster", config = {
+            device = { ref = "dev2" }, slave_id = 1,
+            registers = { holding = { setpoint = { index = 1 } } },
+        } },
         stream1 = { type = "RedisStream",     config = { stream_key = "modbus/master1" } },
         stream2 = { type = "RedisStream",     config = { stream_key = "modbus/master2" } },
     },

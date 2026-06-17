@@ -64,7 +64,13 @@ ColumnLayout {
     function isNumeric(b) {
         return ["int", "uint", "ushort", "ulong", "uchar", "qlonglong", "float32"].indexOf(b) >= 0
     }
-    function isRequired(fs) { return typeof fs === "string" && leafAnno(fs) === "" && leafBase(fs) !== "function" }
+    // a field is required if its schema has no [optional]/[has_default] wrapper —
+    // applies to both plain string leaves and plain containers/structs
+    function isRequired(fs) {
+        if (typeof fs === "string") return leafAnno(fs) === "" && leafBase(fs) !== "function"
+        if (fs === null || typeof fs !== "object") return false
+        return fs["[optional]"] === undefined && fs["[has_default]"] === undefined
+    }
 
     function isDefault(fs)    { return isObj(fs) && fs["[has_default]"] !== undefined }
     function unwrapDefault(fs){ return isDefault(fs) ? fs["[has_default]"] : fs }
@@ -154,9 +160,9 @@ ColumnLayout {
                     visible: text.length > 0
                     text: foptional   ? "(optional)"
                         : fhasdefault ? (fdefault !== undefined ? ("default: " + form.defaultStr(fdefault)) : "(has default)")
-                        : (typeof fschema === "string" && form.isRequired(fschema)) ? "required" : ""
-                    color: (!foptional && !fhasdefault && typeof fschema === "string"
-                            && form.isRequired(fschema)) ? "#b00" : "#888"
+                        : form.isRequired(form.schema[fkey]) ? "required" : ""
+                    color: (!foptional && !fhasdefault
+                            && form.isRequired(form.schema[fkey])) ? "#b00" : "#888"
                     font.pixelSize: 11
                 }
             }
