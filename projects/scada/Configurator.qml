@@ -152,7 +152,6 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-                        contentHeight: configurator.implicitHeight
 
                         WorkerConfigurator {
                             id: configurator

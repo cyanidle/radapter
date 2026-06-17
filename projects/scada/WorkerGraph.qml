@@ -83,10 +83,8 @@ Item {
             anchors.fill: parent
             anchors.margins: 8
             clip: true
-            contentHeight: nodeColumns.implicitHeight
 
             ColumnLayout {
-                id: nodeColumns
                 width: graph.width - 32
                 spacing: 10
 
