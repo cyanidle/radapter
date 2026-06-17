@@ -71,6 +71,25 @@ static int lua_schema(lua_State* L) {
     return 1;
 }
 
+// raise the message captured as upvalue 1 (used for both __call and __index)
+static int unavailableError(lua_State* L) {
+    return luaL_error(L, "%s", lua_tostring(L, lua_upvalueindex(1)));
+}
+
+// register a global stub that raises `msg` on any call or index, so a feature used
+// before it is enabled reports the cause instead of a nil call/index error
+static void registerUnavailable(lua_State* L, const char* name, const char* msg) {
+    lua_newtable(L);                                  // stub
+    lua_newtable(L);                                  // metatable
+    lua_pushstring(L, msg);
+    lua_pushcclosure(L, unavailableError, 1);         // closure capturing msg
+    lua_pushvalue(L, -1);                             // use it for both metamethods
+    lua_setfield(L, -3, "__index");
+    lua_setfield(L, -2, "__call");
+    lua_setmetatable(L, -2);
+    lua_setglobal(L, name);
+}
+
 Instance::Instance(QObject *parent) :
     QObject(parent),
     d(new Impl)
@@ -158,6 +177,13 @@ Instance::Instance(QObject *parent) :
     for (size_t i{}; i < builtin::workers::count; ++i) {
         builtin::workers::all[i](this);
     }
+
+    // Globals that only exist once a feature is enabled (QML -> EnableGui via --gui,
+    // tags -> EnableTags via --tags) get an erroring stub so that using them otherwise
+    // reports the cause instead of a bare "attempt to call/index a nil value". The
+    // real value overwrites the stub when the feature is enabled.
+    registerUnavailable(L, "QML", "QML worker is unavailable: run with --gui (needs a RADAPTER_GUI build)");
+    registerUnavailable(L, "tags", "tag API is unavailable: run with --tags");
 }
 
 static string load_builtin(QString name) {
