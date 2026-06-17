@@ -69,8 +69,8 @@ local default_config = {
             device = { ref = "dev2" }, slave_id = 1,
             registers = { holding = { setpoint = { index = 1 } } },
         } },
-        stream1 = { type = "RedisStream",     config = { stream_key = "modbus/master1" } },
-        stream2 = { type = "RedisStream",     config = { stream_key = "modbus/master2" } },
+        stream1 = { type = "RedisStream",     config = { stream_key = "modbus:master1" } },
+        stream2 = { type = "RedisStream",     config = { stream_key = "modbus:master2" } },
     },
     pipes = {
         { from = "master1", to = "stream1" },
