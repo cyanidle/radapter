@@ -2,13 +2,13 @@
 -- radapter process (via the Process worker, so they can't interfere with each other's
 -- ports/sockets/shutdown) — and reports a pass/fail summary. Exits 0 iff all pass.
 --
---   build/bin/radapter tests/radapter.lua
+--   build/bin/radapter tests/all.lua
 --
 -- New tests are picked up automatically; add a flag entry below if one needs CLI flags.
 
 local lfs = require "lfs"
 
-local SELF = "radapter.lua"
+local SELF = "all.lua"
 local FLAGS = {                       -- per-file extra CLI flags
     ["tags.lua"] = { "--tags" },
 }

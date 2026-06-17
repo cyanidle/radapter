@@ -68,10 +68,10 @@ There is no unit-test framework. Self-checking scripts live under `tests/`; runn
 demonstrations live under `examples/`.
 
 **Tests (`tests/`)** are self-checking — the binary runs them and they exit 0 on success /
-1 on failure. **`tests/radapter.lua` runs the whole suite** — it spawns every other
+1 on failure. **`tests/all.lua` runs the whole suite** — it spawns every other
 `tests/*.lua` in its own radapter process (via the `Process` worker, so they can't clash on
 ports/sockets/shutdown), applies any needed flags, and exits 0 iff all pass
-(`build/bin/radapter tests/radapter.lua`); new tests are auto-discovered. **The primary
+(`build/bin/radapter tests/all.lua`); new tests are auto-discovered. **The primary
 smoke test is `tests/smoke.lua`** — run it after any engine change
 (`build/bin/radapter tests/smoke.lua`); it constructs every worker that needs no external
 hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus slave/master
