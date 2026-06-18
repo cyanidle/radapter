@@ -1,7 +1,7 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import QtQuick.Dialogs 1.2
+import QtQuick.Dialogs 1.2 as Dialogs   // aliased so `Dialog` stays QtQuick.Controls' Dialog
 // configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are
 // sibling .qml files in this directory and resolve by name without an import.
 
@@ -33,24 +33,16 @@ ApplicationWindow {
 
     // strip the file:// scheme a FileDialog url carries, yielding a plain path for Lua I/O
     function urlToPath(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")) }
+    function dirOf(p)  { return p.replace(/[\/\\][^\/\\]*$/, "") }
+    function baseOf(p) { return p.replace(/^.*[\/\\]/, "") }
 
-    // File dialog for save/open
-    FileDialog {
-        id: saveDialog
-        title: "Save Project"
-        nameFilters: ["JSON files (*.json)"]
-        selectExisting: false
-        folder: shortcuts.home
-        onAccepted: {
-            var path = root.urlToPath(fileUrl)
-            if (path.indexOf(".json") === -1) path = path + ".json"
-            root.projectPath = path
-            // hand Lua the path and the current config to write
-            radapter.model.send({ save_file: path, config: root.projectConfig() })
-        }
-    }
-
-    FileDialog {
+    // Open uses a native FileDialog (pick-existing works natively). Saving does NOT:
+    // QtQuick.Dialogs 1.2's `selectExisting: false` is ignored by the native helper (it
+    // always opens in pick-existing mode), and Qt.labs.platform's save dialog has no
+    // backend here (radapter links no Qt Widgets). So we compose folder selection with an
+    // explicit filename field — a small custom dialog that reliably lets the user name the
+    // file on any platform.
+    Dialogs.FileDialog {
         id: openDialog
         title: "Open Project"
         nameFilters: ["JSON files (*.json)"]
@@ -62,8 +54,61 @@ ApplicationWindow {
         }
     }
 
+    // folder picker behind the Save dialog's "Browse…" button (selectFolder works natively)
+    Dialogs.FileDialog {
+        id: folderDialog
+        title: "Choose Folder"
+        selectFolder: true
+        folder: shortcuts.home
+        onAccepted: saveDialog.folder = root.urlToPath(fileUrl)
+    }
+
+    Dialog {
+        id: saveDialog
+        title: "Save Project"
+        modal: true
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 460
+        standardButtons: Dialog.Save | Dialog.Cancel
+        property string folder: ""     // chosen directory (plain path)
+
+        onAccepted: {
+            var name = nameField.text.trim()
+            if (!name.length) { messageDialog.text = "Please enter a file name."; messageDialog.open(); return }
+            if (name.indexOf(".json") === -1) name = name + ".json"
+            var dir = saveDialog.folder.replace(/[\/\\]+$/, "")
+            var path = (dir.length ? dir + "/" : "") + name
+            root.projectPath = path
+            radapter.model.send({ save_file: path, config: root.projectConfig() })
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 8
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                TextField {
+                    id: folderField
+                    Layout.fillWidth: true
+                    placeholderText: "Folder"
+                    text: saveDialog.folder
+                    onEditingFinished: saveDialog.folder = text
+                }
+                Button { text: "Browse…"; onClicked: folderDialog.open() }
+            }
+            TextField {
+                id: nameField
+                Layout.fillWidth: true
+                placeholderText: "File name (e.g. project.json)"
+                onAccepted: saveDialog.accept()
+            }
+        }
+    }
+
     // Message dialog for file I/O feedback (not an attached property)
-    MessageDialog {
+    Dialogs.MessageDialog {
         id: messageDialog
         title: "Radapter Configurator"
     }
@@ -79,6 +124,14 @@ ApplicationWindow {
     }
 
     function saveProjectAs() {
+        if (root.projectPath.length) {
+            saveDialog.folder = root.dirOf(root.projectPath)
+            nameField.text = root.baseOf(root.projectPath)
+        } else {
+            if (!saveDialog.folder.length)
+                saveDialog.folder = root.urlToPath(folderDialog.shortcuts.home)
+            nameField.text = "project.json"
+        }
         saveDialog.open()
     }
 

@@ -169,6 +169,12 @@ public:
         if (!_engine) {
             _engine = std::make_shared<QQmlEngine>();
             g_engineWeak = _engine;
+            // QML `Qt.quit()` (e.g. the File→Exit menu) emits these — route them to a
+            // cooperative radapter shutdown instead of killing the app out from under us
+            QObject::connect(_engine.get(), &QQmlEngine::quit, _engine.get(),
+                             [inst] { inst->Shutdown(); });
+            QObject::connect(_engine.get(), &QQmlEngine::exit, _engine.get(),
+                             [inst](int) { inst->Shutdown(); });
         }
         auto* engine = _engine.get();
         model = new GuiModel(this, nullptr, QString(), this);
