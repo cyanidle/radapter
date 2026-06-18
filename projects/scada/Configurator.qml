@@ -1,6 +1,7 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
+import QtQuick.Dialogs 1.2
 // configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are
 // sibling .qml files in this directory and resolve by name without an import.
 
@@ -11,18 +12,78 @@ import QtQuick.Layouts 1.3
 // onto another worker links them into a pipe. A live preview shows the authored
 // declarative config (objects + pipes), ready for declare.build / declare.save_to.
 // The canvas, editor and preview are arranged in SplitViews so the panes are resizable.
+//
+// A menubar (File menu) provides New, Open, Save, and Save As project operations.
 ApplicationWindow {
     id: root
     visible: true
-    width: 720
-    height: 860
-    title: "Radapter Configurator"
+    width: 960
+    height: 900
+    title: "Radapter Configurator" + (root.projectName.length > 0 ? " — " + root.projectName : "")
 
     property var schemas: ({})
     property var pickable: []
     property var formOverrides: ({})   // per-field custom editors, from Lua
     property string lastJson: ""
     property string runState: "—"      // runner connection state, shown in the log window
+    property string projectPath: ""     // last saved/opened file path
+
+    // File dialog for save/open
+    FileDialog {
+        id: saveDialog
+        title: "Save Project"
+        nameFilters: ["JSON files (*.json)"]
+        currentFolder: StandardPaths.locate(StandardPaths.HomeLocation, "", StandardPaths.FType.Directory)
+        onAccepted: {
+            var path = decodeURIComponent(url)
+            if (path.indexOf(".json") === -1) path = path + ".json"
+            root.projectPath = path
+            // notify Lua to actually write the file
+            radapter.model.send({ save_file: path })
+        }
+    }
+
+    FileDialog {
+        id: openDialog
+        title: "Open Project"
+        nameFilters: ["JSON files (*.json)"]
+        currentFolder: StandardPaths.locate(StandardPaths.HomeLocation, "", StandardPaths.FType.Directory)
+        selectExisting: true
+        onAccepted: {
+            var path = decodeURIComponent(url)
+            root.projectPath = path
+            // notify Lua to read the file and send back the config
+            radapter.model.send({ open_file: path })
+        }
+    }
+
+    messageDialog: MessageDialog {
+        id: messageDialog
+        title: "Radapter Configurator"
+    }
+
+    // ── File operations (delegate to Lua for actual I/O) ─────────────────
+
+    function saveProject() {
+        if (root.projectPath.length > 0) {
+            radapter.model.send({ save_file: root.projectPath })
+        } else {
+            saveProjectAs()
+        }
+    }
+
+    function saveProjectAs() {
+        saveDialog.open()
+    }
+
+    function openProject() {
+        openDialog.open()
+    }
+
+    function newProject() {
+        sharedContext.load({ objects: {}, pipes: [], visualization: { root: { type: "Column", spacing: 8, children: [] } } })
+        root.projectPath = ""
+    }
 
     // schemas arrive as a plain { schemas: {...} } message; received() delivers the
     // raw tree as native JS (so Object.keys / arrays work, unlike the model tree)
@@ -30,10 +91,30 @@ ApplicationWindow {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
         // a declare-style { objects, pipes, visualization } config to seed/replace the set
-        if (msg.config !== undefined) sharedContext.load(msg.config)
+        if (msg.config !== undefined) {
+            sharedContext.load(msg.config)
+        }
         // streamed back from the headless runner launched by "Run"
         if (msg.run_state !== undefined) root.runState = String(msg.run_state)
         if (msg.log !== undefined) logWindow.append(msg.log)
+        // file I/O responses
+        if (msg.save_ok !== undefined) {
+            messageDialog.text = "Saved to " + msg.save_ok
+            messageDialog.open()
+        }
+        if (msg.save_err !== undefined) {
+            messageDialog.text = "Failed to save: " + msg.save_msg
+            messageDialog.open()
+        }
+        if (msg.open_ok !== undefined) {
+            root.projectPath = msg.open_ok
+            messageDialog.text = "Opened " + msg.open_ok
+            messageDialog.open()
+        }
+        if (msg.open_err !== undefined) {
+            messageDialog.text = "Failed to open: " + msg.open_msg
+            messageDialog.open()
+        }
     }
 
     // shared authoring state: the WorkerConfigurator and the WorkerGraph both read/write
@@ -72,6 +153,39 @@ ApplicationWindow {
         sharedContext.changed.connect(refreshPreview)
         // custom_forms is a global context property set from Lua (QML properties=...)
         if (typeof custom_forms !== "undefined") root.formOverrides = custom_forms
+    }
+
+    // ── Menu bar ─────────────────────────────────────────────────────────
+    menubar: MenuBar {
+        Menu {
+            title: "File"
+            MenuItem {
+                text: "New"
+                shortcut: "Ctrl+N"
+                onTriggered: root.newProject()
+            }
+            MenuItem {
+                text: "Open…"
+                shortcut: "Ctrl+O"
+                onTriggered: root.openProject()
+            }
+            MenuItem {
+                text: "Save"
+                shortcut: "Ctrl+S"
+                onTriggered: root.saveProject()
+            }
+            MenuItem {
+                text: "Save As…"
+                shortcut: "Ctrl+Shift+S"
+                onTriggered: root.saveProjectAs()
+            }
+            MenuSeparator {}
+            MenuItem {
+                text: "Exit"
+                shortcut: "Alt+F4"
+                onTriggered: Qt.quit()
+            }
+        }
     }
 
     ColumnLayout {

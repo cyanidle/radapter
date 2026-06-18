@@ -184,3 +184,60 @@ pipe(view, function(msg)
         stop_runner()
     end
 end)
+
+-- ── File save/load (triggered by QML menubar actions) ────────────────────
+--
+-- QML sends { save_file = path } or { open_file = path } through the view
+-- worker. We use Lua's standard io library to read/write project JSON.
+-- We keep the current project state in a local variable so we can save it.
+
+local current_config = default_config   -- the live authoring state
+
+pipe(view, function(msg)
+    if msg.save_file then
+        local path = msg.save_file
+        local data = json_encode(current_config)
+        local f, err = io.open(path, "w")
+        if f then
+            f:write(data)
+            f:close()
+            view { save_ok = path }
+            log.info("Saved project to {}", path)
+        else
+            view { save_err = path, save_msg = err }
+            log.error("Failed to save {}: {}", path, err)
+        end
+    elseif msg.open_file then
+        local path = msg.open_file
+        local f, err = io.open(path, "r")
+        if f then
+            local data = f:read("*a")
+            f:close()
+            local ok, cfg = pcall(json_decode, data)
+            if ok then
+                current_config = cfg
+                view { config = cfg }
+                view { open_ok = path }
+                log.info("Loaded project from {}", path)
+            else
+                view { open_err = path, open_msg = "Invalid JSON: " .. tostring(cfg) }
+                log.error("Failed to parse {}: {}", path, cfg)
+            end
+        else
+            view { open_err = path, open_msg = err }
+            log.error("Failed to open {}: {}", path, err)
+        end
+    elseif msg.config then
+        -- QML sends the live config when the user makes changes via the GUI;
+        -- we keep our own copy for save operations.
+        current_config = msg.config
+    elseif msg.save_ok then
+        log.info("Project saved to {}", msg.save_ok)
+    elseif msg.save_err then
+        log.error("Failed to save {}: {}", msg.save_err, msg.save_msg)
+    elseif msg.open_ok then
+        log.info("Project loaded from {}", msg.open_ok)
+    elseif msg.open_err then
+        log.error("Failed to open {}: {}", msg.open_err, msg.open_msg)
+    end
+end)
