@@ -7,7 +7,7 @@ CPMAddPackage("gh:SpartanJ/efsw#0c70ed2")
 CPMAddPackage(NAME rpcxx
   GITHUB_REPOSITORY Neolant-Service/rpcxx
   GIT_SHALLOW YES
-  VERSION 2.0
+  VERSION 2.5
   EXCLUDE_FROM_ALL YES
 )
 
