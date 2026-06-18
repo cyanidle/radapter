@@ -487,7 +487,7 @@ QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
     auto s = luaL_tolstring(L, idx, &len);
     lua_pop(L, 1);
     auto res = QString::fromUtf8(s, int(len));
-    if (!res.isEmpty()) {
+    if (!len || !res.isEmpty()) {
         return res;
     }
     return QByteArray(s, static_cast<int>(len));
