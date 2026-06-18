@@ -208,6 +208,11 @@ int main (int argc, char **argv) try {
     if (!app) {
         app.reset(new QCoreApplication(argc, argv));
     }
+    // QtQuick.Dialogs' fallback file dialog persists its state via QSettings, which warns
+    // unless the application identity is set — give it one so the GUI runs noise-free
+    QCoreApplication::setOrganizationName("radapter");
+    QCoreApplication::setOrganizationDomain("radapter.local");
+    QCoreApplication::setApplicationName("radapter");
     std::vector<std::string> args;
     for (auto a: app->arguments()) {
         args.push_back(a.toStdString());
