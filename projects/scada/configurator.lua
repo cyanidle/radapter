@@ -78,33 +78,12 @@ local default_config = {
     },
 }
 
--- Candidate tag names for the visualization editor. Tags follow the "<worker>:<field>"
--- convention (see src/tags.cpp); derive the field set from each Modbus object's register
--- tables. Best-effort discovery — the editor's tag field is also free-text.
-local function candidate_tags(config)
-    local out = {}
-    for name, entry in pairs(config.objects or {}) do
-        if entry.type == "ModbusMaster" or entry.type == "ModbusSlave" then
-            local regs = (entry.config or {}).registers or {}
-            for _, group in pairs(regs) do
-                if type(group) == "table" then
-                    for field in pairs(group) do
-                        out[#out + 1] = name .. ":" .. field
-                    end
-                end
-            end
-        end
-    end
-    table.sort(out)   -- clusters by worker-name prefix
-    return out
-end
-
--- restrict the type picker to the pickable set, and seed the canvas
+-- restrict the type picker to the pickable set, and seed the canvas. The visualization
+-- editor derives its candidate tags live from the authored config (see hmi/HmiEditor.qml).
 view {
     schemas = schemas,
     pickable = pickable,
     config = default_config,
-    candidate_tags = candidate_tags(default_config),
 }
 
 -- ── Run: launch the authored config in a separate headless adapter ───────────

@@ -21,7 +21,6 @@ ApplicationWindow {
     property var schemas: ({})
     property var pickable: []
     property var formOverrides: ({})   // per-field custom editors, from Lua
-    property var candidateTags: []     // "worker:field" tag names, derived from the config
     property string lastJson: ""
     property string runState: "—"      // runner connection state, shown in the log window
 
@@ -30,7 +29,6 @@ ApplicationWindow {
     function onMsg(msg) {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
-        if (msg.candidate_tags !== undefined) root.candidateTags = msg.candidate_tags
         // a declare-style { objects, pipes, visualization } config to seed/replace the set
         if (msg.config !== undefined) sharedContext.load(msg.config)
         // streamed back from the headless runner launched by "Run"
@@ -231,8 +229,7 @@ ApplicationWindow {
         id: hmiEditorLoader
         source: "hmi/HmiEditor.qml"
         onLoaded: {
-            item.context = sharedContext
-            item.candidateTags = Qt.binding(function () { return root.candidateTags })
+            item.context = sharedContext   // the editor derives candidate tags from it live
         }
     }
 

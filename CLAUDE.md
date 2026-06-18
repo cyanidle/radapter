@@ -31,7 +31,8 @@ build/bin/radapter --schema
 
 # Other useful flags
 build/bin/radapter --watch-dir . examples/modbus/modbus.lua  # hot reload on file change
-build/bin/radapter --gui --gui-auto-quit examples/chat/client.lua  # quit when window closes
+build/bin/radapter --gui examples/chat/client.lua  # quits when the last window closes
+build/bin/radapter --gui --gui-no-auto-quit examples/chat/client.lua  # keep running after the window closes
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
 build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables QML
@@ -57,7 +58,7 @@ drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 ### Adding CLI flags
 
 `app/main.cpp` does a **pre-scan** of raw `argv` before argparse runs. This is necessary
-**only for the GUI-enabling flags** (`--gui`, and `--gui-auto-quit` which implies it),
+**only for the GUI-enabling flags** (`--gui`, and `--gui-no-auto-quit` which also implies it),
 because `QGuiApplication` must be constructed before argparse touches `argc/argv`. All
 other flags must be added to the argparse parser and read after `cli.parse_args(args)` —
 do not add new flags to the pre-scan loop.

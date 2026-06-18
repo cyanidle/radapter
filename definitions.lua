@@ -68,12 +68,13 @@ function make_service(request, responce, timeout) end
 ---@field on string?
 
 ---A node in the operator visualization (HMI) tree. Either a layout container
----(type Row/Column/Grid, with `children`) or a widget leaf (type Gauge/InfoDisplay,
----bound to a `tag`). See projects/scada/hmi/Node.qml.
+---(type Row/Column/Grid, with `children`) or a widget leaf (type Gauge/InfoDisplay/
+---Spacer/Custom, bound to a `tag`). See projects/scada/hmi/Node.qml.
 ---@class RadVizNode
----@field type string -- "Row"|"Column"|"Grid"|"Gauge"|"InfoDisplay"
+---@field type string -- "Row"|"Column"|"Grid"|"Gauge"|"InfoDisplay"|"Spacer"|"Custom"
 ---@field children RadVizNode[]? -- container children
 ---@field tag string? -- "<worker>:<field>" tag the leaf binds to
+---@field source string? -- Custom: path/URL of a .qml file to load
 ---@field spacing number? -- container child spacing
 ---@field columns number? -- Grid column count
 ---@field min number? -- Gauge range minimum

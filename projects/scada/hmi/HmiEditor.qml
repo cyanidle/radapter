@@ -18,7 +18,10 @@ ApplicationWindow {
     title: "Visualization Editor"
 
     property var context: null          // shared ConfigContext
-    property var candidateTags: []      // "worker:field" strings, grouped by worker prefix
+
+    // candidate "worker:field" tags, derived live from the authored config (re-evaluated
+    // on every context edit via revision), sorted so they cluster by worker-name prefix.
+    property var candidateTags: context ? deriveTags(context.objects, context.revision) : []
 
     property var viz: ({ root: { type: "Column", spacing: 8, children: [] } })
     property var selectedPath: null     // array of child indices; [] is the root
@@ -26,7 +29,26 @@ ApplicationWindow {
     property var fields: []             // property descriptors for the selected node
 
     readonly property var containerTypes: ["Row", "Column", "Grid"]
-    readonly property var widgetTypes: ["Gauge", "InfoDisplay"]
+    readonly property var widgetTypes: ["Gauge", "InfoDisplay", "Spacer", "Custom"]
+
+    // Tags follow the "<worker>:<field>" convention (see src/tags.cpp). Walk each
+    // Modbus object's register tables for the field names. Best-effort — the tag field
+    // is also free-text, so anything not discovered here can still be typed in.
+    function deriveTags(objects, _rev) {
+        var out = []
+        for (var name in (objects || ({}))) {
+            var o = objects[name]
+            if (!o || (o.type !== "ModbusMaster" && o.type !== "ModbusSlave")) continue
+            var regs = (o.config || ({})).registers || ({})
+            for (var group in regs) {
+                var g = regs[group]
+                if (g && typeof g === "object")
+                    for (var field in g) out.push(name + ":" + field)
+            }
+        }
+        out.sort()
+        return out
+    }
 
     function isContainerType(t) { return containerTypes.indexOf(t) >= 0 }
     function clone(o) { return JSON.parse(JSON.stringify(o)) }
@@ -78,6 +100,8 @@ ApplicationWindow {
         if (type === "Grid")  return { type: type, spacing: 8, columns: 2, children: [] }
         if (isContainerType(type)) return { type: type, spacing: 8, children: [] }
         if (type === "Gauge") return { type: type, tag: "", min: 0, max: 100, label: type, units: "" }
+        if (type === "Spacer") return { type: type, fillWidth: true }
+        if (type === "Custom") return { type: type, source: "", tag: "" }
         return { type: type, tag: "", label: type, units: "" }   // InfoDisplay & others
     }
     function addNode(type) {
@@ -126,6 +150,11 @@ ApplicationWindow {
         if (isContainerType(node.type)) {
             f.push({ key: "spacing", label: "Spacing", kind: "number" })
             if (node.type === "Grid") f.push({ key: "columns", label: "Columns", kind: "number" })
+        } else if (node.type === "Spacer") {
+            // a spacer carries only layout hints (appended below)
+        } else if (node.type === "Custom") {
+            f.push({ key: "source", label: "QML source", kind: "text" })
+            f.push({ key: "tag", label: "Tag", kind: "tag" })
         } else {
             f.push({ key: "tag", label: "Tag", kind: "tag" })
             f.push({ key: "label", label: "Label", kind: "text" })
@@ -192,12 +221,24 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
+                focus: true
                 model: editor.rows
+                // Delete key removes the selected node (no-op on the root). Scoped to the
+                // tree's focus so it doesn't hijack Delete while editing a property field.
+                Keys.onPressed: {
+                    if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+                        editor.removeSelected()
+                        event.accepted = true
+                    }
+                }
                 delegate: ItemDelegate {
                     width: treeList.width
                     height: 26
                     highlighted: editor.pathEq(modelData.path, editor.selectedPath)
-                    onClicked: { editor.selectedPath = modelData.path; editor.refresh() }
+                    onClicked: {
+                        editor.selectedPath = modelData.path; editor.refresh()
+                        treeList.forceActiveFocus()
+                    }
                     contentItem: Text {
                         text: modelData.label
                         leftPadding: 8 + modelData.depth * 16
@@ -229,7 +270,10 @@ ApplicationWindow {
                         mode: "design"
                         path: []
                         selectedPath: editor.selectedPath
-                        onSelectRequested: { editor.selectedPath = path; editor.refresh() }
+                        onSelectRequested: {
+                            editor.selectedPath = path; editor.refresh()
+                            treeList.forceActiveFocus()
+                        }
                     }
                 }
             }
