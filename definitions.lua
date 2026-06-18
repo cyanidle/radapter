@@ -67,9 +67,32 @@ function make_service(request, responce, timeout) end
 ---@field unwrap string?
 ---@field on string?
 
+---A node in the operator visualization (HMI) tree. Either a layout container
+---(type Row/Column/Grid, with `children`) or a widget leaf (type Gauge/InfoDisplay,
+---bound to a `tag`). See projects/scada/hmi/Node.qml.
+---@class RadVizNode
+---@field type string -- "Row"|"Column"|"Grid"|"Gauge"|"InfoDisplay"
+---@field children RadVizNode[]? -- container children
+---@field tag string? -- "<worker>:<field>" tag the leaf binds to
+---@field spacing number? -- container child spacing
+---@field columns number? -- Grid column count
+---@field min number? -- Gauge range minimum
+---@field max number? -- Gauge range maximum
+---@field label string? -- widget caption
+---@field units string? -- value units suffix
+---@field color string? -- Gauge arc color
+---@field fillWidth boolean? -- Layout.fillWidth hint
+---@field fillHeight boolean? -- Layout.fillHeight hint
+---@field preferredWidth number? -- Layout.preferredWidth hint
+---@field preferredHeight number? -- Layout.preferredHeight hint
+
+---@class RadVisualization
+---@field root RadVizNode
+
 ---@class RadConfig
 ---@field objects table<string, RadObjectEntry>
 ---@field pipes RadPipe[]?
+---@field visualization RadVisualization? -- operator HMI authored by the scada configurator
 
 ---@class RadSaveParams
 ---@field config RadConfig

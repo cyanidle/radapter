@@ -28,6 +28,7 @@ public:
 
     void Subscribe(QString const& tagName, LuaFunction fn);
     Tag const* GetTag(QString const& tagName) const;
+    QStringList TagNames() const { return _tags.keys(); }
     void Advertise(Worker* w, QStringList const& fields);
 
     // get-or-create the per-tag listener list behind tags.changed["name"]
@@ -36,6 +37,9 @@ public:
     // called from worker_notify before Lua listeners fire
     void onWorkerMsg(Worker* w, QVariant const& msg);
     void onWorkerEvent(Worker* w, QVariant const& msg);
+
+signals:
+    void tagChanged(QString const& name, QVariant const& value, QString const& quality);
 
 public slots:
     void onWorkerCreated(Worker* w);

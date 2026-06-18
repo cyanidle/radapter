@@ -2,6 +2,7 @@
 #include <radapter/logs.hpp>
 #include <radapter/function.hpp>
 #include "builtin.hpp"
+#include "tags.hpp"
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
@@ -99,14 +100,52 @@ private:
     QString _key;
 };
 
+// Reactive view of the tag registry for QML: radapter.tags["worker:field"] is the live
+// value, radapter.quality["worker:field"] the live quality ("good"/"comm_fail"). Both are
+// QQmlPropertyMaps kept in sync from TagRegistry::tagChanged, so bindings update on data.
+class TagsProxy : public QQmlPropertyMap {
+    Q_OBJECT
+public:
+    TagsProxy(TagRegistry* reg, QQmlPropertyMap* quality, QObject* parent) :
+        QQmlPropertyMap(this, parent), _quality(quality)
+    {
+        for (auto const& name : reg->TagNames()) {
+            if (auto const* tag = reg->GetTag(name)) {
+                QQmlPropertyMap::insert(name, tag->value);
+                _quality->insert(name, QString(TagRegistry::qualityStr(tag->quality)));
+            }
+        }
+        connect(reg, &TagRegistry::tagChanged, this,
+                [this](QString const& name, QVariant const& value, QString const& q) {
+            QQmlPropertyMap::insert(name, value);
+            _quality->insert(name, q);
+        });
+    }
+
+    // make a key exist so a binding to it is reactive before the first value arrives
+    Q_INVOKABLE void ensure(QString const& name) {
+        if (!contains(name)) {
+            QQmlPropertyMap::insert(name, QVariant{});
+            _quality->insert(name, QStringLiteral("comm_fail"));
+        }
+    }
+
+private:
+    QQmlPropertyMap* _quality;
+};
+
 class GuiInstanceProxy : public QObject {
     Q_OBJECT
     Q_PROPERTY(radapter::gui::GuiModel* model READ model CONSTANT)
+    Q_PROPERTY(QObject* tags READ tags CONSTANT)
+    Q_PROPERTY(QObject* quality READ quality CONSTANT)
 
     QMLWorker* w;
 public:
     GuiInstanceProxy(QMLWorker* worker);
     GuiModel* model() const;
+    QObject* tags() const;
+    QObject* quality() const;
 public slots:
     void shutdown(unsigned timeout = 5000);
 };
@@ -120,6 +159,8 @@ class QMLWorker final : public radapter::Worker
     QObject* root = nullptr;
     GuiModel* model;
     GuiInstanceProxy* proxy;
+    TagsProxy* tags = nullptr;
+    QQmlPropertyMap* quality = nullptr;
 public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, baseConfig(args), "qml")
@@ -131,6 +172,10 @@ public:
         }
         auto* engine = _engine.get();
         model = new GuiModel(this, nullptr, QString(), this);
+        if (auto* reg = inst->Tags()) {
+            quality = new QQmlPropertyMap(this);
+            tags = new TagsProxy(reg, quality, this);
+        }
         proxy = new GuiInstanceProxy{this};
         auto ctx = new QQmlContext(engine, this);
         ctx->setContextProperty("radapter", proxy);
@@ -166,6 +211,8 @@ public:
         model->applyIncoming(msg);   // fires received() on the matching node(s)
     }
     GuiModel* dataModel() const { return model; }
+    TagsProxy* tagsProxy() const { return tags; }
+    QQmlPropertyMap* qualityProxy() const { return quality; }
     void emitModelChange(QVariant const& payload) { emit SendMsg(payload); }
 };
 
@@ -205,6 +252,8 @@ void GuiModel::applyIncoming(QVariant const& msg) {
 
 GuiInstanceProxy::GuiInstanceProxy(QMLWorker *worker) : QObject(worker), w(worker) {}
 GuiModel* GuiInstanceProxy::model() const { return w->dataModel(); }
+QObject* GuiInstanceProxy::tags() const { return w->tagsProxy(); }
+QObject* GuiInstanceProxy::quality() const { return w->qualityProxy(); }
 void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeout); }
 
 }

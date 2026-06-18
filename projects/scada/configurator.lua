@@ -78,11 +78,33 @@ local default_config = {
     },
 }
 
+-- Candidate tag names for the visualization editor. Tags follow the "<worker>:<field>"
+-- convention (see src/tags.cpp); derive the field set from each Modbus object's register
+-- tables. Best-effort discovery — the editor's tag field is also free-text.
+local function candidate_tags(config)
+    local out = {}
+    for name, entry in pairs(config.objects or {}) do
+        if entry.type == "ModbusMaster" or entry.type == "ModbusSlave" then
+            local regs = (entry.config or {}).registers or {}
+            for _, group in pairs(regs) do
+                if type(group) == "table" then
+                    for field in pairs(group) do
+                        out[#out + 1] = name .. ":" .. field
+                    end
+                end
+            end
+        end
+    end
+    table.sort(out)   -- clusters by worker-name prefix
+    return out
+end
+
 -- restrict the type picker to the pickable set, and seed the canvas
 view {
     schemas = schemas,
     pickable = pickable,
     config = default_config,
+    candidate_tags = candidate_tags(default_config),
 }
 
 -- ── Run: launch the authored config in a separate headless adapter ───────────
@@ -113,15 +135,31 @@ local function stop_runner()
     active = nil
 end
 
+-- does this config carry a non-empty operator visualization?
+local function has_visualization(config)
+    local viz = config.visualization
+    return viz and viz.root and viz.root.children and #viz.root.children > 0
+end
+
 local function start_runner(config)
     stop_runner()
 
     local token = tostring(__gen_id())
     pending[token] = config
+    -- a visualization needs a GUI window (--gui) and the tag registry (--tags) live in
+    -- the runner process so the HMI binds straight to radapter.tags; otherwise headless
+    local arguments = {}
+    if has_visualization(config) then
+        arguments[#arguments + 1] = "--gui"
+        arguments[#arguments + 1] = "--tags"
+    end
+    arguments[#arguments + 1] = RUNNER
+    arguments[#arguments + 1] = SERVER
+    arguments[#arguments + 1] = token
     -- app_info().executable is *this* radapter binary (Qt's applicationFilePath)
     local proc = Process {
         program = app_info().executable,
-        arguments = { RUNNER, SERVER, token },
+        arguments = arguments,
     }
     active = { proc = proc, token = token, client = nil }
     view { run_state = "starting" }

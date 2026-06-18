@@ -21,6 +21,7 @@ ApplicationWindow {
     property var schemas: ({})
     property var pickable: []
     property var formOverrides: ({})   // per-field custom editors, from Lua
+    property var candidateTags: []     // "worker:field" tag names, derived from the config
     property string lastJson: ""
     property string runState: "—"      // runner connection state, shown in the log window
 
@@ -29,7 +30,8 @@ ApplicationWindow {
     function onMsg(msg) {
         if (msg.schemas !== undefined) root.schemas = msg.schemas
         if (msg.pickable !== undefined) root.pickable = msg.pickable
-        // a declare-style { objects, pipes } config to seed/replace the editor's set
+        if (msg.candidate_tags !== undefined) root.candidateTags = msg.candidate_tags
+        // a declare-style { objects, pipes, visualization } config to seed/replace the set
         if (msg.config !== undefined) sharedContext.load(msg.config)
         // streamed back from the headless runner launched by "Run"
         if (msg.run_state !== undefined) root.runState = String(msg.run_state)
@@ -43,7 +45,14 @@ ApplicationWindow {
     function refreshPreview() {
         var _rev = sharedContext.revision   // re-run when the shared set changes
         root.lastJson = JSON.stringify({ objects: sharedContext.objects,
-                                         pipes: sharedContext.pipes }, null, 2)
+                                         pipes: sharedContext.pipes,
+                                         visualization: sharedContext.visualization }, null, 2)
+    }
+
+    // the full project config (data + HMI), used by Run and the preview
+    function projectConfig() {
+        return { objects: sharedContext.objects, pipes: sharedContext.pipes,
+                 visualization: sharedContext.visualization }
     }
 
     function uniqueName(type) {
@@ -99,10 +108,16 @@ ApplicationWindow {
                                  && Object.keys(sharedContext.objects).length > 0
                 ToolTip.text: "Some workers are missing required fields"
                 onClicked: {
-                    radapter.model.send({ run: { objects: sharedContext.objects,
-                                                 pipes: sharedContext.pipes } })
+                    radapter.model.send({ run: root.projectConfig() })
                     logWindow.show()
                     logWindow.raise()
+                }
+            }
+            Button {
+                text: "🖼 Visualization"
+                onClicked: {
+                    var ed = hmiEditorLoader.item
+                    ed.show(); ed.raise(); ed.requestActivate()
                 }
             }
             Item { Layout.fillWidth: true }
@@ -206,6 +221,18 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+    }
+
+    // Visualization (HMI) editor, in a subdir so loaded by URL (sibling resolution only
+    // reaches same-directory files). Shares the authoring ConfigContext, so edits land in
+    // the project's `visualization` and flow into the preview + Run payload.
+    Loader {
+        id: hmiEditorLoader
+        source: "hmi/HmiEditor.qml"
+        onLoaded: {
+            item.context = sharedContext
+            item.candidateTags = Qt.binding(function () { return root.candidateTags })
         }
     }
 

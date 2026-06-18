@@ -14,6 +14,9 @@ QtObject {
     property var schemas: ({})
     // pipes between objects, as [ { from, to } ] (the graph editor's edges)
     property var pipes: []
+    // operator visualization (HMI): a tree of layout/widget nodes under `root`
+    // (see hmi/Node.qml). Default: an empty Column to drop widgets into.
+    property var visualization: ({ root: { type: "Column", spacing: 8, children: [] } })
     // QML can't observe deep mutation of a var map, so observers bind to `revision`
     // (bumped on every structural change) to re-evaluate candidate lists / validation
     property int revision: 0
@@ -44,8 +47,13 @@ QtObject {
             for (var i = 0; i < config.pipes.length; i++) newPipes.push(config.pipes[i])
         objects = newObjects
         pipes = newPipes
+        if (config.visualization !== undefined && config.visualization.root !== undefined)
+            visualization = config.visualization
         bump()
     }
+
+    // replace the visualization tree (the HMI editor commits a fresh copy here)
+    function setVisualization(viz) { visualization = viz; bump() }
     function remove(name) {
         if (!has(name)) return
         delete objects[name]

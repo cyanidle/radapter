@@ -94,6 +94,8 @@ QVariant AsExtraMethod(Worker* w, QVariantList const& argList) {
 
 QVariant RADAPTER_API MakeFunction(ExtraFunction func);
 
+class TagRegistry;
+
 class RADAPTER_API Instance : public QObject
 {
     Q_OBJECT
@@ -107,6 +109,8 @@ public:
     
     void EnableGui();
     void EnableTags();
+    // the tag registry, or nullptr when --tags was not enabled
+    TagRegistry* Tags() const;
 
     void RegisterWorker(const char* name, Factory factory, ExtraMethods const& extra = {});
 

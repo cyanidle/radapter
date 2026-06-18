@@ -161,6 +161,8 @@ void TagRegistry::notifyTag(QString const& tagName, Tag const& tag) {
     if (it != _perTag.end()) {
         callListeners(_inst, it.value(), evVar);         // tags.changed["name"]
     }
+
+    emit tagChanged(tagName, tag.value, QString(qualityStr(tag.quality)));
 }
 
 LuaValue& TagRegistry::PerTagListeners(QString const& tagName) {
@@ -227,6 +229,10 @@ static int tags_source(lua_State* L) {
     }
     lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
     return 1;
+}
+
+TagRegistry* Instance::Tags() const {
+    return d->tagRegistry.get();
 }
 
 void Instance::EnableTags() {

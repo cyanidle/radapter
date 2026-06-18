@@ -88,9 +88,10 @@ function M.build(config)
     return built
 end
 
--- Reserved Redis hash field holding the pipe list ('@' cannot appear in an
--- object name, so it never collides with a per-object field).
+-- Reserved Redis hash fields ('@' cannot appear in an object name, so they never
+-- collide with a per-object field): the pipe list and the operator visualization.
 local PIPES_FIELD = "@pipes"
+local VIZ_FIELD = "@visualization"
 
 local function read_file(path)
     local f, err = io.open(path, "r")
@@ -140,6 +141,10 @@ function M.save_to(params)
             end
             fields[#fields + 1] = PIPES_FIELD
             fields[#fields + 1] = json_encode(config.pipes or {})
+            if config.visualization then
+                fields[#fields + 1] = VIZ_FIELD
+                fields[#fields + 1] = json_encode(config.visualization)
+            end
             await(cache:Exec("DEL " .. params.key))
             await(cache:Exec("HSET " .. params.key, fields))
         end)
@@ -166,15 +171,18 @@ function M.load_from(params)
             local flat = await(cache:Exec("HGETALL " .. params.key))
             local objects = {}
             local pipes = {}
+            local visualization = nil
             for i = 1, #flat, 2 do
                 local field, value = flat[i], flat[i + 1]
                 if field == PIPES_FIELD then
                     pipes = json_decode(value)
+                elseif field == VIZ_FIELD then
+                    visualization = json_decode(value)
                 else
                     objects[field] = json_decode(value)
                 end
             end
-            return { objects = objects, pipes = pipes }
+            return { objects = objects, pipes = pipes, visualization = visualization }
         end)
         cache:destroy()
         if not ok then error(res) end
