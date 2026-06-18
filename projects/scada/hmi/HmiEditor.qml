@@ -290,11 +290,13 @@ ApplicationWindow {
                 padding: 6
             }
             ScrollView {
+                id: propScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.rightMargin: 8   // breathing room so fields don't butt the window edge
                 clip: true
                 ColumnLayout {
-                    width: editor.width  // bounded by ScrollView; fields stretch
+                    width: propScroll.availableWidth   // fit the panel, not the whole window
                     spacing: 8
 
                     Repeater {

@@ -172,7 +172,10 @@ ApplicationWindow {
                             schemas: root.schemas
                             context: sharedContext
                             customForms: root.formOverrides
-                            onChanged: root.refreshPreview()
+                            // bump the shared revision (not just refresh the preview) so
+                            // revision-bound consumers — the HMI editor's candidate tags —
+                            // pick up edits to a worker's config (e.g. added registers)
+                            onChanged: sharedContext.bump()
                         }
                     }
                 }
