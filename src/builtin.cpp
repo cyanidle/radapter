@@ -12,6 +12,7 @@
 #include "builtin.hpp"
 #include "glua/glua.hpp"
 #include <QPluginLoader>
+#include <QTextCodec>
 #include "_embedded_scripts.h"
 
 using namespace radapter;
@@ -486,8 +487,10 @@ QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
     size_t len;
     auto s = luaL_tolstring(L, idx, &len);
     lua_pop(L, 1);
-    auto res = QString::fromUtf8(s, int(len));
-    if (!len || !res.isEmpty()) {
+    static QTextCodec* utf8 = QTextCodec::codecForName("UTF-8");
+    QTextCodec::ConverterState state;
+    auto res = utf8->toUnicode(s, static_cast<int>(len), &state);
+    if (state.invalidChars == 0) {
         return res;
     }
     return QByteArray(s, static_cast<int>(len));
