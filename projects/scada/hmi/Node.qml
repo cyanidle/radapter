@@ -59,6 +59,15 @@ Loader {
             implicitWidth: lay.implicitWidth
             implicitHeight: lay.implicitHeight
 
+            // background click-catcher, BEHIND the children: clicking empty container
+            // space selects this container, but a click on a child widget is grabbed by
+            // the child's own MouseArea on top (so selection follows what you clicked).
+            MouseArea {
+                anchors.fill: parent
+                enabled: node.mode === "design"
+                onClicked: node.selectRequested(node.path)
+            }
+
             GridLayout {
                 id: lay
                 anchors.fill: parent
@@ -97,19 +106,14 @@ Loader {
                 }
             }
 
-            // selection chrome + click for an (empty) container body in design mode
+            // selection chrome (visual only — a Rectangle doesn't intercept input, so
+            // it can stay on top without stealing clicks from the children)
             Rectangle {
                 anchors.fill: parent
                 color: "transparent"
                 border.color: node.pathEq(node.path, node.selectedPath) ? "#2196f3" : "#e8e8e8"
                 border.width: node.pathEq(node.path, node.selectedPath) ? 2 : 1
                 visible: node.mode === "design"
-            }
-            MouseArea {
-                anchors.fill: parent
-                enabled: node.mode === "design"
-                propagateComposedEvents: true
-                onPressed: { node.selectRequested(node.path); mouse.accepted = false }
             }
         }
     }
