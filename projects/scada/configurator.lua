@@ -196,6 +196,8 @@ local current_config = default_config   -- the live authoring state
 pipe(view, function(msg)
     if msg.save_file then
         local path = msg.save_file
+        -- the save message carries the GUI's live config; keep our copy in sync
+        if msg.config then current_config = msg.config end
         local data = json_encode(current_config)
         local f, err = io.open(path, "w")
         if f then
@@ -228,16 +230,7 @@ pipe(view, function(msg)
             log.error("Failed to open {}: {}", path, err)
         end
     elseif msg.config then
-        -- QML sends the live config when the user makes changes via the GUI;
-        -- we keep our own copy for save operations.
+        -- QML pushes the live config alongside other actions; keep our copy for saves
         current_config = msg.config
-    elseif msg.save_ok then
-        log.info("Project saved to {}", msg.save_ok)
-    elseif msg.save_err then
-        log.error("Failed to save {}: {}", msg.save_err, msg.save_msg)
-    elseif msg.open_ok then
-        log.info("Project loaded from {}", msg.open_ok)
-    elseif msg.open_err then
-        log.error("Failed to open {}: {}", msg.open_err, msg.open_msg)
     end
 end)

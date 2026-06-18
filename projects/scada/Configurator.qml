@@ -27,19 +27,26 @@ ApplicationWindow {
     property string lastJson: ""
     property string runState: "—"      // runner connection state, shown in the log window
     property string projectPath: ""     // last saved/opened file path
+    // file name (no dir, no .json) shown in the window title
+    readonly property string projectName:
+        projectPath.length ? projectPath.replace(/^.*[\/\\]/, "").replace(/\.json$/, "") : ""
+
+    // strip the file:// scheme a FileDialog url carries, yielding a plain path for Lua I/O
+    function urlToPath(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")) }
 
     // File dialog for save/open
     FileDialog {
         id: saveDialog
         title: "Save Project"
         nameFilters: ["JSON files (*.json)"]
-        currentFolder: StandardPaths.locate(StandardPaths.HomeLocation, "", StandardPaths.FType.Directory)
+        selectExisting: false
+        folder: shortcuts.home
         onAccepted: {
-            var path = decodeURIComponent(url)
+            var path = root.urlToPath(fileUrl)
             if (path.indexOf(".json") === -1) path = path + ".json"
             root.projectPath = path
-            // notify Lua to actually write the file
-            radapter.model.send({ save_file: path })
+            // hand Lua the path and the current config to write
+            radapter.model.send({ save_file: path, config: root.projectConfig() })
         }
     }
 
@@ -47,17 +54,16 @@ ApplicationWindow {
         id: openDialog
         title: "Open Project"
         nameFilters: ["JSON files (*.json)"]
-        currentFolder: StandardPaths.locate(StandardPaths.HomeLocation, "", StandardPaths.FType.Directory)
         selectExisting: true
+        folder: shortcuts.home
         onAccepted: {
-            var path = decodeURIComponent(url)
-            root.projectPath = path
-            // notify Lua to read the file and send back the config
-            radapter.model.send({ open_file: path })
+            // notify Lua to read the file and send back the config (open_ok sets the path)
+            radapter.model.send({ open_file: root.urlToPath(fileUrl) })
         }
     }
 
-    messageDialog: MessageDialog {
+    // Message dialog for file I/O feedback (not an attached property)
+    MessageDialog {
         id: messageDialog
         title: "Radapter Configurator"
     }
@@ -66,7 +72,7 @@ ApplicationWindow {
 
     function saveProject() {
         if (root.projectPath.length > 0) {
-            radapter.model.send({ save_file: root.projectPath })
+            radapter.model.send({ save_file: root.projectPath, config: root.projectConfig() })
         } else {
             saveProjectAs()
         }
@@ -156,31 +162,35 @@ ApplicationWindow {
     }
 
     // ── Menu bar ─────────────────────────────────────────────────────────
-    menubar: MenuBar {
+    menuBar: MenuBar {
+        // the Default style reserves generous vertical padding; trim it so the menu
+        // bar sits snug against the toolbar below instead of leaving a tall gap
+        topPadding: 0
+        bottomPadding: 0
         Menu {
             title: "File"
-            MenuItem {
+            Action {
                 text: "New"
                 shortcut: "Ctrl+N"
                 onTriggered: root.newProject()
             }
-            MenuItem {
+            Action {
                 text: "Open…"
                 shortcut: "Ctrl+O"
                 onTriggered: root.openProject()
             }
-            MenuItem {
+            Action {
                 text: "Save"
                 shortcut: "Ctrl+S"
                 onTriggered: root.saveProject()
             }
-            MenuItem {
+            Action {
                 text: "Save As…"
                 shortcut: "Ctrl+Shift+S"
                 onTriggered: root.saveProjectAs()
             }
             MenuSeparator {}
-            MenuItem {
+            Action {
                 text: "Exit"
                 shortcut: "Alt+F4"
                 onTriggered: Qt.quit()
