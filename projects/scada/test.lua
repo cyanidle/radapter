@@ -4,9 +4,9 @@
 
 local SERVER = "radapter-scada-test-" .. tostring(__gen_id())
 local TOKEN  = "tok-" .. tostring(__gen_id())
--- cwd is the script's dir (tests/) during top-level execution, and the Process
--- spawns now, so this resolves to projects/scada/runner.lua
-local RUNNER = "../projects/scada/runner.lua"
+-- cwd is the script's dir (projects/scada/) during top-level execution, so the
+-- runner resolves as a sibling
+local RUNNER = "./runner.lua"
 
 local server = LocalServer { socket = SERVER, per_client = true }
 

@@ -32,7 +32,7 @@ build/bin/radapter --schema
 # Other useful flags
 build/bin/radapter --watch-dir . examples/modbus/modbus.lua  # hot reload on file change
 build/bin/radapter --gui examples/chat/client.lua  # quits when the last window closes
-build/bin/radapter --gui --gui-no-auto-quit examples/chat/client.lua  # keep running after the window closes
+build/bin/radapter --gui-no-auto-quit examples/chat/client.lua  # keep running after the window closes
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
 build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables QML
@@ -78,8 +78,14 @@ smoke test is `tests/smoke.lua`** — run it after any engine change
 hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus slave/master
 loopback, services, worker naming). `tests/modbus_loopback.lua` is a deeper ModbusSlave <->
 ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pipe/get/set);
-`tests/local.lua` the local-IPC workers; `tests/scada.lua` the end-to-end runner;
+`tests/local.lua` the local-IPC workers; `projects/scada/test.lua` the end-to-end runner;
 `tests/tags.lua` the tag system (run with `--tags`).
+
+After making some changes **ALWAYS** check result somehow
+
+When the engine code (src/, include/) is touched, always run `build/bin/radapter tests/all.lua`.
+When the project (projects/) touches QML or Lua config files, always launch QML **headlessly**
+to verify the visual components (write short test as inline -e "code" for example, dont forget to shutdown() at the end)
 
 When writing a short test/`-e` snippet, always end it with `shutdown()` — otherwise the
 event loop keeps running and the process hangs instead of exiting on success.
