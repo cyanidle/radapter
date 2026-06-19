@@ -9,14 +9,13 @@
 #include <QQmlPropertyMap>
 #include <QDir>
 #include <memory>
+#include <unordered_map>
 
 namespace radapter::gui
 {
 
 struct QMLConfig : WorkerConfig {
     QString url;
-    // extra values exposed to the QML as global context properties, e.g.
-    // QML { url=.., properties = { customForms = {...} } } -> `customForms` in QML
     optional<QVariantMap> properties;
 };
 
@@ -36,8 +35,6 @@ static QMLConfig baseConfig(QVariantList const& args) {
     return c;
 }
 
-static std::weak_ptr<QQmlEngine> g_engineWeak;
-
 static QVariant unwrapQmlVar(QVariant const& var) {
     if (var.type() >= QVariant::UserType) {
         return var.value<QJSValue>().toVariant();
@@ -48,13 +45,32 @@ static QVariant unwrapQmlVar(QVariant const& var) {
 
 class QMLWorker;
 
+// One QQmlEngine per Instance, shared by all that Instance's QML workers. Each
+// worker holds a shared_ptr; the map keeps only a weak_ptr, so the engine is
+// destroyed once the last QML worker of the instance goes away.
+static std::shared_ptr<QQmlEngine> qmlEngineFor(Instance* inst) {
+    static std::unordered_map<Instance*, std::weak_ptr<QQmlEngine>> engines;
+    auto& slot = engines[inst];
+    if (auto engine = slot.lock()) {
+        return engine;
+    }
+    auto engine = std::make_shared<QQmlEngine>();
+    slot = engine;
+    // QML `Qt.quit()` (e.g. the File→Exit menu) emits these — route them to a
+    // cooperative radapter shutdown instead of killing the app out from under us
+    QObject::connect(engine.get(), &QQmlEngine::quit, engine.get(),
+                     [inst] { inst->Shutdown(); });
+    QObject::connect(engine.get(), &QQmlEngine::exit, engine.get(),
+                     [inst](int) { inst->Shutdown(); });
+    return engine;
+}
+
 // A reactive node in the GUI data model, mirroring the radapter message tree:
 // each nested map is a child GuiModel reached via node(). State writes from QML
 // go through updateValue() and auto-emit the change; writes from C++ (insert via
 // applyIncoming) don't, so inbound data delivered by a pipe doesn't echo back.
 // The node also carries the event channel: send() emits a message and received()
-// fires on inbound — both scoped to the node's path in the tree, so a nested
-// component is addressed correctly without a manually-managed prefix.
+// fires on inbound — both scoped to the node's path in the tree.
 class GuiModel : public QQmlPropertyMap {
     Q_OBJECT
 public:
@@ -63,7 +79,6 @@ public:
         _worker(worker), _up(parentNode), _key(std::move(key))
     {}
 
-    // get-or-create the nested node addressed by key
     Q_INVOKABLE radapter::gui::GuiModel* node(QString const& key) {
         if (auto existing = qobject_cast<GuiModel*>(value(key).value<QObject*>())) {
             return existing;
@@ -73,17 +88,12 @@ public:
         return child;
     }
 
-    // make a leaf key exist so QML bindings to it are reactive, without emitting
     Q_INVOKABLE void ensure(QString const& key) {
         if (!contains(key)) QQmlPropertyMap::insert(key, QVariant{});
     }
 
-    // emit an event from this node, wrapped in the node's path (the root node
-    // emits it flat); the inverse of the inbound routing
     Q_INVOKABLE void send(QVariant const& msg);
 
-    // merge an inbound message into the tree, then fire received() at this node
-    // (and, recursively, at child nodes) with the sub-message scoped to each
     void applyIncoming(QVariant const& msg);
 
 signals:
@@ -100,29 +110,25 @@ private:
     QString _key;
 };
 
-// Reactive view of the tag registry for QML: radapter.tags["worker:field"] is the live
-// value, radapter.quality["worker:field"] the live quality ("good"/"comm_fail"). Both are
-// QQmlPropertyMaps kept in sync from TagRegistry::tagChanged, so bindings update on data.
 class TagsProxy : public QQmlPropertyMap {
     Q_OBJECT
 public:
-    TagsProxy(TagRegistry* reg, QQmlPropertyMap* quality, QObject* parent) :
+    TagsProxy(radapter::TagRegistry* reg, QQmlPropertyMap* quality, QObject* parent) :
         QQmlPropertyMap(this, parent), _quality(quality)
     {
         for (auto const& name : reg->TagNames()) {
             if (auto const* tag = reg->GetTag(name)) {
                 QQmlPropertyMap::insert(name, tag->value);
-                _quality->insert(name, QString(TagRegistry::qualityStr(tag->quality)));
+                _quality->insert(name, QString(radapter::TagRegistry::qualityStr(tag->quality)));
             }
         }
-        connect(reg, &TagRegistry::tagChanged, this,
+        connect(reg, &radapter::TagRegistry::tagChanged, this,
                 [this](QString const& name, QVariant const& value, QString const& q) {
             QQmlPropertyMap::insert(name, value);
             _quality->insert(name, q);
         });
     }
 
-    // make a key exist so a binding to it is reactive before the first value arrives
     Q_INVOKABLE void ensure(QString const& name) {
         if (!contains(name)) {
             QQmlPropertyMap::insert(name, QVariant{});
@@ -152,7 +158,7 @@ public slots:
 
 class QMLWorker final : public radapter::Worker
 {
-	Q_OBJECT
+    Q_OBJECT
     QMLConfig config;
     std::shared_ptr<QQmlEngine> _engine;
     QQmlComponent* creator;
@@ -165,17 +171,7 @@ public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, baseConfig(args), "qml")
     {
-        _engine = g_engineWeak.lock();
-        if (!_engine) {
-            _engine = std::make_shared<QQmlEngine>();
-            g_engineWeak = _engine;
-            // QML `Qt.quit()` (e.g. the File→Exit menu) emits these — route them to a
-            // cooperative radapter shutdown instead of killing the app out from under us
-            QObject::connect(_engine.get(), &QQmlEngine::quit, _engine.get(),
-                             [inst] { inst->Shutdown(); });
-            QObject::connect(_engine.get(), &QQmlEngine::exit, _engine.get(),
-                             [inst](int) { inst->Shutdown(); });
-        }
+        _engine = qmlEngineFor(inst);
         auto* engine = _engine.get();
         model = new GuiModel(this, nullptr, QString(), this);
         if (auto* reg = inst->Tags()) {
@@ -195,8 +191,6 @@ public:
             Parse(config, first);
             creator = new QQmlComponent(engine, config.url);
         }
-        // expose Lua-provided values as global QML context properties (must be set
-        // before the component is created so bindings see them)
         if (config.properties) {
             for (auto it = config.properties->constBegin(); it != config.properties->constEnd(); ++it) {
                 ctx->setContextProperty(it.key(), it.value());
@@ -214,7 +208,7 @@ public:
         delete root;
     }
 	void OnMsg(QVariant const& msg) override {
-        model->applyIncoming(msg);   // fires received() on the matching node(s)
+        model->applyIncoming(msg);
     }
     GuiModel* dataModel() const { return model; }
     TagsProxy* tagsProxy() const { return tags; }
@@ -222,8 +216,6 @@ public:
     void emitModelChange(QVariant const& payload) { emit SendMsg(payload); }
 };
 
-// wrap a payload in this node's path: walk up to the root prepending each key,
-// so an event/change from a nested node is addressed like the inbound routing
 QVariant GuiModel::wrapPath(QVariant payload) const {
     for (GuiModel const* n = this; n->_up; n = n->_up) {
         QVariantMap wrapped;
@@ -266,7 +258,6 @@ void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeo
 
 namespace radapter::builtin {
 
-
 void workers::gui(Instance* inst)
 {
 	using namespace radapter::gui;
@@ -275,6 +266,5 @@ void workers::gui(Instance* inst)
 }
 
 }
-
 
 #include "gui.moc"
