@@ -101,12 +101,16 @@ Loader {
                         Layout.preferredHeight: childSpec.preferredHeight !== undefined
                             ? childSpec.preferredHeight : implicitHeight
                         source: Qt.resolvedUrl("Node.qml")
+                        // mode and path MUST be bindings, not one-time assignments: setting
+                        // `spec` below synchronously instantiates the whole child subtree, so
+                        // nested leaves would otherwise capture node.mode/node.path before this
+                        // parent's own mode/path have settled (default "run"/[]) and never update.
                         onLoaded: {
-                            item.spec = Qt.binding(function () { return node.spec.children[index] })
-                            item.mode = node.mode
-                            item.path = node.path.concat([index])
+                            item.mode = Qt.binding(function () { return node.mode })
+                            item.path = Qt.binding(function () { return node.path.concat([index]) })
                             item.selectedPath = Qt.binding(function () { return node.selectedPath })
                             item.selectRequested.connect(function (p) { node.selectRequested(p) })
+                            item.spec = Qt.binding(function () { return node.spec.children[index] })
                         }
                     }
                 }
@@ -140,7 +144,7 @@ Loader {
                     item.spec = Qt.binding(function () { return node.spec })
                     item.value = Qt.binding(function () { return node.resolvedValue })
                     item.quality = Qt.binding(function () { return node.resolvedQuality })
-                    if ("mode" in item) item.mode = node.mode
+                    if ("mode" in item) item.mode = Qt.binding(function () { return node.mode })
                 }
             }
 

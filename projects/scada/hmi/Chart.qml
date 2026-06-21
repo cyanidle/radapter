@@ -29,10 +29,11 @@ Item {
     // Last value we recorded, so we only push on real changes
     property var _lastValue: undefined
 
-    // Padding inside the canvas (left for Y labels, bottom for X labels)
+    // Padding inside the canvas: left for Y labels, bottom for X labels, top for the
+    // title/units band, right for the trailing current-value readout.
     readonly property int padLeft: 48
-    readonly property int padRight: 12
-    readonly property int padTop: 8
+    readonly property int padRight: 44
+    readonly property int padTop: 24
     readonly property int padBottom: 28
 
     readonly property int plotW: width - padLeft - padRight
@@ -174,14 +175,15 @@ Item {
                 ctx.fillText(formatNum(v), px - 4, yy)
             }
 
-            // X axis labels (time)
-            ctx.textAlign = "center"
+            // X axis labels (time). End labels are edge-aligned so the first/last don't
+            // get clipped at the plot boundaries.
             ctx.textBaseline = "top"
-            var xCount = Math.min(6, Math.floor(pw / 50))
+            var xCount = Math.max(2, Math.min(6, Math.floor(pw / 60)))
             for (var i = 0; i <= xCount; i++) {
                 var tt = tMin + tRange * i / xCount
                 var xx = toX(tt)
-                ctx.fillText(formatTime(tt, now), xx, py + ph + 4)
+                ctx.textAlign = i === 0 ? "left" : (i === xCount ? "right" : "center")
+                ctx.fillText(formatTime(tt, now), xx, py + ph + 6)
             }
 
             // Draw the line
@@ -198,7 +200,8 @@ Item {
                 ctx.lineTo(toX(pts[pts.length - 1].t), py + ph)
                 ctx.lineTo(toX(pts[0].t), py + ph)
                 ctx.closePath()
-                ctx.fillStyle = chart.lineColor + "18"  // ~10% opacity
+                var lc = chart.lineColor
+                ctx.fillStyle = Qt.rgba(lc.r, lc.g, lc.b, 0.12)
                 ctx.fill()
             } else if (pts.length === 1) {
                 // Single point — draw a dot
@@ -208,16 +211,22 @@ Item {
                 ctx.fill()
             }
 
-            // Current value label at the right edge
+            // Current value: a small marker dot on the last point plus a readout in the
+            // right gutter, vertically clamped into the plot so it never spills off-canvas.
             if (pts.length > 0) {
                 var last = pts[pts.length - 1]
-                var lx = px + pw + 4
-                var ly = toY(last.v)
+                var mx = toX(last.t), my = toY(last.v)
+                ctx.beginPath()
+                ctx.arc(mx, my, 2.5, 0, Math.PI * 2)
+                ctx.fillStyle = chart.lineColor
+                ctx.fill()
+
+                var ly = Math.max(py + 6, Math.min(py + ph - 6, my))
                 ctx.fillStyle = chart.lineColor
                 ctx.font = "bold 10px sans-serif"
                 ctx.textAlign = "left"
                 ctx.textBaseline = "middle"
-                ctx.fillText(formatNum(last.v), lx, ly)
+                ctx.fillText(formatNum(last.v), px + pw + 5, ly)
             }
         }
     }
