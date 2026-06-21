@@ -90,6 +90,8 @@ to verify the visual components (write short test as inline -e "code" for exampl
 When writing a short test/`-e` snippet, always end it with `shutdown()` — otherwise the
 event loop keeps running and the process hangs instead of exiting on success.
 
+Always run tests with some timeout provided to avoid hanging
+
 **Examples (`examples/`)** are documentation-grade demos; most need live hardware/services:
 `modbus/modbus.lua` (a Modbus TCP device on :1502) and `modbus/modbus_table.lua` (a GUI
 table, self-contained loopback), `redis.lua` (a Redis server), `serial/serial.lua` (a
