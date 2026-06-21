@@ -29,7 +29,7 @@ ApplicationWindow {
     property var fields: []             // property descriptors for the selected node
 
     readonly property var containerTypes: ["Row", "Column", "Grid"]
-    readonly property var widgetTypes: ["Gauge", "InfoDisplay", "Spacer", "Custom"]
+    readonly property var widgetTypes: ["Gauge", "InfoDisplay", "Chart", "Spacer", "Custom"]
 
     // Tags follow the "<worker>:<field>" convention (see src/tags.cpp). Walk each
     // Modbus object's register tables for the field names. Best-effort — the tag field
@@ -100,6 +100,7 @@ ApplicationWindow {
         if (type === "Grid")  return { type: type, spacing: 8, columns: 2, children: [] }
         if (isContainerType(type)) return { type: type, spacing: 8, children: [] }
         if (type === "Gauge") return { type: type, tag: "", min: 0, max: 100, label: type, units: "" }
+        if (type === "Chart") return { type: type, tag: "", timeFrame: 3600, label: type, units: "" }
         if (type === "Spacer") return { type: type, fillWidth: true }
         if (type === "Custom") return { type: type, source: "", tag: "" }
         return { type: type, tag: "", label: type, units: "" }   // InfoDisplay & others
@@ -166,6 +167,12 @@ ApplicationWindow {
             }
             if (node.type === "InfoDisplay")
                 f.push({ key: "decimals", label: "Decimals", kind: "number" })
+            if (node.type === "Chart") {
+                f.push({ key: "timeFrame", label: "Time frame (s)", kind: "number" })
+                f.push({ key: "yMin", label: "Y min", kind: "number" })
+                f.push({ key: "yMax", label: "Y max", kind: "number" })
+                f.push({ key: "color", label: "Line color", kind: "text" })
+            }
         }
         f.push({ key: "fillWidth", label: "Fill width", kind: "bool" })
         f.push({ key: "fillHeight", label: "Fill height", kind: "bool" })

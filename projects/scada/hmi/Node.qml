@@ -62,7 +62,12 @@ Loader {
             // background click-catcher, BEHIND the children: clicking empty container
             // space selects this container, but a click on a child widget is grabbed by
             // the child's own MouseArea on top (so selection follows what you clicked).
+            // Layering is by explicit non-negative z, never negative: a negative z pushes
+            // this area behind the parent and into the GRANDPARENT's stacking context,
+            // where a nested container's background leaks in front of an earlier sibling's
+            // leaf widgets — which made clicks on the first row select the row, not the item.
             MouseArea {
+                z: 0
                 anchors.fill: parent
                 enabled: node.mode === "design"
                 onClicked: node.selectRequested(node.path)
@@ -70,6 +75,7 @@ Loader {
 
             GridLayout {
                 id: lay
+                z: 1
                 anchors.fill: parent
                 rowSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
                 columnSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
@@ -109,6 +115,7 @@ Loader {
             // selection chrome (visual only — a Rectangle doesn't intercept input, so
             // it can stay on top without stealing clicks from the children)
             Rectangle {
+                z: 2
                 anchors.fill: parent
                 color: "transparent"
                 border.color: node.pathEq(node.path, node.selectedPath) ? "#2196f3" : "#e8e8e8"
@@ -133,6 +140,7 @@ Loader {
                     item.spec = Qt.binding(function () { return node.spec })
                     item.value = Qt.binding(function () { return node.resolvedValue })
                     item.quality = Qt.binding(function () { return node.resolvedQuality })
+                    if ("mode" in item) item.mode = node.mode
                 }
             }
 
