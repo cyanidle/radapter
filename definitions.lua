@@ -577,6 +577,89 @@ function ProcessWorker:State() end
 ---@return ProcessWorker
 function Process(params) end
 
+---@class HttpConfig : WorkerBaseParams
+---@field base_url string? prepended to relative request URLs
+---@field user_agent string? User-Agent header (default "radapter")
+---@field follow_redirects boolean? follow 3xx redirects (default true)
+---@field timeout_ms integer? abort a request after this many ms (default 30000; 0 = no timeout)
+---@field response_format ("raw"|"json"|"text")? how to decode response bodies (default "text")
+---@field cert_file string? PEM client certificate for mutual TLS
+---@field key_file string? PEM private key for mutual TLS
+
+---Per-request options; all fields override the worker config for that request.
+---@class HttpRequestOpts
+---@field headers table<string, string>? extra request headers
+---@field query table<string, string>? query parameters appended to the URL
+---@field format ("raw"|"json"|"text")? response body decoding for this request
+---@field timeout_ms integer? request timeout override
+
+---@class HttpResponse
+---@field status integer HTTP status code
+---@field headers table<string, string> response headers
+---@field body any decoded body (string|table|userdata per response_format)
+
+---@alias HttpCallback fun(response: HttpResponse, error: string)
+
+---@class HttpWorker : Worker
+HttpWorker = {}
+
+---@param url string
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Get(url, opts) end
+---@param url string
+---@param callback HttpCallback
+---@return nil
+function HttpWorker:Get(url, callback) end
+---@param url string
+---@param opts HttpRequestOpts?
+---@param callback HttpCallback
+---@return nil
+function HttpWorker:Get(url, opts, callback) end
+
+---@param url string
+---@param body any?
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Post(url, body, opts) end
+---@param url string
+---@param body any?
+---@param opts HttpRequestOpts?
+---@param callback HttpCallback
+---@return nil
+function HttpWorker:Post(url, body, opts, callback) end
+
+---@param url string
+---@param body any?
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Put(url, body, opts) end
+
+---@param url string
+---@param body any?
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Patch(url, body, opts) end
+
+---@param url string
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Delete(url, opts) end
+
+---@param url string
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Head(url, opts) end
+
+---@param url string
+---@param opts HttpRequestOpts?
+---@return fun(defer: HttpCallback)
+function HttpWorker:Options(url, opts) end
+
+---@param params HttpConfig
+---@return HttpWorker
+function Http(params) end
+
 ---@class AppInfo
 ---@field executable string -- absolute path to the running radapter binary
 ---@field dir string -- directory containing the binary

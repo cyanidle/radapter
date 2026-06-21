@@ -130,7 +130,7 @@ is the schema-driven configurator (`--gui projects/scada/configurator.lua`).
 and the live set of `Worker`s. On construction it opens the Lua libs, registers the global
 Lua API, loads the embedded scripts, then calls every entry in `builtin::workers::all`
 (the `_all[]` array in `src/builtin.cpp`: `test, modbus, websocket, redis, sql, serial,
-can, cyphal, process, local`) to register built-in workers. `Instance::FromLua(L)` recovers the instance
+can, cyphal, process, local, http`) to register built-in workers. `Instance::FromLua(L)` recovers the instance
 from any `lua_State` via a registry lightuserdata key. Shutdown is cooperative: it emits
 `ShutdownRequest`, waits for each worker's `ShutdownDone` (or a timeout), then
 `ShutdownDone`.

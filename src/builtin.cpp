@@ -658,7 +658,7 @@ namespace radapter::builtin::workers
 static InitSystem _all[] = {
     test, modbus, websocket,
     redis, sql, serial, can,
-    cyphal, process, local
+    cyphal, process, local, http
 };
 
 InitSystem* all = _all;

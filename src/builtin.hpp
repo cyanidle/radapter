@@ -200,6 +200,7 @@ void can(Instance* inst);
 void cyphal(Instance* inst);
 void process(Instance* inst);
 void local(Instance* inst);
+void http(Instance* inst);
 
 using InitSystem = void(*)(Instance*);
 
