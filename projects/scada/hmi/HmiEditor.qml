@@ -28,6 +28,7 @@ Item {
     property var selectedPath: null     // array of child indices; [] is the root
     property var rows: []               // flattened tree rows for the structure list
     property var fields: []             // property descriptors for the selected node
+    property var clipboard: null        // deep-cloned node for Ctrl+C / Ctrl+V duplication
 
     readonly property var containerTypes: ["Row", "Column", "Grid"]
     readonly property var widgetTypes: ["Gauge", "InfoDisplay", "Chart", "Spacer", "Custom"]
@@ -73,11 +74,31 @@ Item {
         selectedPath = []
         refresh()
     }
-    function refresh() {
+    function refresh() {                       // full rebuild: tree rows + property fields
         rows = buildRows()
         fields = fieldsFor(selectedPath ? nodeAt(selectedPath) : null)
     }
+    // Selection must NOT rebuild the tree: reassigning `rows` resets the ListView and
+    // destroys every delegate — including the one whose MouseArea is mid-click — which
+    // crashes on fast clicking. The selected highlight reacts to `selectedPath` via
+    // bindings, so selecting only needs to refresh the property panel.
+    function selectNode(path) {
+        selectedPath = path
+        fields = fieldsFor(path ? nodeAt(path) : null)
+    }
+
+    // Structural edits defer the heavy rebuild (canvas re-clone + tree rebuild) to the next
+    // event-loop turn via Qt.callLater, so it never runs re-entrantly inside an input/click
+    // handler (which is the other way fast clicking could destroy an item under the grab).
+    // The flag coalesces a burst of edits into a single rebuild.
+    property bool _commitPending: false
     function commit() {
+        _commitPending = true
+        Qt.callLater(flushCommit)
+    }
+    function flushCommit() {
+        if (!_commitPending) return
+        _commitPending = false
         viz = clone(viz)                     // new reference so the canvas Node re-renders
         if (context) context.setVisualization(clone(viz))
         refresh()
@@ -117,6 +138,37 @@ Item {
         }
         if (!target.children) target.children = []
         target.children.push(makeNode(type))
+        commit()
+    }
+    // add a child of a specific container (the in-canvas "＋" button, by node path)
+    function addChild(containerPath, type) {
+        var target = nodeAt(containerPath)
+        if (!isContainerType(target.type)) return
+        if (!target.children) target.children = []
+        target.children.push(makeNode(type))
+        selectedPath = containerPath.concat([target.children.length - 1])
+        commit()
+    }
+
+    // ---- clipboard (duplicate a subtree) ------------------------------------
+    function copySelected() {
+        if (selectedPath) clipboard = clone(nodeAt(selectedPath))
+    }
+    // duplicate the clipboard node as the sibling right after the selection (the root has no
+    // siblings, so a copy of it — or a paste with nothing selected — appends into the root)
+    function pasteClipboard() {
+        if (!clipboard) return
+        var node = clone(clipboard)
+        if (selectedPath && selectedPath.length > 0) {
+            var parent = nodeAt(selectedPath.slice(0, -1))
+            var at = selectedPath[selectedPath.length - 1] + 1
+            parent.children.splice(at, 0, node)
+            selectedPath = selectedPath.slice(0, -1).concat([at])
+        } else {
+            if (!viz.root.children) viz.root.children = []
+            viz.root.children.push(node)
+            selectedPath = [viz.root.children.length - 1]
+        }
         commit()
     }
     function removeSelected() {
@@ -246,9 +298,11 @@ Item {
             anchors.rightMargin: 8
             spacing: 6
 
-            Label { text: "Add:"; font.bold: true }
+            // only layout containers live on the toolbar; widgets are added in-place via
+            // the "＋" button inside a container (see Node.qml), or pasted into the tree.
+            Label { text: "Add layout:"; font.bold: true }
             Repeater {
-                model: editor.containerTypes.concat(editor.widgetTypes)
+                model: editor.containerTypes
                 delegate: Button {
                     text: modelData
                     onClicked: editor.addNode(modelData)
@@ -299,6 +353,12 @@ Item {
                     if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
                         editor.removeSelected()
                         event.accepted = true
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
+                        editor.copySelected()
+                        event.accepted = true
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V) {
+                        editor.pasteClipboard()
+                        event.accepted = true
                     }
                 }
                 // Each row is draggable (reorder/reparent) and a drop target. A row is
@@ -344,7 +404,7 @@ Item {
                         drag.target: content
                         drag.axis: Drag.YAxis
                         onClicked: {
-                            editor.selectedPath = wrapper.rowData.path; editor.refresh()
+                            editor.selectNode(wrapper.rowData.path)
                             treeList.forceActiveFocus()
                         }
                         onReleased: {
@@ -412,10 +472,12 @@ Item {
                         selectedPath: editor.selectedPath
                         liveValues: editor.liveValues
                         liveQuality: editor.liveQuality
+                        addTypes: editor.containerTypes.concat(editor.widgetTypes)
                         onSelectRequested: {
-                            editor.selectedPath = path; editor.refresh()
+                            editor.selectNode(path)
                             treeList.forceActiveFocus()
                         }
+                        onAddRequested: editor.addChild(path, type)
                     }
                 }
             }

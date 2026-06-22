@@ -1,4 +1,5 @@
 import QtQuick 2.7
+import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 
 // Recursive renderer for one visualization node. A node is either a layout CONTAINER
@@ -15,6 +16,11 @@ Loader {
     property var path: []                  // index path from the root
     property var selectedPath: null        // editor's current selection (design mode)
     signal selectRequested(var path)
+
+    // design mode: the in-container "＋" button offers these types to add as a child;
+    // the request bubbles up to the editor (which mutates the tree at `path`).
+    property var addTypes: []
+    signal addRequested(var path, string type)
 
     // optional live overlay: a { tag: value } / { tag: quality } map. When set (the editor
     // canvas while a runner is streaming), a leaf shows the live value/quality for its tag
@@ -119,8 +125,41 @@ Loader {
                             item.selectedPath = Qt.binding(function () { return node.selectedPath })
                             item.liveValues = Qt.binding(function () { return node.liveValues })
                             item.liveQuality = Qt.binding(function () { return node.liveQuality })
+                            item.addTypes = Qt.binding(function () { return node.addTypes })
                             item.selectRequested.connect(function (p) { node.selectRequested(p) })
+                            item.addRequested.connect(function (p, t) { node.addRequested(p, t) })
                             item.spec = Qt.binding(function () { return node.spec.children[index] })
+                        }
+                    }
+                }
+
+                // design-mode "＋": append a child via a type-picker menu. Being last in
+                // the layout, it sits to the right in a Row and at the bottom of a Column/
+                // Grid. Invisible items are excluded from the layout, so run mode is unaffected.
+                Rectangle {
+                    id: addBtn
+                    visible: node.mode === "design"
+                    implicitWidth: 26; implicitHeight: 26
+                    Layout.alignment: Qt.AlignCenter
+                    radius: 4
+                    color: addMouse.containsMouse ? "#e3f2fd" : "#f0f0f0"
+                    border.color: "#bbb"; border.width: 1
+                    Text { anchors.centerIn: parent; text: "＋"; color: "#1565c0"
+                           font.pixelSize: 16; font.bold: true }
+                    MouseArea {
+                        id: addMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: addMenu.popup()
+                    }
+                    Menu {
+                        id: addMenu
+                        Repeater {
+                            model: node.addTypes
+                            delegate: MenuItem {
+                                text: modelData
+                                onTriggered: node.addRequested(node.path, modelData)
+                            }
                         }
                     }
                 }
