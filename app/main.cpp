@@ -201,9 +201,8 @@ int main (int argc, char **argv) try {
 #ifdef RADAPTER_GUI
     for (auto it = argv; it != argv + argc; ++it) {
         if (strcmp(*it, "--gui") == 0 || strcmp(*it, "--gui-no-auto-quit") == 0) {
-            // QApplication (not QGuiApplication) because some QML modules used by the
-            // GUI — notably QtCharts — render through QtWidgets' QGraphicsScene and
-            // crash without a widget-capable application instance.
+            // QApplication, not QGuiApplication: QtCharts' QML module renders through
+            // QtWidgets and crashes without a widget-capable application instance.
             auto gapp = new QApplication(argc, argv);
             gapp->setQuitOnLastWindowClosed(false);
             app.reset(gapp);

@@ -125,6 +125,54 @@ ApplicationWindow {
         selectedPath = null
         commit()
     }
+    // is `a` a prefix of (or equal to) `b`? — used to forbid dropping a node into its
+    // own subtree, which would detach the branch from the tree.
+    function isPrefix(a, b) {
+        if (a.length > b.length) return false
+        for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+        return true
+    }
+
+    // Move the node at fromPath to be child #toIndex of the node at toParentPath.
+    function moveNode(fromPath, toParentPath, toIndex) {
+        if (!fromPath || fromPath.length === 0) return        // never move the root
+        if (isPrefix(fromPath, toParentPath)) return          // not into own subtree
+        var node = nodeAt(fromPath)
+        var fromParent = nodeAt(fromPath.slice(0, -1))
+        var fromIdx = fromPath[fromPath.length - 1]
+        var sameParent = pathEq(fromPath.slice(0, -1), toParentPath)
+        var insertIdx = (sameParent && fromIdx < toIndex) ? toIndex - 1 : toIndex
+        fromParent.children.splice(fromIdx, 1)
+        var toParent = nodeAt(toParentPath)
+        if (!toParent.children) toParent.children = []
+        toParent.children.splice(insertIdx, 0, node)
+        selectedPath = toParentPath.concat([insertIdx])
+        commit()
+    }
+
+    // Resolve a drag-drop onto a target row into a moveNode call. zone: -1 before the
+    // target, +1 after it, 0 "into" it (only when the target is a container).
+    function dropOnto(fromPath, targetPath, zone) {
+        var toParentPath, toIndex
+        if (zone === 0) {
+            var t = nodeAt(targetPath)
+            if (isContainerType(t.type)) {
+                toParentPath = targetPath
+                toIndex = t.children ? t.children.length : 0
+                moveNode(fromPath, toParentPath, toIndex)
+                return
+            }
+            zone = 1   // a leaf can't contain — fall back to "after"
+        }
+        if (targetPath.length === 0) {   // before/after the root → append into the root
+            moveNode(fromPath, [], nodeAt([]).children ? nodeAt([]).children.length : 0)
+            return
+        }
+        toParentPath = targetPath.slice(0, -1)
+        var idx = targetPath[targetPath.length - 1]
+        moveNode(fromPath, toParentPath, zone < 0 ? idx : idx + 1)
+    }
+
     function moveSelected(delta) {
         if (!selectedPath || selectedPath.length === 0) return
         var parent = nodeAt(selectedPath.slice(0, -1))
@@ -238,20 +286,90 @@ ApplicationWindow {
                         event.accepted = true
                     }
                 }
-                delegate: ItemDelegate {
+                // Each row is draggable (reorder/reparent) and a drop target. A row is
+                // dropped before/after a sibling, or "into" a container node.
+                delegate: Item {
+                    id: wrapper
                     width: treeList.width
                     height: 26
-                    highlighted: editor.pathEq(modelData.path, editor.selectedPath)
-                    onClicked: {
-                        editor.selectedPath = modelData.path; editor.refresh()
-                        treeList.forceActiveFocus()
+                    property var rowData: modelData
+                    readonly property bool selected: editor.pathEq(rowData.path, editor.selectedPath)
+
+                    Rectangle {
+                        id: content
+                        width: wrapper.width
+                        height: wrapper.height
+                        color: dragArea.drag.active ? "#bbdefb"
+                             : wrapper.selected     ? "#e3f2fd" : "transparent"
+                        Drag.active: dragArea.drag.active
+                        Drag.source: wrapper
+                        Drag.hotSpot.x: 12
+                        Drag.hotSpot.y: 13
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 8 + wrapper.rowData.depth * 16
+                            width: parent.width - x - 4
+                            text: wrapper.rowData.label
+                            elide: Text.ElideRight
+                            color: wrapper.selected ? "#1565c0" : "#333"
+                        }
+
+                        // while dragging, float above the list so the row follows the cursor
+                        states: State {
+                            when: dragArea.drag.active
+                            ParentChange { target: content; parent: treeList }
+                            AnchorChanges { target: content; anchors.verticalCenter: undefined }
+                        }
                     }
-                    contentItem: Text {
-                        text: modelData.label
-                        leftPadding: 8 + modelData.depth * 16
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                        color: parent.highlighted ? "#1565c0" : "#333"
+
+                    MouseArea {
+                        id: dragArea
+                        anchors.fill: parent
+                        drag.target: content
+                        drag.axis: Drag.YAxis
+                        onClicked: {
+                            editor.selectedPath = wrapper.rowData.path; editor.refresh()
+                            treeList.forceActiveFocus()
+                        }
+                        onReleased: {
+                            if (drag.active) content.Drag.drop()
+                            content.x = 0; content.y = 0   // snap back into the list slot
+                        }
+                    }
+
+                    // drop indicator: a line at the top/bottom for before/after, or a full
+                    // outline when dropping into a container.
+                    DropArea {
+                        id: drop
+                        anchors.fill: parent
+                        property int zone: 0   // -1 before, 0 into, +1 after
+                        property bool active: false
+                        onEntered: active = true
+                        onExited: active = false
+                        onDropped: {
+                            active = false
+                            editor.dropOnto(drag.source.rowData.path, wrapper.rowData.path, zone)
+                        }
+                        onPositionChanged: {
+                            var f = drag.y / wrapper.height
+                            zone = f < 0.3 ? -1 : (f > 0.7 ? 1 : 0)
+                        }
+
+                        Rectangle {   // into-container highlight
+                            anchors.fill: parent
+                            color: "transparent"
+                            border.color: "#1565c0"; border.width: 2
+                            visible: drop.active && drop.zone === 0
+                                     && editor.isContainerType(wrapper.rowData.type)
+                        }
+                        Rectangle {   // before/after insertion line
+                            height: 2; color: "#1565c0"
+                            anchors.left: parent.left; anchors.right: parent.right
+                            y: drop.zone < 0 ? 0 : parent.height - 2
+                            visible: drop.active &&
+                                     (drop.zone !== 0 || !editor.isContainerType(wrapper.rowData.type))
+                        }
                     }
                 }
             }

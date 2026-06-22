@@ -37,9 +37,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
 if (RADAPTER_GUI)
-    # Widgets: QtCharts' QML module renders through QtWidgets' QGraphicsScene, so the GUI
-    # build needs a QApplication (links Widgets). The QtCharts QML plugin itself is loaded
-    # at runtime from the installed qml module — no C++ link/dev package required.
+    # Widgets: --gui runs on a QApplication (QtCharts' QML module needs it). The QtCharts
+    # QML plugin loads at runtime from the system qml module — no C++ link required.
     find_package(Qt5 REQUIRED COMPONENTS Gui Qml Quick Widgets)
 endif()
 
