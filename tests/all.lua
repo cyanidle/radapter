@@ -47,12 +47,12 @@ local function run_next()
     local errbuf = {}
     pipe(proc.events, function(ev)
         if ev.stderr then errbuf[#errbuf + 1] = tostring(ev.stderr) end
-        if ev.finished ~= nil then
-            if ev.finished == 0 then
+        if ev.finished then
+            if ev.exit_code == 0 then
                 log.info("PASS  {}", file)
             else
                 failures[#failures + 1] = file
-                log.error("FAIL  {} (exit {})", file, ev.finished)
+                log.error("FAIL  {} (exit {})", file, ev.exit_code)
                 io.stderr:write(table.concat(errbuf))   -- show the failing run's output
             end
             proc:destroy()

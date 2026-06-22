@@ -11,10 +11,10 @@ local proc = Process { program = "echo", arguments = { "hello", "radapter" } }
 pipe(proc, function(chunk) out[#out + 1] = tostring(chunk) end)
 
 pipe(proc.events, function(ev)
-    if ev.finished ~= nil then
+    if ev.finished then
         local s = table.concat(out)
         assert(s:find("hello radapter"), "stdout mismatch: [" .. s .. "]")
-        assert(ev.finished == 0, "echo should exit 0, got " .. tostring(ev.finished))
+        assert(ev.exit_code == 0, "echo should exit 0, got " .. tostring(ev.exit_code))
         assert(proc:State() == "not_running", "state after exit")
         log.info("Process test OK")
         shutdown()
