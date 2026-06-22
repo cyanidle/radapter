@@ -1,10 +1,9 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-// configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, FilePicker, …)
-// are sibling .qml files in this directory and resolve by name without an import. We avoid
-// QtQuick.Dialogs entirely: under the QApplication this app runs on (for QtCharts) it uses
-// the QtWidgets file dialog, which hangs on a KDE session — FilePicker is pure QML.
+import QtQuick.Dialogs 1.2 as Dialogs   // aliased so `Dialog` stays QtQuick.Controls' Dialog
+// configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are sibling
+// .qml files in this directory and resolve by name without an import.
 
 // Multi-object graph configurator. The Lua side sends the worker schemas (filtered to
 // the supported families). The toolbar adds workers; the WorkerGraph canvas shows every
@@ -39,24 +38,32 @@ ApplicationWindow {
     function dirOf(p)  { return p.replace(/[\/\\][^\/\\]*$/, "") }
     function baseOf(p) { return p.replace(/^.*[\/\\]/, "") }
 
+    // strip the file:// scheme a FileDialog url carries, yielding a plain path for Lua I/O
+    function urlToPath(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")) }
+
     // a sensible starting directory for the pickers
     readonly property string homeDir: (typeof home !== "undefined" && home) ? home : "/"
 
-    // Open: pick an existing project file. Saving uses a separate compose-the-name dialog
-    // below (folder + filename), so it works without a save-capable native dialog.
-    FilePicker {
+    // Open uses a native FileDialog (pick-existing works natively). Saving does NOT:
+    // QtQuick.Dialogs 1.2's `selectExisting: false` is ignored by the native helper (it
+    // always opens in pick-existing mode), so we compose folder selection with an explicit
+    // filename field below — a small custom dialog that reliably lets the user name the file.
+    Dialogs.FileDialog {
         id: openDialog
         title: "Open Project"
-        nameFilter: "*.json"
-        onPicked: radapter.model.send({ open_file: path })
+        nameFilters: ["JSON files (*.json)"]
+        selectExisting: true
+        folder: shortcuts.home
+        onAccepted: radapter.model.send({ open_file: root.urlToPath(fileUrl) })
     }
 
-    // folder picker behind the Save dialog's "Browse…" button
-    FilePicker {
+    // folder picker behind the Save dialog's "Browse…" button (selectFolder works natively)
+    Dialogs.FileDialog {
         id: folderDialog
         title: "Choose Folder"
         selectFolder: true
-        onPicked: saveDialog.folder = path
+        folder: shortcuts.home
+        onAccepted: saveDialog.folder = root.urlToPath(fileUrl)
     }
 
     Dialog {
@@ -92,7 +99,13 @@ ApplicationWindow {
                     text: saveDialog.folder
                     onEditingFinished: saveDialog.folder = text
                 }
-                Button { text: "Browse…"; onClicked: folderDialog.openAt(saveDialog.folder.length ? saveDialog.folder : root.homeDir) }
+                Button {
+                    text: "Browse…"
+                    onClicked: {
+                        folderDialog.folder = "file://" + (saveDialog.folder.length ? saveDialog.folder : root.homeDir)
+                        folderDialog.open()
+                    }
+                }
             }
             TextField {
                 id: nameField
@@ -103,16 +116,10 @@ ApplicationWindow {
         }
     }
 
-    // Message dialog for file I/O feedback (pure QML, see import note above)
-    Dialog {
+    // Message dialog for file I/O feedback (not an attached property)
+    Dialogs.MessageDialog {
         id: messageDialog
-        property string text: ""
         title: "Radapter Configurator"
-        modal: true
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        standardButtons: Dialog.Ok
-        Label { text: messageDialog.text; wrapMode: Text.Wrap }
     }
 
     // ── File operations (delegate to Lua for actual I/O) ─────────────────
@@ -137,7 +144,8 @@ ApplicationWindow {
     }
 
     function openProject() {
-        openDialog.openAt(root.projectPath.length ? root.dirOf(root.projectPath) : root.homeDir)
+        openDialog.folder = "file://" + (root.projectPath.length ? root.dirOf(root.projectPath) : root.homeDir)
+        openDialog.open()
     }
 
     function newProject() {
