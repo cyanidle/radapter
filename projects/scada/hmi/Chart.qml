@@ -1,9 +1,13 @@
 import QtQuick 2.7
-import QtQuick.Controls 2.13
+import QtCharts 2.15
 
-// Time-series line chart. Collects timestamped values on `value` changes (run mode)
-// and draws them on a Canvas with auto-scaling Y axis and a fixed time window (spec.timeFrame,
-// default 3600 s = 1 hour). In design mode it renders a representative sine curve.
+// Time-series line chart built on QtCharts. Collects timestamped values on `value`
+// changes (run mode) into a LineSeries drawn against a scrolling DateTimeAxis and an
+// auto- or fixed-range ValueAxis (spec.yMin/spec.yMax). The time window is spec.timeFrame
+// (default 3600 s = 1 hour). In design mode it renders a representative sine curve.
+//
+// QtCharts renders through QtWidgets' QGraphicsScene, so the radapter GUI build runs on a
+// QApplication (see app/main.cpp) — required for this component to load.
 Item {
     id: chart
     implicitWidth: 320
@@ -14,236 +18,133 @@ Item {
     property string quality: "good"
     property string mode: "design"    // set by Node.qml: "run" | "design"
 
-    // Configurable time window in seconds; default 1 hour
     readonly property int timeFrame: spec.timeFrame !== undefined ? Number(spec.timeFrame) : 3600
-    // Optional fixed Y range; when absent the chart auto-scales
     readonly property var yMinFixed: spec.yMin
     readonly property var yMaxFixed: spec.yMax
-    // Display
     readonly property string label: spec.label !== undefined ? spec.label : ""
     readonly property string units: spec.units !== undefined ? spec.units : ""
     readonly property color lineColor: spec.color !== undefined ? spec.color : "#2196f3"
 
-    // Internal circular buffer: array of {t: <epoch ms>, v: <number>}
-    property var _data: []
-    // Last value we recorded, so we only push on real changes
+    // last value seen since the previous flush, so bursts coalesce to one point per second
     property var _lastValue: undefined
-
-    // Padding inside the canvas: left for Y labels, bottom for X labels, top for the
-    // title/units band, right for the trailing current-value readout.
-    readonly property int padLeft: 48
-    readonly property int padRight: 44
-    readonly property int padTop: 24
-    readonly property int padBottom: 28
-
-    readonly property int plotW: width - padLeft - padRight
-    readonly property int plotH: height - padTop - padBottom
 
     opacity: quality === "comm_fail" ? 0.4 : 1.0
 
     // ── data collection (run mode only) ──────────────────────────────────────
     Timer {
         id: flusher
-        interval: 1000; repeat: false
-        running: false
+        interval: 1000; repeat: false; running: false
         onTriggered: chart._flush()
     }
-
-    // Scrolls the (time) X axis and prunes stale points even while the value is steady,
-    // so the plot keeps advancing in run mode. Repaints once per second.
+    // Scrolls the X axis and prunes stale points even while the value is steady.
     Timer {
         id: ticker
         interval: 1000; repeat: true
-        running: chart._mode === "run"
-        onTriggered: { chart._prune(); canvas.requestPaint() }
+        running: chart.mode === "run"
+        onTriggered: { chart._prune(); chart._scrollAxes(); chart._rescaleY() }
     }
 
-    // On every value change, schedule a flush if in run mode and value is a number
     onValueChanged: {
-        if (chart._mode !== "run") return
+        if (chart.mode !== "run") return
         var v = Number(chart.value)
         if (isNaN(v)) return
         chart._lastValue = v
         if (!flusher.running) flusher.start()
     }
 
-    // Repaint the design-mode preview when the configured window or display props change.
-    onTimeFrameChanged: canvas.requestPaint()
-    onModeChanged: canvas.requestPaint()
-    onSpecChanged: canvas.requestPaint()
+    onModeChanged: chart._reload()
+    onSpecChanged: chart._reload()
+    Component.onCompleted: chart._reload()
+
+    function _now() { return Date.now() }
+
+    function _scrollAxes() {
+        var now = chart._now()
+        axisX.min = new Date(now - chart.timeFrame * 1000)
+        axisX.max = new Date(now)
+    }
 
     function _prune() {
-        var cutoff = Date.now() - chart.timeFrame * 1000
-        while (chart._data.length > 0 && chart._data[0].t < cutoff)
-            chart._data.shift()
+        var cutoff = chart._now() - chart.timeFrame * 1000
+        while (series.count > 0 && series.at(0).x < cutoff) series.remove(0)
+    }
+
+    function _rescaleY() {
+        if (chart.yMinFixed !== undefined && chart.yMaxFixed !== undefined) {
+            axisY.min = Number(chart.yMinFixed)
+            axisY.max = Number(chart.yMaxFixed)
+            return
+        }
+        var lo = Infinity, hi = -Infinity
+        for (var i = 0; i < series.count; i++) {
+            var v = series.at(i).y
+            if (v < lo) lo = v
+            if (v > hi) hi = v
+        }
+        if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = 100 }
+        var range = hi - lo
+        if (range === 0) { lo -= 5; hi += 5 }
+        else { lo -= range * 0.05; hi += range * 0.05 }
+        axisY.min = lo
+        axisY.max = hi
     }
 
     function _flush() {
-        chart._data.push({ t: Date.now(), v: Number(chart._lastValue) })
+        series.append(chart._now(), Number(chart._lastValue))
         chart._prune()
-        canvas.requestPaint()
+        chart._scrollAxes()
+        chart._rescaleY()
     }
 
-    // ── design-mode sample data ──────────────────────────────────────────────
-    function designPoints() {
-        var pts = []
-        var now = Date.now()
-        var n = 60
-        for (var i = 0; i <= n; i++) {
-            var frac = i / n
-            var t = now - chart.timeFrame * 1000 * (1 - frac)
-            var v = 50 + 30 * Math.sin(frac * Math.PI * 4) + 10 * Math.cos(frac * Math.PI * 7)
-            pts.push({ t: t, v: v })
+    // Rebuild the series from scratch (mode/spec change). Design mode seeds a sine curve.
+    function _reload() {
+        series.clear()
+        if (chart.mode === "design") {
+            var now = chart._now()
+            var n = 60
+            for (var i = 0; i <= n; i++) {
+                var frac = i / n
+                var t = now - chart.timeFrame * 1000 * (1 - frac)
+                var v = 50 + 30 * Math.sin(frac * Math.PI * 4) + 10 * Math.cos(frac * Math.PI * 7)
+                series.append(t, v)
+            }
         }
-        return pts
+        _scrollAxes()
+        _rescaleY()
     }
 
-    // ── painting ─────────────────────────────────────────────────────────────
-    function getDataPoints() {
-        if (chart._mode === "design")
-            return chart.designPoints()
-        return chart._data
-    }
-
-    Canvas {
-        id: canvas
+    ChartView {
+        id: view
         anchors.fill: parent
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
+        antialiasing: true
+        legend.visible: false
+        backgroundColor: "#fafafa"
+        title: chart.label
+        titleColor: "#555"
+        titleFont.pixelSize: 12
+        titleFont.bold: true
+        margins.top: 4; margins.bottom: 4; margins.left: 4; margins.right: 4
 
-            var pts = chart.getDataPoints()
-
-            // Determine Y range
-            var yMin, yMax
-            if (chart.yMinFixed !== undefined && chart.yMaxFixed !== undefined) {
-                yMin = Number(chart.yMinFixed)
-                yMax = Number(chart.yMaxFixed)
-            } else {
-                yMin = Infinity; yMax = -Infinity
-                for (var i = 0; i < pts.length; i++) {
-                    if (pts[i].v < yMin) yMin = pts[i].v
-                    if (pts[i].v > yMax) yMax = pts[i].v
-                }
-                if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 100 }
-                var range = yMax - yMin
-                if (range === 0) { yMin -= 5; yMax += 5 }
-                else { yMin -= range * 0.05; yMax += range * 0.05 }
+        LineSeries {
+            id: series
+            color: chart.lineColor
+            width: 2
+            axisX: DateTimeAxis {
+                id: axisX
+                format: "hh:mm"
+                labelsFont.pixelSize: 9
+                tickCount: 5
+                gridLineColor: "#eee"
             }
-
-            var now = Date.now()
-            var tMin = now - chart.timeFrame * 1000
-            var tMax = now
-            var tRange = chart.timeFrame * 1000
-
-            // Background
-            ctx.fillStyle = "#fafafa"
-            ctx.fillRect(0, 0, width, height)
-
-            // Plot area
-            var px = chart.padLeft
-            var py = chart.padTop
-            var pw = chart.plotW
-            var ph = chart.plotH
-
-            ctx.fillStyle = "#ffffff"
-            ctx.strokeStyle = "#e0e0e0"
-            ctx.lineWidth = 1
-            ctx.fillRect(px, py, pw, ph)
-            ctx.strokeRect(px, py, pw, ph)
-
-            // Helper: convert data coords to canvas coords
-            function toX(t) { return px + ((t - tMin) / tRange) * pw }
-            function toY(v) { return py + ph - ((v - yMin) / (yMax - yMin)) * ph }
-
-            // Grid lines and Y labels
-            ctx.strokeStyle = "#eee"
-            ctx.lineWidth = 1
-            ctx.fillStyle = "#999"
-            ctx.font = "9px sans-serif"
-            ctx.textAlign = "right"
-            ctx.textBaseline = "middle"
-
-            var ySteps = 5
-            for (var i = 0; i <= ySteps; i++) {
-                var v = yMin + (yMax - yMin) * i / ySteps
-                var yy = toY(v)
-                ctx.beginPath()
-                ctx.moveTo(px, yy)
-                ctx.lineTo(px + pw, yy)
-                ctx.stroke()
-                ctx.fillText(formatNum(v), px - 4, yy)
-            }
-
-            // X axis labels (time). End labels are edge-aligned so the first/last don't
-            // get clipped at the plot boundaries.
-            ctx.textBaseline = "top"
-            var xCount = Math.max(2, Math.min(6, Math.floor(pw / 60)))
-            for (var i = 0; i <= xCount; i++) {
-                var tt = tMin + tRange * i / xCount
-                var xx = toX(tt)
-                ctx.textAlign = i === 0 ? "left" : (i === xCount ? "right" : "center")
-                ctx.fillText(formatTime(tt, now), xx, py + ph + 6)
-            }
-
-            // Draw the line
-            if (pts.length > 1) {
-                ctx.beginPath()
-                ctx.strokeStyle = chart.lineColor
-                ctx.lineWidth = 2
-                ctx.moveTo(toX(pts[0].t), toY(pts[0].v))
-                for (var i = 1; i < pts.length; i++)
-                    ctx.lineTo(toX(pts[i].t), toY(pts[i].v))
-                ctx.stroke()
-
-                // Fill under the line
-                ctx.lineTo(toX(pts[pts.length - 1].t), py + ph)
-                ctx.lineTo(toX(pts[0].t), py + ph)
-                ctx.closePath()
-                var lc = chart.lineColor
-                ctx.fillStyle = Qt.rgba(lc.r, lc.g, lc.b, 0.12)
-                ctx.fill()
-            } else if (pts.length === 1) {
-                // Single point — draw a dot
-                ctx.beginPath()
-                ctx.arc(toX(pts[0].t), toY(pts[0].v), 3, 0, Math.PI * 2)
-                ctx.fillStyle = chart.lineColor
-                ctx.fill()
-            }
-
-            // Current value: a small marker dot on the last point plus a readout in the
-            // right gutter, vertically clamped into the plot so it never spills off-canvas.
-            if (pts.length > 0) {
-                var last = pts[pts.length - 1]
-                var mx = toX(last.t), my = toY(last.v)
-                ctx.beginPath()
-                ctx.arc(mx, my, 2.5, 0, Math.PI * 2)
-                ctx.fillStyle = chart.lineColor
-                ctx.fill()
-
-                var ly = Math.max(py + 6, Math.min(py + ph - 6, my))
-                ctx.fillStyle = chart.lineColor
-                ctx.font = "bold 10px sans-serif"
-                ctx.textAlign = "left"
-                ctx.textBaseline = "middle"
-                ctx.fillText(formatNum(last.v), px + pw + 5, ly)
+            axisY: ValueAxis {
+                id: axisY
+                labelsFont.pixelSize: 9
+                gridLineColor: "#eee"
             }
         }
     }
 
-    // Label at the top-left
-    Text {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 4
-        text: chart.label
-        font.pixelSize: 11
-        font.bold: true
-        color: "#555"
-        visible: chart.label.length > 0
-    }
-
-    // Units at the top-right
+    // Units, top-right
     Text {
         anchors.right: parent.right
         anchors.top: parent.top
@@ -253,20 +154,4 @@ Item {
         color: "#999"
         visible: chart.units.length > 0
     }
-
-    // ── formatting helpers ───────────────────────────────────────────────────
-    function formatNum(v) {
-        if (v === Math.floor(v)) return v.toFixed(0)
-        return v.toFixed(1)
-    }
-
-    function formatTime(ts, now) {
-        var d = new Date(ts)
-        var h = d.getHours()
-        var m = d.getMinutes()
-        return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m
-    }
-
-    // Expose mode so onValueChanged knows when to collect
-    readonly property string _mode: chart.mode
 }

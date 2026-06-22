@@ -105,8 +105,10 @@ is the schema-driven configurator (`--gui projects/scada/configurator.lua`).
 
 ### Layers
 
-- `app/main.cpp` → the `radapter` executable. Owns the `QCoreApplication`/`QGuiApplication`
-  event loop, CLI parsing (argparse), signal handling (qctrl), and the `--watch-dir`
+- `app/main.cpp` → the `radapter` executable. Owns the event loop
+  (`QCoreApplication` headless; `QApplication` under `--gui` — a widget-capable app is
+  required because QtCharts' QML module renders through QtWidgets' `QGraphicsScene`),
+  CLI parsing (argparse), signal handling (qctrl), and the `--watch-dir`
   hot-reload loop (which destroys the `Instance` and builds a fresh one on file change).
   `--pre-reload "<cmd>"` runs a shell command (e.g. `cmake --build build`) before each
   reload and skips the reload — keeping the current instance live — if the command fails.

@@ -37,7 +37,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
 if (RADAPTER_GUI)
-    find_package(Qt5 REQUIRED COMPONENTS Gui Qml Quick)
+    # Widgets: QtCharts' QML module renders through QtWidgets' QGraphicsScene, so the GUI
+    # build needs a QApplication (links Widgets). The QtCharts QML plugin itself is loaded
+    # at runtime from the installed qml module — no C++ link/dev package required.
+    find_package(Qt5 REQUIRED COMPONENTS Gui Qml Quick Widgets)
 endif()
 
 add_subdirectory(deps)
@@ -141,7 +144,7 @@ target_link_libraries(radapter-qt INTERFACE
     Qt5::Sql Qt5::WebSockets Qt5::Network
 )
 if (RADAPTER_GUI)
-    target_link_libraries(radapter-qt INTERFACE Qt5::Gui Qt5::Qml Qt5::Quick)
+    target_link_libraries(radapter-qt INTERFACE Qt5::Gui Qt5::Qml Qt5::Quick Qt5::Widgets)
 endif()
 
 target_link_libraries(radapter-sdk PUBLIC 
