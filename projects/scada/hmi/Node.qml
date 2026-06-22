@@ -16,6 +16,12 @@ Loader {
     property var selectedPath: null        // editor's current selection (design mode)
     signal selectRequested(var path)
 
+    // optional live overlay: a { tag: value } / { tag: quality } map. When set (the editor
+    // canvas while a runner is streaming), a leaf shows the live value/quality for its tag
+    // in place of the design placeholder.
+    property var liveValues: undefined
+    property var liveQuality: undefined
+
     function isContainer(t) { return t === "Row" || t === "Column" || t === "Grid" }
     function pathEq(a, b) {
         if (a === null || b === null) return false
@@ -34,10 +40,12 @@ Loader {
     // resolved value/quality for leaf widgets. Only touch radapter.tags in run mode
     // (the editor process has no --tags, so radapter.tags is null there).
     readonly property var resolvedValue:
-        mode === "run" && spec.tag ? radapter.tags[spec.tag]
-                                   : (mode === "design" ? designValue() : undefined)
+        spec.tag && liveValues && liveValues[spec.tag] !== undefined ? liveValues[spec.tag]
+      : mode === "run" && spec.tag ? radapter.tags[spec.tag]
+      : (mode === "design" ? designValue() : undefined)
     readonly property string resolvedQuality:
-        mode === "run" && spec.tag ? (radapter.quality[spec.tag] || "comm_fail") : "good"
+        spec.tag && liveQuality && liveQuality[spec.tag] !== undefined ? liveQuality[spec.tag]
+      : mode === "run" && spec.tag ? (radapter.quality[spec.tag] || "comm_fail") : "good"
 
     // a representative placeholder so widgets look alive in the editor
     function designValue() {
@@ -109,6 +117,8 @@ Loader {
                             item.mode = Qt.binding(function () { return node.mode })
                             item.path = Qt.binding(function () { return node.path.concat([index]) })
                             item.selectedPath = Qt.binding(function () { return node.selectedPath })
+                            item.liveValues = Qt.binding(function () { return node.liveValues })
+                            item.liveQuality = Qt.binding(function () { return node.liveQuality })
                             item.selectRequested.connect(function (p) { node.selectRequested(p) })
                             item.spec = Qt.binding(function () { return node.spec.children[index] })
                         }

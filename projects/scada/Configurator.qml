@@ -1,9 +1,10 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import QtQuick.Dialogs 1.2 as Dialogs   // aliased so `Dialog` stays QtQuick.Controls' Dialog
-// configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are
-// sibling .qml files in this directory and resolve by name without an import.
+// configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, FilePicker, …)
+// are sibling .qml files in this directory and resolve by name without an import. We avoid
+// QtQuick.Dialogs entirely: under the QApplication this app runs on (for QtCharts) it uses
+// the QtWidgets file dialog, which hangs on a KDE session — FilePicker is pure QML.
 
 // Multi-object graph configurator. The Lua side sends the worker schemas (filtered to
 // the supported families). The toolbar adds workers; the WorkerGraph canvas shows every
@@ -26,41 +27,36 @@ ApplicationWindow {
     property var formOverrides: ({})   // per-field custom editors, from Lua
     property string lastJson: ""
     property string runState: "—"      // runner connection state, shown in the log window
+    // live tag overlay streamed back from the running adapter, shown on the editor canvas
+    property var liveValues: ({})
+    property var liveQuality: ({})
+    property bool runnerLive: false
     property string projectPath: ""     // last saved/opened file path
     // file name (no dir, no .json) shown in the window title
     readonly property string projectName:
         projectPath.length ? projectPath.replace(/^.*[\/\\]/, "").replace(/\.json$/, "") : ""
 
-    // strip the file:// scheme a FileDialog url carries, yielding a plain path for Lua I/O
-    function urlToPath(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")) }
     function dirOf(p)  { return p.replace(/[\/\\][^\/\\]*$/, "") }
     function baseOf(p) { return p.replace(/^.*[\/\\]/, "") }
 
-    // Open uses a native FileDialog (pick-existing works natively). Saving does NOT:
-    // QtQuick.Dialogs 1.2's `selectExisting: false` is ignored by the native helper (it
-    // always opens in pick-existing mode), and Qt.labs.platform's save dialog has no
-    // backend here (radapter links no Qt Widgets). So we compose folder selection with an
-    // explicit filename field — a small custom dialog that reliably lets the user name the
-    // file on any platform.
-    Dialogs.FileDialog {
+    // a sensible starting directory for the pickers
+    readonly property string homeDir: (typeof home !== "undefined" && home) ? home : "/"
+
+    // Open: pick an existing project file. Saving uses a separate compose-the-name dialog
+    // below (folder + filename), so it works without a save-capable native dialog.
+    FilePicker {
         id: openDialog
         title: "Open Project"
-        nameFilters: ["JSON files (*.json)"]
-        selectExisting: true
-        folder: shortcuts.home
-        onAccepted: {
-            // notify Lua to read the file and send back the config (open_ok sets the path)
-            radapter.model.send({ open_file: root.urlToPath(fileUrl) })
-        }
+        nameFilter: "*.json"
+        onPicked: radapter.model.send({ open_file: path })
     }
 
-    // folder picker behind the Save dialog's "Browse…" button (selectFolder works natively)
-    Dialogs.FileDialog {
+    // folder picker behind the Save dialog's "Browse…" button
+    FilePicker {
         id: folderDialog
         title: "Choose Folder"
         selectFolder: true
-        folder: shortcuts.home
-        onAccepted: saveDialog.folder = root.urlToPath(fileUrl)
+        onPicked: saveDialog.folder = path
     }
 
     Dialog {
@@ -96,7 +92,7 @@ ApplicationWindow {
                     text: saveDialog.folder
                     onEditingFinished: saveDialog.folder = text
                 }
-                Button { text: "Browse…"; onClicked: folderDialog.open() }
+                Button { text: "Browse…"; onClicked: folderDialog.openAt(saveDialog.folder.length ? saveDialog.folder : root.homeDir) }
             }
             TextField {
                 id: nameField
@@ -107,10 +103,16 @@ ApplicationWindow {
         }
     }
 
-    // Message dialog for file I/O feedback (not an attached property)
-    Dialogs.MessageDialog {
+    // Message dialog for file I/O feedback (pure QML, see import note above)
+    Dialog {
         id: messageDialog
+        property string text: ""
         title: "Radapter Configurator"
+        modal: true
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok
+        Label { text: messageDialog.text; wrapMode: Text.Wrap }
     }
 
     // ── File operations (delegate to Lua for actual I/O) ─────────────────
@@ -128,15 +130,14 @@ ApplicationWindow {
             saveDialog.folder = root.dirOf(root.projectPath)
             nameField.text = root.baseOf(root.projectPath)
         } else {
-            if (!saveDialog.folder.length)
-                saveDialog.folder = root.urlToPath(folderDialog.shortcuts.home)
+            if (!saveDialog.folder.length) saveDialog.folder = root.homeDir
             nameField.text = "project.json"
         }
         saveDialog.open()
     }
 
     function openProject() {
-        openDialog.open()
+        openDialog.openAt(root.projectPath.length ? root.dirOf(root.projectPath) : root.homeDir)
     }
 
     function newProject() {
@@ -154,8 +155,29 @@ ApplicationWindow {
             sharedContext.load(msg.config)
         }
         // streamed back from the headless runner launched by "Run"
-        if (msg.run_state !== undefined) root.runState = String(msg.run_state)
+        if (msg.run_state !== undefined) {
+            root.runState = String(msg.run_state)
+            // a fresh run clears the overlay; a finished/lost run stops marking it live
+            if (root.runState === "starting") {
+                root.liveValues = ({}); root.liveQuality = ({}); root.runnerLive = false
+            } else if (root.runState === "stopped" || root.runState === "disconnected"
+                       || root.runState.indexOf("exited") === 0) {
+                root.runnerLive = false
+            }
+        }
         if (msg.log !== undefined) runnerPanel.append(msg.log)
+        // live tag update { tag: { name, value, quality, ts } } → overlay on the editor
+        if (msg.tag !== undefined) {
+            var ev = msg.tag
+            var nv = {}, nq = {}
+            for (var k in root.liveValues)  nv[k] = root.liveValues[k]
+            for (var k2 in root.liveQuality) nq[k2] = root.liveQuality[k2]
+            nv[ev.name] = ev.value
+            nq[ev.name] = ev.quality
+            root.liveValues = nv
+            root.liveQuality = nq
+            root.runnerLive = true
+        }
         // file I/O responses
         if (msg.save_ok !== undefined) {
             messageDialog.text = "Saved to " + msg.save_ok
@@ -423,7 +445,14 @@ ApplicationWindow {
             id: hmiEditorLoader
             anchors.fill: parent
             source: "hmi/HmiEditor.qml"
-            onLoaded: item.context = sharedContext
+            onLoaded: {
+                item.context = sharedContext
+                item.live = Qt.binding(function () { return root.runnerLive })
+                item.liveValues = Qt.binding(function () {
+                    return root.runnerLive ? root.liveValues : undefined })
+                item.liveQuality = Qt.binding(function () {
+                    return root.runnerLive ? root.liveQuality : undefined })
+            }
         }
     }
 

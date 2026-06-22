@@ -15,6 +15,11 @@ Item {
 
     property var context: null          // shared ConfigContext
 
+    // live overlay fed by the configurator while a runner streams tags (see Configurator.qml)
+    property var liveValues: undefined
+    property var liveQuality: undefined
+    property bool live: false
+
     // candidate "worker:field" tags, derived live from the authored config (re-evaluated
     // on every context edit via revision), sorted so they cluster by worker-name prefix.
     property var candidateTags: context ? deriveTags(context.objects, context.revision) : []
@@ -260,6 +265,14 @@ Item {
             Button { text: "▼"; enabled: editor.selectedPath && editor.selectedPath.length > 0
                      onClicked: editor.moveSelected(1) }
             Item { Layout.fillWidth: true }
+            Row {
+                visible: editor.live
+                spacing: 4
+                Rectangle { width: 10; height: 10; radius: 5; color: "#43a047"
+                            anchors.verticalCenter: parent.verticalCenter }
+                Label { text: "LIVE"; color: "#43a047"; font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter }
+            }
         }
     }
 
@@ -397,6 +410,8 @@ Item {
                         mode: "design"
                         path: []
                         selectedPath: editor.selectedPath
+                        liveValues: editor.liveValues
+                        liveQuality: editor.liveQuality
                         onSelectRequested: {
                             editor.selectedPath = path; editor.refresh()
                             treeList.forceActiveFocus()

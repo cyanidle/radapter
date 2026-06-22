@@ -6,10 +6,11 @@
 -- log line back to the configurator over the same socket.
 --
 -- Wire format (over the local socket):
---   configurator -> runner : { config = { objects, pipes } }   -- build it
+--   configurator -> runner : { config = { objects, pipes }, observe = bool }  -- build it
 --                            { shutdown = true }                -- stop the runner
 --   runner -> configurator : { hello = token }                 -- on connect (correlation)
 --                            { log = { level, msg, category, timestamp } }
+--                            { tag = { name, value, quality, ts } }  -- observe mode
 
 local declare = require "declare"   -- sibling module (resolved via the script's dir)
 
@@ -42,12 +43,20 @@ pipe(client, function(msg)
         for _ in pairs(built) do n = n + 1 end
         log.info("runner: built {} object(s) from received config", n)
 
-        -- if the project carries an operator visualization, open the HMI window. The
-        -- runner was launched with --gui --tags (see configurator.lua), so the QML worker
-        -- has an engine and radapter.tags is live for the widgets to bind to.
+        -- handle the project's operator visualization. In observe mode (launched by the
+        -- configurator, which has its own visualization editor) we stream live tag values
+        -- back over the socket so they render there. Standalone, we open our own HMI window
+        -- bound to radapter.tags (needs --gui --tags).
         local viz = msg.config.visualization
         if viz and viz.root and viz.root.children and #viz.root.children > 0 then
-            if tags then
+            if msg.observe then
+                if tags then
+                    pipe(tags.changed, function(ev) client { tag = ev } end)
+                    log.info("runner: streaming live tags to the configurator")
+                else
+                    log.warn("runner: observe requested but --tags not enabled")
+                end
+            elseif tags then
                 QML { url = here .. "hmi/Hmi.qml", properties = { visualization = viz } }
                 log.info("runner: opened HMI visualization window")
             else

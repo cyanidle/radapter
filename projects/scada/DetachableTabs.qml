@@ -1,5 +1,7 @@
 import QtQuick 2.13
 import QtQuick.Window 2.13
+import QtQuick.Controls 2.13
+import QtQuick.Layouts 1.3
 
 // A tab strip whose pages (TabPanel children) can be torn off into their own window by
 // dragging a tab out of the application, or via the ⤢ button, and re-docked by closing
@@ -61,12 +63,23 @@ Item {
 
     Component {
         id: floatComp
-        Window {
+        ApplicationWindow {
+            id: win
             property var panel
             property alias body: body
             width: 820; height: 580
             title: panel ? panel.title : ""
+            // closing the window (or "Dock back") returns the page to the tab strip
             onClosing: { tabs._redock(panel); Qt.callLater(destroy) }
+            header: ToolBar {
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8; anchors.rightMargin: 8
+                    Label { text: win.title; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    Button { text: "⤡ Dock back"; onClicked: win.close() }
+                }
+            }
             Item { id: body; anchors.fill: parent }
         }
     }

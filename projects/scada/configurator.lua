@@ -46,6 +46,7 @@ local view = QML {
     url = "./Configurator.qml",
     properties = {
         custom_forms = custom_forms,
+        home = os.getenv("HOME") or "/",   -- starting dir for the file pickers
     },
 }
 
@@ -94,7 +95,7 @@ view {
 -- to the pending config, send the config to that client, and stream its logs back to
 -- the GUI's log window. "Stop" (or a re-run) shuts the previous runner down.
 
-local SERVER = "radapter-scada-" .. tostring(__gen_id())
+local SERVER = "radapter-scada-" .. tostring(next_id())
 -- per_client: address each runner individually (send its config, read its hello/logs)
 local server = LocalServer { socket = SERVER, per_client = true }
 
@@ -123,13 +124,14 @@ end
 local function start_runner(config)
     stop_runner()
 
-    local token = tostring(__gen_id())
-    pending[token] = config
-    -- a visualization needs a GUI window (--gui) and the tag registry (--tags) live in
-    -- the runner process so the HMI binds straight to radapter.tags; otherwise headless
+    local token = tostring(next_id())
+    local observe = has_visualization(config)
+    pending[token] = { config = config, observe = observe }
+    -- when the project carries a visualization we run the adapter with --tags and have it
+    -- stream live tag values back here (observe mode), so the configurator's visualization
+    -- editor shows the running state instead of the runner popping its own HMI window
     local arguments = {}
-    if has_visualization(config) then
-        arguments[#arguments + 1] = "--gui"
+    if observe then
         arguments[#arguments + 1] = "--tags"
     end
     arguments[#arguments + 1] = RUNNER
@@ -168,12 +170,16 @@ pipe(server, function(wrapped)
             if active and active.token == token then
                 active.client = id
                 view { run_state = "ConnectedState" }
-                local cfg = pending[token]
+                local entry = pending[token]
                 pending[token] = nil
-                if cfg then server { [id] = { config = cfg } } end
+                if entry then
+                    server { [id] = { config = entry.config, observe = entry.observe } }
+                end
             end
         elseif msg.log ~= nil then
             view { log = msg.log }
+        elseif msg.tag ~= nil then
+            view { tag = msg.tag }   -- live tag update for the visualization editor
         end
     end
 end)
