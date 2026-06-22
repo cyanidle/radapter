@@ -144,8 +144,9 @@ local function start_runner(config)
     view { run_state = "starting" }
 
     pipe(proc.events, function(ev)
-        if ev.finished ~= nil then
-            view { run_state = "exited(" .. tostring(ev.finished) .. ")" }
+        if ev.finished then
+            local how = ev.signal and "signal" or ("code " .. tostring(ev.exit_code))
+            view { run_state = "exited(" .. how .. ")" }
         elseif ev.stderr and active and not active.client then
             -- boot diagnostics, until the socket takes over as the log source
             view { log = { level = "warn", category = "runner.boot", msg = tostring(ev.stderr) } }

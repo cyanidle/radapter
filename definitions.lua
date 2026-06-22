@@ -550,8 +550,9 @@ function LocalClient(params) end
 ---@field merge_stderr boolean? -- fold stderr into the stdout data channel
 
 ---A child process. stdout is the data channel (`pipe(proc, fn)`); stderr and
----lifecycle land on `proc.events`: { stderr }, { started }, { finished, crashed },
----{ error }. Inbound strings/bytes are written to stdin. Destroying the worker
+---lifecycle land on `proc.events`: { stderr }, { started },
+---{ finished=true, exit_code } on normal exit / { finished=true, signal=true } when
+---killed by a signal, { error }. Inbound strings/bytes are written to stdin. Destroying the worker
 ---terminates the child.
 ---@class ProcessWorker : Worker
 ProcessWorker = {}

@@ -25,7 +25,8 @@ RAD_DESCRIBE(ProcessConfig) {
 
 // Wraps a child process (QProcess). stdout is the data channel (pipe(proc, fn));
 // stderr and lifecycle land on the event channel (proc.events): { stderr }, { started },
-// { finished, crashed }, { error }. Inbound messages (strings/bytes) are written to stdin.
+// { finished=true, exit_code } on normal exit / { finished=true, signal=true } when killed
+// by a signal, { error }. Inbound messages (strings/bytes) are written to stdin.
 // The child is terminated when the worker is destroyed, so it never outlives the instance.
 class ProcessWorker : public Worker {
     Q_OBJECT
@@ -60,11 +61,17 @@ public:
         });
         connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
                 [this](int code, QProcess::ExitStatus status){
-            Info("finished (exit code {})", code);
-            emit SendEvent(QVariantMap{
-                {"finished", code},
-                {"crashed", status == QProcess::CrashExit},
-            });
+            QVariantMap ev{ {"finished", true} };
+            if (status == QProcess::CrashExit) {
+                // QProcess has no public API for the signal number; surface that the
+                // process was terminated by a signal rather than exiting normally.
+                ev["signal"] = true;
+                Info("finished (terminated by signal)");
+            } else {
+                ev["exit_code"] = code;
+                Info("finished (exit code {})", code);
+            }
+            emit SendEvent(ev);
         });
         connect(proc, &QProcess::errorOccurred, this, [this](QProcess::ProcessError err){
             auto name = QMetaEnum::fromType<QProcess::ProcessError>().valueToKey(err);
