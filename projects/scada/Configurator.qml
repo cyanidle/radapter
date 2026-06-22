@@ -155,7 +155,7 @@ ApplicationWindow {
         }
         // streamed back from the headless runner launched by "Run"
         if (msg.run_state !== undefined) root.runState = String(msg.run_state)
-        if (msg.log !== undefined) logWindow.append(msg.log)
+        if (msg.log !== undefined) runnerPanel.append(msg.log)
         // file I/O responses
         if (msg.save_ok !== undefined) {
             messageDialog.text = "Saved to " + msg.save_ok
@@ -251,6 +251,18 @@ ApplicationWindow {
         }
     }
 
+    // The configurator, the visualization editor and the runner output are pages of a
+    // detachable tab strip: each can be torn off into its own window and re-docked.
+    DetachableTabs {
+        id: tabs
+        anchors.fill: parent
+        appWindow: root
+
+    TabPanel {
+        id: configPanel
+        title: "Configurator"
+        detachable: false
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
@@ -284,16 +296,12 @@ ApplicationWindow {
                 ToolTip.text: "Some workers are missing required fields"
                 onClicked: {
                     radapter.model.send({ run: root.projectConfig() })
-                    logWindow.show()
-                    logWindow.raise()
+                    tabs.selectPanel(runnerPanel)
                 }
             }
             Button {
                 text: "🖼 Visualization"
-                onClicked: {
-                    var ed = hmiEditorLoader.item
-                    ed.show(); ed.raise(); ed.requestActivate()
-                }
+                onClicked: tabs.selectPanel(vizPanel)
             }
             Item { Layout.fillWidth: true }
             Label {
@@ -402,25 +410,27 @@ ApplicationWindow {
         }
     }
 
-    // Visualization (HMI) editor, in a subdir so loaded by URL (sibling resolution only
-    // reaches same-directory files). Shares the authoring ConfigContext, so edits land in
-    // the project's `visualization` and flow into the preview + Run payload.
-    Loader {
-        id: hmiEditorLoader
-        source: "hmi/HmiEditor.qml"
-        onLoaded: {
-            item.context = sharedContext   // the editor derives candidate tags from it live
+    }   // configPanel
+
+    // Visualization (HMI) editor. Shares the authoring ConfigContext, so edits land in the
+    // project's `visualization` and flow into the preview + Run payload.
+    TabPanel {
+        id: vizPanel
+        title: "Visualization"
+        // loaded by URL because HmiEditor lives in hmi/ (sibling resolution is same-dir only)
+        property alias editor: hmiEditorLoader.item
+        Loader {
+            id: hmiEditorLoader
+            anchors.fill: parent
+            source: "hmi/HmiEditor.qml"
+            onLoaded: item.context = sharedContext
         }
     }
 
-    // Separate window showing the logs streamed back from the headless runner
-    // launched by "Run". Closing it (or pressing Stop) shuts the runner down.
-    ApplicationWindow {
-        id: logWindow
-        visible: false
-        width: 660
-        height: 440
-        title: "Runner — " + root.runState
+    // Logs streamed back from the headless runner launched by "Run".
+    TabPanel {
+        id: runnerPanel
+        title: "Runner"
 
         function append(entry) {
             logModel.append({ lvl: String(entry.level),
@@ -428,8 +438,6 @@ ApplicationWindow {
                               cat: String(entry.category) })
             logList.positionViewAtEnd()
         }
-
-        onClosing: radapter.model.send({ stop: true })
 
         ColumnLayout {
             anchors.fill: parent
@@ -481,4 +489,6 @@ ApplicationWindow {
             }
         }
     }
+
+    }   // DetachableTabs
 }

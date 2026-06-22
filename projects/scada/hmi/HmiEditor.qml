@@ -3,19 +3,15 @@ import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 // Node, Gauge, InfoDisplay are sibling .qml files (same-directory resolution).
 
-// Visualization (HMI) editor window, opened from the configurator. Edits a tree of layout
-// containers (Row/Column/Grid) and widget leaves (Gauge/InfoDisplay). Three panes:
+// Visualization (HMI) editor, embedded as a tab in the configurator. Edits a tree of
+// layout containers (Row/Column/Grid) and widget leaves (Gauge/InfoDisplay). Three panes:
 //   - structure tree: the node hierarchy; add/remove/reorder nodes
 //   - WYSIWYG canvas: the real layout rendered via Node { mode: "design" }
 //   - property panel: edit the selected node's props + layout hints
 // Every edit commits back to the shared ConfigContext, so the configurator's preview and
 // Run payload always carry the current visualization.
-ApplicationWindow {
+Item {
     id: editor
-    visible: false
-    width: 880
-    height: 620
-    title: "Visualization Editor"
 
     property var context: null          // shared ConfigContext
 
@@ -232,8 +228,13 @@ ApplicationWindow {
     onContextChanged: loadFromContext()
     onVisibleChanged: if (visible) loadFromContext()
 
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
     // ── toolbar: add nodes / remove / reorder ────────────────────────────────
-    header: ToolBar {
+    ToolBar {
+        Layout.fillWidth: true
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 8
@@ -263,7 +264,8 @@ ApplicationWindow {
     }
 
     SplitView {
-        anchors.fill: parent
+        Layout.fillWidth: true
+        Layout.fillHeight: true
         orientation: Qt.Horizontal
 
         // structure tree
@@ -483,5 +485,6 @@ ApplicationWindow {
                 }
             }
         }
+    }
     }
 }
