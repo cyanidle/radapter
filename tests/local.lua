@@ -11,7 +11,7 @@ local function run(label, opts)
     local r = { connected = false, echo = false, disconnected = false }
     results[label] = r
 
-    local socket = "radapter-test-" .. label .. "-" .. __gen_id()
+    local socket = "radapter-test-" .. label .. "-" .. next_id()
     local server = LocalServer { socket = socket, per_client = opts.per_client,
                                  protocol = opts.protocol, compression = opts.compression }
     local client = LocalClient { socket = socket, protocol = opts.protocol,

@@ -130,7 +130,7 @@ function make_service(request, responce, timeout)
     end)
     return function (req, callback)
         assert(type(req) == "table", "table expected for arg#1")
-        local id = __gen_id() --simpler to make u32 number in C
+        local id = next_id() --simpler to make u32 number in C
         req.id = id
         reqs[id] = {
             timeout = timeout,

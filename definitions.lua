@@ -253,7 +253,7 @@ function json_decode(json) end
 
 ---Return a process-unique, monotonically increasing integer id.
 ---@return integer
-function __gen_id() end
+function next_id() end
 
 ---@class promise<T>: { __call: fun(self: promise<T>, callback: fun(result: T, err: string)) }
 

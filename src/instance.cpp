@@ -133,7 +133,7 @@ Instance::Instance(QObject *parent) :
 
     lua_setglobal(L, "log");
 
-    lua_register(L, "__gen_id", _gen_id);
+    lua_register(L, "next_id", _gen_id);
     lua_register(L, "json_decode", glua::protect<builtin::json_decode>);
     lua_register(L, "json_encode", glua::protect<builtin::json_encode>);
 

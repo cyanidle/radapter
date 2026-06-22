@@ -2,8 +2,8 @@
 -- projects/scada/runner.lua over local IPC (passing the socket name + a token),
 -- send it a trivial config, and assert its "built" log streams back.
 
-local SERVER = "radapter-scada-test-" .. tostring(__gen_id())
-local TOKEN  = "tok-" .. tostring(__gen_id())
+local SERVER = "radapter-scada-test-" .. tostring(next_id())
+local TOKEN  = "tok-" .. tostring(next_id())
 -- cwd is the script's dir (projects/scada/) during top-level execution, so the
 -- runner resolves as a sibling
 local RUNNER = "./runner.lua"
