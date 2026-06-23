@@ -3,14 +3,14 @@ import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 
 // A panel that lives inside a DockHost. It can be docked to the host's left/right/bottom
-// edge or floated into its own window, moved by dragging its header, and minimized to just
-// its header bar (the sibling panels on that edge expand to fill the freed space, VSCode
-// style). Declare its content as children; it fills the area below the header. Reparented
-// (never recreated) as it moves, so live state survives.
+// edge or floated into its own window, moved/reordered by dragging its header, and minimized
+// to just its header bar (sibling panels on that edge expand to fill the freed space, VSCode
+// style). Declare its content as children; it fills the area below the header.
 //
-// Geometry is owned by the host: when docked the panel is a child of an edge SplitView and
-// drives its size through the SplitView attached properties below; when floating the host
-// anchors it to the window body. So this Item sets NO anchors of its own.
+// Geometry is owned by the host: when docked the host sets this Item's x/y/width/height
+// directly (manual stacking — a SplitView does not re-lay-out reliably when children are
+// reparented between edges); when floating the host anchors it to the window body. So this
+// Item sets NO anchors of its own.
 Item {
     id: panel
     readonly property bool isDockPanel: true
@@ -22,25 +22,14 @@ Item {
     property bool minimized: false
     readonly property int headerH: 28
 
-    // ── size hints for the edge SplitView the host reparents us into ──────────
-    // left/right edges stack vertically (height is the shared axis); the bottom edge stacks
-    // horizontally (width). Minimizing pins the shared axis to the header so siblings grow.
-    readonly property bool _vertical: side !== "bottom"
-    SplitView.fillHeight: _vertical ? !minimized : true
-    SplitView.fillWidth:  _vertical ? true : !minimized
-    SplitView.minimumHeight: (_vertical && minimized) ? headerH : 80
-    SplitView.preferredHeight: (_vertical && minimized) ? headerH : 220
-    SplitView.maximumHeight: (_vertical && minimized) ? headerH : 1000000
-    SplitView.minimumWidth: (!_vertical && minimized) ? 150 : 140
-    SplitView.preferredWidth: (!_vertical && minimized) ? 150 : 320
-    SplitView.maximumWidth: (!_vertical && minimized) ? 150 : 1000000
+    onMinimizedChanged: if (host) host.relayout()
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // The header is a drag handle: drag it onto a host edge to dock there, into the
-        // host's middle to leave it where it is, or out of the host to float it.
+        // The header is a drag handle: drag it onto a host edge to dock/reorder there, into
+        // the host's middle to leave it where it is, or out of the host to float it.
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: panel.headerH
