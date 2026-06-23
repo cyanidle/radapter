@@ -341,27 +341,32 @@ ApplicationWindow {
             }
         }
 
-        // graph canvas on the left; the three editor panes docked on the right
-        SplitView {
-            orientation: Qt.Horizontal
+        // graph canvas in the center; the worker-properties inspector docks to an edge
+        // (right by default), drags to another edge, or floats into its own window.
+        DockHost {
+            id: cfgDock
             Layout.fillWidth: true
             Layout.fillHeight: true
+            appWindow: root
+            centerContent: graph
 
             WorkerGraph {
                 id: graph
-                SplitView.fillWidth: true
-                SplitView.minimumWidth: 240
+                anchors.fill: parent ? parent : undefined
                 context: sharedContext
                 connectableTypes: root.pickable   // workers connect; devices (refs) don't
                 onNodeClicked: configurator.select(name)
                 onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
             }
 
-            // worker config / pipe list / preview, stacked and snapped to the right
-            SplitView {
-                orientation: Qt.Vertical
-                SplitView.preferredWidth: 340
-                SplitView.minimumWidth: 220
+            DockablePanel {
+                id: propsPanel
+                side: "right"; homeSide: "right"; title: "Worker properties"
+
+                // worker config / pipe list / preview, stacked vertically
+                SplitView {
+                    anchors.fill: parent ? parent : undefined
+                    orientation: Qt.Vertical
 
                 ColumnLayout {
                     SplitView.fillHeight: true
@@ -436,8 +441,9 @@ ApplicationWindow {
                         }
                     }
                 }
-            }
-        }
+                }   // vertical SplitView
+            }       // DockablePanel
+        }           // DockHost
     }
 
     }   // configPanel

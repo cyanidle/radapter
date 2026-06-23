@@ -1,6 +1,8 @@
 import QtQuick 2.7
+import QtQuick.Window 2.13
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
+import ".."   // DockHost / DockablePanel live one dir up in projects/scada/
 // Node, Gauge, InfoDisplay are sibling .qml files (same-directory resolution).
 
 // Visualization (HMI) editor, embedded as a tab in the configurator. Edits a tree of
@@ -330,10 +332,18 @@ Item {
         }
     }
 
-    SplitView {
+    DockHost {
+        id: hmiDock
         Layout.fillWidth: true
         Layout.fillHeight: true
-        orientation: Qt.Horizontal
+        appWindow: Window.window
+        centerContent: hmiCenter
+
+        // structure tree + canvas in the center; the property inspector docks to an edge
+        SplitView {
+            id: hmiCenter
+            anchors.fill: parent ? parent : undefined
+            orientation: Qt.Horizontal
 
         // structure tree
         ColumnLayout {
@@ -483,21 +493,21 @@ Item {
             }
         }
 
-        // property panel
-        ColumnLayout {
-            SplitView.preferredWidth: 260
-            SplitView.minimumWidth: 200
-            Label {
-                text: editor.selectedPath ? ("Properties — " + editor.nodeAt(editor.selectedPath).type)
-                                          : "Select a node"
-                font.bold: true
-                padding: 6
-            }
+        }   // hmiCenter SplitView
+
+        // property inspector — dockable to an edge, or floatable into its own window
+        DockablePanel {
+            id: hmiProps
+            side: "right"; homeSide: "right"
+            title: editor.selectedPath ? ("Properties — " + editor.nodeAt(editor.selectedPath).type)
+                                       : "Properties"
+            ColumnLayout {
+                anchors.fill: parent ? parent : undefined
             ScrollView {
                 id: propScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.rightMargin: 8   // breathing room so fields don't butt the window edge
+                Layout.margins: 8   // breathing room so fields don't butt the panel edge
                 clip: true
                 ColumnLayout {
                     width: propScroll.availableWidth   // fit the panel, not the whole window
@@ -562,6 +572,7 @@ Item {
                 }
             }
         }
-    }
+        }   // DockablePanel hmiProps
+    }       // DockHost
     }
 }
