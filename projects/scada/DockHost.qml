@@ -45,11 +45,30 @@ Item {
     }
 
     // ── layout ──────────────────────────────────────────────────────────────
+    // a bottom dock with everything minimized shrinks to a single header strip (bound on the
+    // slot's SplitView.maximumHeight, below) so it doesn't leave a tall empty band — the
+    // panels keep full width and show their titles
+    property bool bottomCollapsed: false
+    // SplitView keeps a child's size and ignores later min/max changes; toggling the slot's
+    // visibility forces it to re-measure and honor the new clamp when collapse state flips
+    onBottomCollapsedChanged: {
+        if (panelsOn("bottom").length === 0) return
+        bottomSlot.visible = false
+        Qt.callLater(function () { bottomSlot.visible = panelsOn("bottom").length > 0 })
+    }
+
     function relayout() {
+        bottomCollapsed = allMinimizedOn("bottom")
         layoutEdge("left");  layoutEdge("right");  layoutEdge("bottom")
         leftSlot.visible   = panelsOn("left").length > 0
         rightSlot.visible  = panelsOn("right").length > 0
         bottomSlot.visible = panelsOn("bottom").length > 0
+    }
+    function allMinimizedOn(side) {
+        var l = panelsOn(side)
+        if (l.length === 0) return false
+        for (var i = 0; i < l.length; i++) if (!l[i].minimized) return false
+        return true
     }
     function layoutEdge(side) {
         var slot = slotFor(side)
@@ -66,15 +85,17 @@ Item {
         }
         var nExp = list.length - nMin
         if (horizontal) {
-            var freeW = Math.max(0, slot.width - nMin * headerH)
-            var eachW = nExp > 0 ? freeW / nExp : 0
+            // bottom: panels share the width equally; minimizing collapses HEIGHT (the header
+            // is a horizontal bar, so collapsing width would hide the title) — a minimized
+            // panel becomes a full-width header strip at the top of its column
+            var eachW = list.length > 0 ? slot.width / list.length : 0
             var x = 0
             for (var a = 0; a < list.length; a++) {
                 var pa = list[a]
-                pa.y = 0; pa.height = slot.height
-                pa.x = x
-                pa.width = pa.minimized ? headerH : eachW
-                x += pa.width
+                pa.x = x; pa.width = eachW
+                pa.y = 0
+                pa.height = pa.minimized ? headerH : slot.height
+                x += eachW
             }
         } else {
             var freeH = Math.max(0, slot.height - nMin * headerH)
@@ -229,7 +250,9 @@ Item {
         }
         Item {
             id: bottomSlot; visible: false
-            SplitView.preferredHeight: 240; SplitView.minimumHeight: 110
+            SplitView.preferredHeight: host.bottomCollapsed ? host.headerH : 240
+            SplitView.minimumHeight:   host.bottomCollapsed ? host.headerH : 110
+            SplitView.maximumHeight:   host.bottomCollapsed ? host.headerH : 1000000
             onWidthChanged: host.layoutEdge("bottom"); onHeightChanged: host.layoutEdge("bottom")
         }
     }
