@@ -89,6 +89,26 @@ Item {
         fields = fieldsFor(path ? nodeAt(path) : null)
     }
 
+    // Canvas click selection cycles through the stack under the cursor: the first click on a
+    // spot selects the deepest (lowest) node there; clicking the same spot again walks the
+    // selection up the ancestor chain to the root, then wraps back to the deepest. The
+    // deepest node always receives the click (child MouseAreas sit above their container's),
+    // so `deepestPath` is what it reports.
+    property var _lastClickPath: null
+    function cycleSelect(deepestPath) {
+        var chain = []
+        var p = deepestPath.slice()
+        while (true) { chain.push(p.slice()); if (p.length === 0) break; p = p.slice(0, -1) }
+        if (pathEq(deepestPath, _lastClickPath)) {
+            var idx = 0
+            for (var i = 0; i < chain.length; i++) if (pathEq(chain[i], selectedPath)) { idx = i; break }
+            selectNode(chain[(idx + 1) % chain.length])
+        } else {
+            selectNode(deepestPath)
+        }
+        _lastClickPath = deepestPath.slice()
+    }
+
     // Structural edits defer the heavy rebuild (canvas re-clone + tree rebuild) to the next
     // event-loop turn via Qt.callLater, so it never runs re-entrantly inside an input/click
     // handler (which is the other way fast clicking could destroy an item under the grab).
@@ -469,10 +489,27 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Flickable {
+                    id: canvasFlick
                     anchors.fill: parent
-                    contentWidth: width
+                    contentWidth: width                       // wrap to viewport width (Node wraps overflow)
                     contentHeight: canvas.implicitHeight
                     clip: true
+                    // scrollable by dragging the bars and by keyboard (not just the wheel)
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                    activeFocusOnTab: true
+                    function maxY() { return Math.max(0, contentHeight - height) }
+                    Keys.onPressed: {
+                        var step = 40
+                        if (event.key === Qt.Key_Down)      contentY = Math.min(contentY + step, maxY())
+                        else if (event.key === Qt.Key_Up)   contentY = Math.max(contentY - step, 0)
+                        else if (event.key === Qt.Key_PageDown) contentY = Math.min(contentY + height * 0.9, maxY())
+                        else if (event.key === Qt.Key_PageUp)   contentY = Math.max(contentY - height * 0.9, 0)
+                        else if (event.key === Qt.Key_Home) contentY = 0
+                        else if (event.key === Qt.Key_End)  contentY = maxY()
+                        else return
+                        event.accepted = true
+                    }
                     Node {
                         id: canvas
                         width: parent.width
@@ -484,7 +521,7 @@ Item {
                         liveQuality: editor.liveQuality
                         addTypes: editor.containerTypes.concat(editor.widgetTypes)
                         onSelectRequested: {
-                            editor.selectNode(path)
+                            editor.cycleSelect(path)
                             treeList.forceActiveFocus()
                         }
                         onAddRequested: editor.addChild(path, type)
@@ -525,12 +562,21 @@ Item {
 
                             Label { text: field.label; font.pixelSize: 11; color: "#666" }
 
+                            // Each control mirrors node[field.key] through a `boundValue`
+                            // that re-evaluates when the selection changes, and pushes it to
+                            // the display unless the control is being actively edited. This
+                            // is what keeps the panel correct on selection change: a plain
+                            // binding breaks once the user types, and a one-time
+                            // Component.onCompleted (the old tag combo) never refreshes at all.
+
                             // text
                             Loader {
                                 Layout.fillWidth: true
                                 active: field.kind === "text"
                                 sourceComponent: TextField {
-                                    text: node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    property string boundValue: node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    text: boundValue
+                                    onBoundValueChanged: if (!activeFocus) text = boundValue
                                     onEditingFinished: editor.setProp(field.key, text)
                                 }
                             }
@@ -539,7 +585,9 @@ Item {
                                 Layout.fillWidth: true
                                 active: field.kind === "number"
                                 sourceComponent: TextField {
-                                    text: node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    property string boundValue: node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    text: boundValue
+                                    onBoundValueChanged: if (!activeFocus) text = boundValue
                                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                                     validator: DoubleValidator {}
                                     onEditingFinished:
@@ -550,7 +598,9 @@ Item {
                             Loader {
                                 active: field.kind === "bool"
                                 sourceComponent: CheckBox {
-                                    checked: node[field.key] === true
+                                    property bool boundValue: node[field.key] === true
+                                    checked: boundValue
+                                    onBoundValueChanged: if (!pressed) checked = boundValue
                                     onToggled: editor.setProp(field.key, checked ? true : "")
                                 }
                             }
@@ -561,8 +611,9 @@ Item {
                                 sourceComponent: ComboBox {
                                     editable: true
                                     model: editor.candidateTags
-                                    Component.onCompleted:
-                                        editText = node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    property string boundValue: node[field.key] !== undefined ? String(node[field.key]) : ""
+                                    onBoundValueChanged: if (!activeFocus) editText = boundValue
+                                    Component.onCompleted: editText = boundValue
                                     onAccepted: editor.setProp(field.key, editText)
                                     onActivated: editor.setProp(field.key, editText)
                                 }

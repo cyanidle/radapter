@@ -70,16 +70,18 @@ Loader {
     Component {
         id: containerComp
         Item {
-            implicitWidth: lay.implicitWidth
-            implicitHeight: lay.implicitHeight
+            id: cont
+            implicitWidth: content.item ? content.item.implicitWidth : 0
+            implicitHeight: content.item ? content.item.implicitHeight : 0
 
-            // background click-catcher, BEHIND the children: clicking empty container
-            // space selects this container, but a click on a child widget is grabbed by
-            // the child's own MouseArea on top (so selection follows what you clicked).
-            // Layering is by explicit non-negative z, never negative: a negative z pushes
-            // this area behind the parent and into the GRANDPARENT's stacking context,
-            // where a nested container's background leaks in front of an earlier sibling's
-            // leaf widgets — which made clicks on the first row select the row, not the item.
+            // Row wraps via a Flow; Column (one column) and Grid (N columns) use a
+            // GridLayout, which already wraps and lets children fill the available width.
+            readonly property bool useFlow: node.spec.type === "Row"
+
+            // background click-catcher, BEHIND the children (z 0): clicking empty container
+            // space selects this container; a click on a child widget is grabbed by the
+            // child's own MouseArea, which sits above (z 1), so selection follows what you
+            // clicked — and the deepest node under the cursor is the one that reports it.
             MouseArea {
                 z: 0
                 anchors.fill: parent
@@ -87,59 +89,54 @@ Loader {
                 onClicked: node.selectRequested(node.path)
             }
 
-            GridLayout {
-                id: lay
+            Loader {
+                id: content
                 z: 1
                 anchors.fill: parent
-                rowSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
-                columnSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
-                // Row -> one row, Column -> one column, Grid -> spec.columns wide
-                flow: node.spec.type === "Row" ? GridLayout.LeftToRight : GridLayout.TopToBottom
-                columns: node.spec.type === "Grid"
-                    ? (node.spec.columns !== undefined ? node.spec.columns : 2)
-                    : (node.spec.type === "Row" ? 1000000 : 1)
-                rows: node.spec.type === "Column" ? 1000000 : 1
+                sourceComponent: cont.useFlow ? flowComp : gridComp
+            }
 
-                Repeater {
-                    model: node.spec.children ? node.spec.children.length : 0
-                    // child Nodes are loaded by URL (not `Node {}`) so QML allows the
-                    // recursion; the Loader is the layout's direct child, so it carries
-                    // the child's Layout.* hints.
-                    delegate: Loader {
-                        id: childLoader
-                        property var childSpec: node.spec.children[index]
-                        Layout.fillWidth: childSpec.fillWidth === true
-                        Layout.fillHeight: childSpec.fillHeight === true
-                        Layout.preferredWidth: childSpec.preferredWidth !== undefined
-                            ? childSpec.preferredWidth : implicitWidth
-                        Layout.preferredHeight: childSpec.preferredHeight !== undefined
-                            ? childSpec.preferredHeight : implicitHeight
-                        source: Qt.resolvedUrl("Node.qml")
-                        // mode and path MUST be bindings, not one-time assignments: setting
-                        // `spec` below synchronously instantiates the whole child subtree, so
-                        // nested leaves would otherwise capture node.mode/node.path before this
-                        // parent's own mode/path have settled (default "run"/[]) and never update.
-                        onLoaded: {
-                            item.mode = Qt.binding(function () { return node.mode })
-                            item.path = Qt.binding(function () { return node.path.concat([index]) })
-                            item.selectedPath = Qt.binding(function () { return node.selectedPath })
-                            item.liveValues = Qt.binding(function () { return node.liveValues })
-                            item.liveQuality = Qt.binding(function () { return node.liveQuality })
-                            item.addTypes = Qt.binding(function () { return node.addTypes })
-                            item.selectRequested.connect(function (p) { node.selectRequested(p) })
-                            item.addRequested.connect(function (p, t) { node.addRequested(p, t) })
-                            item.spec = Qt.binding(function () { return node.spec.children[index] })
-                        }
+            // shared child renderer. In a Flow the child is sized by width/height; in the
+            // GridLayout the Layout.* hints apply (and the layout overrides width/height).
+            Component {
+                id: childComp
+                Loader {
+                    property var childSpec: node.spec.children[index]
+                    readonly property bool childIsContainer:
+                        childSpec.type === "Row" || childSpec.type === "Column" || childSpec.type === "Grid"
+                    width: childSpec.preferredWidth !== undefined ? childSpec.preferredWidth : implicitWidth
+                    height: childSpec.preferredHeight !== undefined ? childSpec.preferredHeight : implicitHeight
+                    // a nested container fills the available width in a Column/Grid so its own
+                    // Flow/Grid has a real width to wrap within (a Flow has no useful implicit
+                    // width); leaf widgets keep their natural size unless they ask to fill.
+                    Layout.fillWidth: childSpec.fillWidth === true || childIsContainer
+                    Layout.fillHeight: childSpec.fillHeight === true
+                    Layout.preferredWidth: childSpec.preferredWidth !== undefined ? childSpec.preferredWidth : implicitWidth
+                    Layout.preferredHeight: childSpec.preferredHeight !== undefined ? childSpec.preferredHeight : implicitHeight
+                    source: Qt.resolvedUrl("Node.qml")
+                    // mode/path MUST be bindings: setting `spec` instantiates the child
+                    // subtree synchronously, so it must not latch the defaults ("run"/[]).
+                    onLoaded: {
+                        item.mode = Qt.binding(function () { return node.mode })
+                        item.path = Qt.binding(function () { return node.path.concat([index]) })
+                        item.selectedPath = Qt.binding(function () { return node.selectedPath })
+                        item.liveValues = Qt.binding(function () { return node.liveValues })
+                        item.liveQuality = Qt.binding(function () { return node.liveQuality })
+                        item.addTypes = Qt.binding(function () { return node.addTypes })
+                        item.selectRequested.connect(function (p) { node.selectRequested(p) })
+                        item.addRequested.connect(function (p, t) { node.addRequested(p, t) })
+                        item.spec = Qt.binding(function () { return node.spec.children[index] })
                     }
                 }
+            }
 
-                // design-mode "＋": append a child via a type-picker menu. Being last in
-                // the layout, it sits to the right in a Row and at the bottom of a Column/
-                // Grid. Invisible items are excluded from the layout, so run mode is unaffected.
+            // design-mode "＋": append a child via a type-picker menu. Last in the layout,
+            // so it sits to the right in a Row and at the bottom of a Column/Grid.
+            Component {
+                id: addComp
                 Rectangle {
-                    id: addBtn
-                    visible: node.mode === "design"
                     implicitWidth: 26; implicitHeight: 26
+                    width: 26; height: 26
                     Layout.alignment: Qt.AlignCenter
                     radius: 4
                     color: addMouse.containsMouse ? "#e3f2fd" : "#f0f0f0"
@@ -161,6 +158,45 @@ Loader {
                                 onTriggered: node.addRequested(node.path, modelData)
                             }
                         }
+                    }
+                }
+            }
+
+            // Row: a Flow that wraps left-to-right when children exceed the width
+            Component {
+                id: flowComp
+                Flow {
+                    spacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
+                    flow: Flow.LeftToRight
+                    Repeater {
+                        model: node.spec.children ? node.spec.children.length : 0
+                        delegate: childComp
+                    }
+                    Loader {                       // the "＋" button (design mode only)
+                        active: node.mode === "design"
+                        visible: node.mode === "design"
+                        sourceComponent: addComp
+                    }
+                }
+            }
+
+            // Column (one column, stacks vertically) and Grid (N columns, wraps every N)
+            Component {
+                id: gridComp
+                GridLayout {
+                    rowSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
+                    columnSpacing: node.spec.spacing !== undefined ? node.spec.spacing : 6
+                    flow: GridLayout.LeftToRight
+                    columns: node.spec.type === "Grid"
+                        ? (node.spec.columns !== undefined ? node.spec.columns : 2) : 1
+                    Repeater {
+                        model: node.spec.children ? node.spec.children.length : 0
+                        delegate: childComp
+                    }
+                    Loader {
+                        active: node.mode === "design"
+                        visible: node.mode === "design"
+                        sourceComponent: addComp
                     }
                 }
             }
