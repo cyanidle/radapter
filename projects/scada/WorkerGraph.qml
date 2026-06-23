@@ -30,39 +30,57 @@ Item {
     property var cardItems: ({})
     // repaint the pipe arrows whenever the pipe set changes or the selection moves
     property int pipeRev: context ? context.revision : 0
-    onPipeRevChanged: arrowCanvas.requestPaint()
-    onSelectedChanged: arrowCanvas.requestPaint()
+    onPipeRevChanged: repaintArrows()
+    onSelectedChanged: repaintArrows()
 
     signal nodeClicked(string name)       // a node was selected
     signal nodeRemoved(string name)        // a node was deleted from the canvas
+    signal selectionCleared()              // selection was cleared (e.g. Esc)
 
     function isConnectable(name) {
         if (connectableTypes.length === 0) return true
         return connectableTypes.indexOf(context.get(name).type) >= 0
     }
     function beginPipe(from, to) { dirPopup.begin(from, to) }
+    function clearSelection() { selected = ""; selectionCleared() }
 
-    function registerCard(name, item) { cardItems[name] = item; arrowCanvas.requestPaint() }
+    function registerCard(name, item) { cardItems[name] = item; repaintArrows() }
     function unregisterCard(name) {
-        if (cardItems[name] !== undefined) { delete cardItems[name]; arrowCanvas.requestPaint() }
+        if (cardItems[name] !== undefined) { delete cardItems[name]; repaintArrows() }
     }
+    // two overlays: unselected pipes paint BELOW the cards, the selected worker's pipes paint
+    // ABOVE them (so a selected worker's connections pop to the front)
+    function repaintArrows() { arrowBelow.requestPaint(); arrowAbove.requestPaint() }
 
     // ── pipe-arrow overlay drawing ───────────────────────────────────────────
     // a directed arrow per pipe, from the source card edge to the target card edge. Greyed
-    // and translucent by default; the selected worker's pipes turn blue and fully opaque.
-    function drawArrows(c) {
-        c.clearRect(0, 0, arrowCanvas.width, arrowCanvas.height)
+    // and translucent by default; the selected worker's pipes turn blue and fully opaque and
+    // are drawn on the top overlay. `wantSelected` picks which set this canvas paints.
+    // Parallel pipes between the same pair are fanned out side by side.
+    function pairKey(p) { return p.from < p.to ? p.from + "|" + p.to : p.to + "|" + p.from }
+    function drawArrows(canvas, c, wantSelected) {
+        c.clearRect(0, 0, canvas.width, canvas.height)
         if (!context) return
         var ps = context.pipes
+        var total = ({}), running = ({})
+        for (var t = 0; t < ps.length; t++) { var kt = pairKey(ps[t]); total[kt] = (total[kt] || 0) + 1 }
         for (var i = 0; i < ps.length; i++) {
             var p = ps[i]
+            var k = pairKey(p)
+            var gi = (running[k] || 0); running[k] = gi + 1   // index within the pair group
+            var sel = (selected === p.from || selected === p.to)
+            if (sel !== wantSelected) continue
             var a = cardItems[p.from], b = cardItems[p.to]
             if (!a || !b) continue
-            var ca = a.mapToItem(arrowCanvas, a.width / 2, a.height / 2)
-            var cb = b.mapToItem(arrowCanvas, b.width / 2, b.height / 2)
+            var ca = a.mapToItem(canvas, a.width / 2, a.height / 2)
+            var cb = b.mapToItem(canvas, b.width / 2, b.height / 2)
             var pa = edgePoint(ca, a.width, a.height, cb)
             var pb = edgePoint(cb, b.width, b.height, ca)
-            var sel = (selected === p.from || selected === p.to)
+            // fan parallel arrows apart along the perpendicular
+            var off = (gi - (total[k] - 1) / 2) * 12
+            var dx = pb.x - pa.x, dy = pb.y - pa.y, len = Math.sqrt(dx * dx + dy * dy) || 1
+            var ox = -dy / len * off, oy = dx / len * off
+            pa.x += ox; pa.y += oy; pb.x += ox; pb.y += oy
             c.globalAlpha = sel ? 1.0 : 0.4
             c.strokeStyle = sel ? "#1e88e5" : "#9e9e9e"
             c.fillStyle = c.strokeStyle
@@ -123,6 +141,13 @@ Item {
         nodeRemoved(name)
     }
 
+    // Esc clears the selection (unless the connect popup is open, which handles Esc itself)
+    Shortcut {
+        sequence: "Escape"
+        enabled: !dirPopup.opened
+        onActivated: graph.clearSelection()
+    }
+
     Rectangle {
         anchors.fill: parent
         color: "#f4f4f4"
@@ -149,14 +174,16 @@ Item {
                 implicitWidth: graph.width - 32
                 implicitHeight: col.implicitHeight
 
-                Canvas {
-                    id: arrowCanvas
+                Canvas {                       // unselected pipes, beneath the cards
+                    id: arrowBelow
                     anchors.fill: parent
-                    onPaint: graph.drawArrows(getContext("2d"))
+                    z: 0
+                    onPaint: graph.drawArrows(arrowBelow, getContext("2d"), false)
                 }
 
             ColumnLayout {
                 id: col
+                z: 1
                 width: scrollContent.width
                 spacing: 10
 
@@ -185,6 +212,13 @@ Item {
                     }
                 }
             }
+
+                Canvas {                       // selected worker's pipes, above the cards
+                    id: arrowAbove
+                    anchors.fill: parent
+                    z: 2
+                    onPaint: graph.drawArrows(arrowAbove, getContext("2d"), true)
+                }
             }   // scrollContent Item
         }
     }
@@ -241,8 +275,8 @@ Item {
             // repaint the arrows whenever the card moves (Flow reflow) or is removed
             Component.onCompleted: graph.registerCard(nodeName, card)
             Component.onDestruction: graph.unregisterCard(nodeName)
-            onXChanged: arrowCanvas.requestPaint()
-            onYChanged: arrowCanvas.requestPaint()
+            onXChanged: graph.repaintArrows()
+            onYChanged: graph.repaintArrows()
 
             color: card.connectable ? "#ffffff" : "#f0f0f5"
             border.width: (nodeName === graph.selected || card.invalid) ? 2 : 1

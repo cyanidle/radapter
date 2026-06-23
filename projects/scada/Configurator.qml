@@ -347,6 +347,7 @@ ApplicationWindow {
                 connectableTypes: root.pickable   // workers connect; devices (refs) don't
                 onNodeClicked: configurator.select(name)
                 onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
+                onSelectionCleared: configurator.clear()   // Esc deselects everywhere
             }
 
             // The inspector is three independently dockable/minimizable panels — worker
