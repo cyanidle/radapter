@@ -226,6 +226,21 @@ ApplicationWindow {
             }
         }
         Menu {
+            title: "Windows"
+            Action {
+                text: "Configurator"
+                onTriggered: tabs.selectPanel(configPanel)
+            }
+            Action {
+                text: "Visualization"
+                onTriggered: tabs.selectPanel(vizPanel)
+            }
+            Action {
+                text: "Runner"
+                onTriggered: tabs.selectPanel(runnerPanel)
+            }
+        }
+        Menu {
             title: "Help"
             Action {
                 text: "Project on GitHub…"
@@ -285,7 +300,6 @@ ApplicationWindow {
     TabPanel {
         id: configPanel
         title: "Configurator"
-        detachable: false
 
     ColumnLayout {
         anchors.fill: parent
@@ -363,7 +377,7 @@ ApplicationWindow {
                     spacing: 6
 
                     Label {
-                        Layout.leftMargin: 6; Layout.topMargin: 4
+                        Layout.leftMargin: 12; Layout.topMargin: 6
                         text: configurator.registeredName.length
                               ? ("Editing: " + configurator.registeredName)
                               : "Select or add a worker to edit"
@@ -396,6 +410,7 @@ ApplicationWindow {
             DockablePanel {
                 id: connPanelDock
                 side: "right"; homeSide: "right"; title: "Connections"
+                minimized: true
 
                 Frame {
                     anchors.fill: parent ? parent : undefined
@@ -413,6 +428,7 @@ ApplicationWindow {
             DockablePanel {
                 id: previewPanelDock
                 side: "right"; homeSide: "right"; title: "Preview (objects + pipes)"
+                minimized: true
 
                 ScrollView {
                     anchors.fill: parent ? parent : undefined
@@ -474,6 +490,17 @@ ApplicationWindow {
                 spacing: 8
                 Label { text: "State: " + root.runState; font.bold: true }
                 Item { Layout.fillWidth: true }
+                Button {
+                    text: "▶ Run"
+                    enabled: sharedContext.revision >= 0
+                             && sharedContext.schemas !== undefined
+                             && Object.keys(sharedContext.objects).length > 0
+                             && sharedContext.allComplete()
+                    onClicked: {
+                        radapter.model.send({ run: root.projectConfig() })
+                        logModel.clear()
+                    }
+                }
                 Button { text: "Clear"; onClicked: logModel.clear() }
                 Button {
                     text: "■ Stop"

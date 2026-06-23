@@ -399,7 +399,10 @@ Item {
                 // Delete key removes the selected node (no-op on the root). Scoped to the
                 // tree's focus so it doesn't hijack Delete while editing a property field.
                 Keys.onPressed: {
-                    if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+                    if (event.key === Qt.Key_Escape) {
+                        editor.deselectAll()
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
                         editor.removeSelected()
                         event.accepted = true
                     } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
@@ -648,11 +651,5 @@ Item {
         }
         }   // DockablePanel hmiProps
     }       // DockHost
-    }
-
-    // Esc deselects whatever is selected
-    Shortcut {
-        sequence: "Escape"
-        onActivated: editor.deselectAll()
     }
 }

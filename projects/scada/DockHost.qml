@@ -85,10 +85,7 @@ Item {
         }
         var nExp = list.length - nMin
         if (horizontal) {
-            // bottom: panels share the width equally; minimizing collapses HEIGHT (the header
-            // is a horizontal bar, so collapsing width would hide the title) — a minimized
-            // panel becomes a full-width header strip at the top of its column
-            var eachW = list.length > 0 ? slot.width / list.length : 0
+            var eachW = list.length > 0 ? Math.max(slot.width / list.length, 150) : 0
             var x = 0
             for (var a = 0; a < list.length; a++) {
                 var pa = list[a]
@@ -99,7 +96,7 @@ Item {
             }
         } else {
             var freeH = Math.max(0, slot.height - nMin * headerH)
-            var eachH = nExp > 0 ? freeH / nExp : 0
+            var eachH = nExp > 0 ? Math.max(freeH / nExp, 100) : 0
             var y = 0
             for (var b = 0; b < list.length; b++) {
                 var pb = list[b]
@@ -239,17 +236,20 @@ Item {
             Item {
                 id: leftSlot; visible: false
                 SplitView.preferredWidth: 300; SplitView.minimumWidth: 170
+                clip: true
                 onWidthChanged: host.layoutEdge("left"); onHeightChanged: host.layoutEdge("left")
             }
             Item { id: centerSlot; SplitView.fillWidth: true; SplitView.minimumWidth: 220 }
             Item {
                 id: rightSlot; visible: false
                 SplitView.preferredWidth: 320; SplitView.minimumWidth: 200
+                clip: true
                 onWidthChanged: host.layoutEdge("right"); onHeightChanged: host.layoutEdge("right")
             }
         }
         Item {
             id: bottomSlot; visible: false
+            clip: true
             SplitView.preferredHeight: host.bottomCollapsed ? host.headerH : 240
             SplitView.minimumHeight:   host.bottomCollapsed ? host.headerH : 110
             SplitView.maximumHeight:   host.bottomCollapsed ? host.headerH : 1000000
@@ -257,16 +257,52 @@ Item {
         }
     }
 
-    // translucent preview of the target edge
+    // translucent preview of the target edge — uses slot geometry when the slot is
+    // visible (panels already on that edge), or the preferred width/height when empty
     Rectangle {
         visible: host.dropZone === "left" || host.dropZone === "right" || host.dropZone === "bottom"
         z: 9998
         color: "#332196f3"
         border.color: "#2196f3"; border.width: 2
-        x: host.dropZone === "right" ? host.width - width : 0
-        y: host.dropZone === "bottom" ? host.height - height : 0
-        width: host.dropZone === "bottom" ? host.width : host.width * 0.32
-        height: host.dropZone === "bottom" ? host.height * 0.4 : host.height
+        x: host.dropZone === "right" ? (rightSlot.visible ? rightSlot.x : host.width - (leftSlot.visible ? leftSlot.width : 300))
+                                    : 0
+        y: host.dropZone === "bottom" ? (bottomSlot.visible ? bottomSlot.y : host.height - 240) : 0
+        width: host.dropZone === "bottom" ? host.width
+               : (host.dropZone === "right" ? (rightSlot.visible ? rightSlot.width : 320)
+                                            : (leftSlot.visible ? leftSlot.width : 300))
+        height: host.dropZone === "bottom" ? (bottomSlot.visible ? bottomSlot.height : 240) : host.height
+    }
+
+    // thin insertion line shown when reordering within an existing slot stack
+    Rectangle {
+        visible: host.draggingPanel !== null && host.dropZone !== "" && host.dropZone !== "out"
+                 && host.dropZone === host.draggingPanel.side
+                 && (host.dropZone === "left" || host.dropZone === "right" || host.dropZone === "bottom")
+        z: 9999
+        color: "#2196f3"
+        // Position the line where the dragged panel would land in the stack
+        x: host.dropZone === "bottom" ? insertLinePos() : (host.dropZone === "right" ? rightSlot.x : leftSlot.x)
+        y: host.dropZone === "bottom" ? bottomSlot.y : insertLinePos()
+        width: host.dropZone === "bottom" ? 2 : (host.dropZone === "right" ? rightSlot.width : leftSlot.width)
+        height: host.dropZone === "bottom" ? bottomSlot.height : 2
+    }
+
+    function insertLinePos() {
+        var slot = slotFor(host.dropZone)
+        if (!slot || !slot.visible) return 0
+        var list = []
+        var on = panelsOn(host.dropZone)
+        for (var i = 0; i < on.length; i++) if (on[i] !== host.draggingPanel) list.push(on[i])
+        if (host.dropIndex >= list.length) {
+            // after last panel
+            var last = list[list.length - 1]
+            if (host.dropZone === "bottom")
+                return last ? (last.x + last.width) : 0
+            else
+                return last ? (last.y + last.height) : 0
+        }
+        var p = list[host.dropIndex]
+        return host.dropZone === "bottom" ? p.x : p.y
     }
 
     // a small ghost that follows the cursor while a panel header is being dragged

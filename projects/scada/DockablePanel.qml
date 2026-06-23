@@ -24,6 +24,13 @@ Item {
 
     onMinimizedChanged: if (host) host.relayout()
 
+    // solid background so docked panels don't show content behind them
+    Rectangle {
+        anchors.fill: parent
+        color: "#fafafa"
+        border.color: "#cfd8dc"; border.width: 1
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0

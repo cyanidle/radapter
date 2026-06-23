@@ -90,6 +90,29 @@ to verify the visual components (write short test as inline -e "code" for exampl
 When writing a short test/`-e` snippet, always end it with `shutdown()` — otherwise the
 event loop keeps running and the process hangs instead of exiting on success.
 
+#### Offscreen visual verification with screenshots
+
+For QML changes, prefer capturing a screenshot to verify rendering. Use `QT_QPA_PLATFORM=offscreen`
+and a small QML inline script that calls `grabToImage` from within QML (QML items have this
+method natively; it's not exposed as a worker extra method):
+
+```lua
+-- QML-side grabs itself on a timer and saves to /tmp; the Lua side just opens the window
+-- and shuts down after giving the timer time to fire.
+local view = QML {
+    url = "projects/scada/Configurator.qml",
+    properties = { grab_path = "/tmp/radapter_smoke.png" },
+}
+after(2, function() shutdown() end)
+```
+
+In the QML add a `Connections` or `Timer` that calls `root.grabToImage(...)` and saves the
+result once the window is painted. Alternatively just rely on stderr silence: QML runtime
+errors (broken anchors, null references) print to stderr and the smoke test fails.
+
+After the test, inspect with `Read /tmp/radapter_smoke.png` — Claude Code can display PNGs
+inline, making it easy to spot rendering regressions (blank areas, layout collapse, etc.).
+
 Always run tests with some timeout provided to avoid hanging
 
 **Examples (`examples/`)** are documentation-grade demos; most need live hardware/services:

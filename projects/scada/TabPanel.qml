@@ -7,6 +7,7 @@ Item {
     readonly property bool isTabPanel: true
     property string title: ""
     property bool detachable: true
+    property bool closable: detachable
     property bool detached: false
     property var _win: null          // the float window while detached (for the ghost tab to raise)
     anchors.fill: parent ? parent : undefined

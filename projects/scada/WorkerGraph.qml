@@ -13,6 +13,7 @@ import QtQuick.Layouts 1.3
 // non-connectable: no nub, no badge, and they reject drops. Empty = everything connects.
 Item {
     id: graph
+    focus: true
 
     property var context: null
     property string selected: ""          // highlighted node (host-driven)
@@ -133,6 +134,7 @@ Item {
 
     function nodeActivated(name) {
         graph.selected = name
+        graph.forceActiveFocus()
         nodeClicked(name)
     }
     function removeNode(name) {
@@ -142,10 +144,8 @@ Item {
     }
 
     // Esc clears the selection (unless the connect popup is open, which handles Esc itself)
-    Shortcut {
-        sequence: "Escape"
-        enabled: !dirPopup.opened
-        onActivated: graph.clearSelection()
+    Keys.onEscapePressed: {
+        if (!dirPopup.opened) graph.clearSelection()
     }
 
     Rectangle {
