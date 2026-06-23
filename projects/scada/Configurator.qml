@@ -114,6 +114,8 @@ ApplicationWindow {
             // a fresh run clears the overlay; a finished/lost run stops marking it live
             if (root.runState === "starting") {
                 root.liveValues = ({}); root.liveQuality = ({}); root.runnerLive = false
+            } else if (root.runState === "ConnectedState") {
+                root.runnerLive = true
             } else if (root.runState === "stopped" || root.runState === "disconnected"
                        || root.runState.indexOf("exited") === 0) {
                 root.runnerLive = false
@@ -359,6 +361,8 @@ ApplicationWindow {
                 anchors.fill: parent ? parent : undefined
                 context: sharedContext
                 connectableTypes: root.pickable   // workers connect; devices (refs) don't
+                liveValues: root.liveValues
+                runnerLive: root.runnerLive
                 onNodeClicked: configurator.select(name)
                 onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
                 onSelectionCleared: configurator.clear()   // Esc deselects everywhere
@@ -374,6 +378,7 @@ ApplicationWindow {
 
                 ColumnLayout {
                     anchors.fill: parent ? parent : undefined
+                    anchors.margins: 8
                     spacing: 6
 
                     Label {
@@ -432,6 +437,7 @@ ApplicationWindow {
 
                 ScrollView {
                     anchors.fill: parent ? parent : undefined
+                    anchors.margins: 6
                     clip: true
                     TextArea {
                         readOnly: true
@@ -439,6 +445,25 @@ ApplicationWindow {
                         text: root.lastJson
                         font.family: "monospace"
                     }
+                }
+            }
+
+            // Send-to-worker panel — visible while the runner is live and a worker is selected
+            DockablePanel {
+                id: senderPanelDock
+                side: "right"; homeSide: "right"; title: "Send to worker"
+                visible: graph.selected !== "" && root.runnerLive
+                minimized: true
+
+                WorkerSender {
+                    anchors.fill: parent ? parent : undefined
+                    workerName: graph.selected
+                    workerType: sharedContext.objects[graph.selected]
+                                ? sharedContext.objects[graph.selected].type : ""
+                    context: sharedContext
+                    liveValues: root.liveValues
+                    liveQuality: root.liveQuality
+                    runnerLive: root.runnerLive
                 }
             }
         }           // DockHost

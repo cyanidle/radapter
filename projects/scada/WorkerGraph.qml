@@ -18,6 +18,8 @@ Item {
     property var context: null
     property string selected: ""          // highlighted node (host-driven)
     property var connectableTypes: []     // worker types; empty = all objects connect
+    property var liveValues: ({})         // live tag values (for live indicator dots)
+    property bool runnerLive: false
 
     // live rubber-band line drawn from the drag source to the cursor while connecting
     property bool linking: false
@@ -160,6 +162,28 @@ Item {
             visible: graph.groups.length === 0
             text: "No workers yet — add one above"
             color: "#999"
+        }
+
+        // runner status indicator (top right, same style as HMI editor).
+        // z:3 keeps it above the ScrollView and arrow canvases.
+        Row {
+            z: 3
+            visible: graph.groups.length > 0
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 8
+            spacing: 4
+            Rectangle {
+                width: 10; height: 10; radius: 5
+                color: graph.runnerLive ? "#43a047" : "#bdbdbd"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Label {
+                text: graph.runnerLive ? "LIVE" : "OFFLINE"
+                color: graph.runnerLive ? "#43a047" : "#9e9e9e"
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+            }
         }
 
         ScrollView {

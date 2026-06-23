@@ -12,3 +12,4 @@ toolchains/
 .cache
 .claude/
 .mcp.json
+build*/

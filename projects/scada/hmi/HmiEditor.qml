@@ -641,7 +641,7 @@ Item {
                                     onBoundValueChanged: if (!activeFocus) editText = boundValue
                                     Component.onCompleted: editText = boundValue
                                     onAccepted: editor.setProp(field.key, editText)
-                                    onActivated: editor.setProp(field.key, editText)
+                                    onActivated: if (currentIndex >= 0) editor.setProp(field.key, currentText)
                                 }
                             }
                         }

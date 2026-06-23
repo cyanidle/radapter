@@ -265,7 +265,12 @@ Item {
         relayout(); select(idx)
     }
     function _raise(panel) {
-        if (panel._win) { panel._win.raise(); panel._win.requestActivate() }
+        if (!panel._win) return
+        var w = panel._win
+        if (w.visibility === Window.Minimized)
+            w.visibility = Window.Windowed
+        w.raise()
+        w.requestActivate()
     }
 
     // ── drag handling ────────────────────────────────────────────────────

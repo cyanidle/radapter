@@ -242,7 +242,7 @@ Item {
             Item { id: centerSlot; SplitView.fillWidth: true; SplitView.minimumWidth: 220 }
             Item {
                 id: rightSlot; visible: false
-                SplitView.preferredWidth: 320; SplitView.minimumWidth: 200
+                SplitView.preferredWidth: 400; SplitView.minimumWidth: 220
                 clip: true
                 onWidthChanged: host.layoutEdge("right"); onHeightChanged: host.layoutEdge("right")
             }

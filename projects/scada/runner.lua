@@ -7,6 +7,7 @@
 --
 -- Wire format (over the local socket):
 --   configurator -> runner : { config = { objects, pipes }, observe = bool }  -- build it
+--                            { send_to = name, msg = {...} }   -- send a message to a worker
 --                            { shutdown = true }                -- stop the runner
 --   runner -> configurator : { hello = token }                 -- on connect (correlation)
 --                            { log = { level, msg, category, timestamp } }
@@ -62,6 +63,13 @@ pipe(client, function(msg)
             else
                 log.warn("runner: visualization present but --tags not enabled; skipping HMI")
             end
+        end
+    elseif msg.send_to then
+        local w = built and built[msg.send_to]
+        if w then
+            w(msg.msg)
+        else
+            log.warn("runner: send_to: unknown worker '{}'", msg.send_to)
         end
     end
 end)

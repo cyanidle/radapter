@@ -193,6 +193,8 @@ pipe(view, function(msg)
         start_runner(msg.run)
     elseif msg.stop then
         stop_runner()
+    elseif msg.send_to and active and active.client then
+        server { [active.client] = msg }
     end
 end)
 
