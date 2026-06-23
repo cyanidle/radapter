@@ -25,13 +25,18 @@ ColumnLayout {
         return out
     }
 
-    function describe(p) {
-        var outgoing = p.from === worker
-        var arrow = outgoing ? "→" : "←"
-        var other = outgoing ? p.to : p.from
-        var dir = context.pipeDir(p)
-        var extra = dir === "" ? "" : "  [" + dir + ":" + context.pipeKey(p) + "]"
-        return arrow + "  " + other + extra
+    // the directive kinds, in the ComboBox order; index 0 is a plain pipe
+    readonly property var kinds: [
+        { kind: "pipe",   label: "plain"  },
+        { kind: "wrap",   label: "wrap"   },
+        { kind: "unwrap", label: "unwrap" },
+        { kind: "on",     label: "on"     }
+    ]
+    function dirToIndex(dir) {
+        if (dir === "wrap")   return 1
+        if (dir === "unwrap") return 2
+        if (dir === "on")     return 3
+        return 0
     }
 
     Label {
@@ -39,23 +44,57 @@ ColumnLayout {
         font.bold: true
     }
 
+    // Each pipe is editable in place: change its directive kind and key. A change commits
+    // through context.setPipeDirective (which bumps and rebuilds these rows); switching to a
+    // keyed kind with no key yet doesn't commit, so the row keeps the user's choice until a
+    // key is typed (no fighting the rebuild).
     Repeater {
         model: panel.rows
         delegate: RowLayout {
             Layout.fillWidth: true
             spacing: 4
+            property var p: modelData.p
+            property int idx: modelData.idx
+            property bool outgoing: p.from === panel.worker
+
             Label {
-                text: panel.describe(modelData.p)
+                text: (outgoing ? "→ " : "← ") + (outgoing ? p.to : p.from)
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 font.pixelSize: 12
+            }
+            ComboBox {
+                id: kindBox
+                Layout.preferredWidth: 86
+                model: panel.kinds
+                textRole: "label"
+                Component.onCompleted: currentIndex = panel.dirToIndex(panel.context.pipeDir(p))
+                onActivated: {
+                    var d = panel.kinds[currentIndex]
+                    // plain commits immediately; keyed kinds wait for a key in keyField
+                    if (d.kind === "pipe") panel.context.setPipeDirective(idx, "pipe", "")
+                    else if (keyField.text.trim().length > 0)
+                        panel.context.setPipeDirective(idx, d.kind, keyField.text)
+                }
+            }
+            TextField {
+                id: keyField
+                Layout.preferredWidth: 90
+                visible: kindBox.currentIndex > 0
+                placeholderText: kindBox.currentIndex === 3 ? "field" : "key"
+                Component.onCompleted: text = panel.context.pipeKey(p)
+                onEditingFinished: {
+                    var d = panel.kinds[kindBox.currentIndex]
+                    if (d.kind !== "pipe")
+                        panel.context.setPipeDirective(idx, d.kind, text)
+                }
             }
             Button {
                 text: "✕"
                 implicitWidth: 22
                 implicitHeight: 22
                 padding: 0
-                onClicked: panel.context.removePipe(modelData.idx)
+                onClicked: panel.context.removePipe(idx)
             }
         }
     }

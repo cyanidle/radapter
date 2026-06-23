@@ -24,6 +24,14 @@ Item {
     property real linkY1: 0
     property real linkX2: 0
     property real linkY2: 0
+    readonly property real linkAngle: Math.atan2(linkY2 - linkY1, linkX2 - linkX1) * 180 / Math.PI
+
+    // node cards register themselves here so the overlay can draw pipe arrows between them
+    property var cardItems: ({})
+    // repaint the pipe arrows whenever the pipe set changes or the selection moves
+    property int pipeRev: context ? context.revision : 0
+    onPipeRevChanged: arrowCanvas.requestPaint()
+    onSelectedChanged: arrowCanvas.requestPaint()
 
     signal nodeClicked(string name)       // a node was selected
     signal nodeRemoved(string name)        // a node was deleted from the canvas
@@ -33,6 +41,56 @@ Item {
         return connectableTypes.indexOf(context.get(name).type) >= 0
     }
     function beginPipe(from, to) { dirPopup.begin(from, to) }
+
+    function registerCard(name, item) { cardItems[name] = item; arrowCanvas.requestPaint() }
+    function unregisterCard(name) {
+        if (cardItems[name] !== undefined) { delete cardItems[name]; arrowCanvas.requestPaint() }
+    }
+
+    // ── pipe-arrow overlay drawing ───────────────────────────────────────────
+    // a directed arrow per pipe, from the source card edge to the target card edge. Greyed
+    // and translucent by default; the selected worker's pipes turn blue and fully opaque.
+    function drawArrows(c) {
+        c.clearRect(0, 0, arrowCanvas.width, arrowCanvas.height)
+        if (!context) return
+        var ps = context.pipes
+        for (var i = 0; i < ps.length; i++) {
+            var p = ps[i]
+            var a = cardItems[p.from], b = cardItems[p.to]
+            if (!a || !b) continue
+            var ca = a.mapToItem(arrowCanvas, a.width / 2, a.height / 2)
+            var cb = b.mapToItem(arrowCanvas, b.width / 2, b.height / 2)
+            var pa = edgePoint(ca, a.width, a.height, cb)
+            var pb = edgePoint(cb, b.width, b.height, ca)
+            var sel = (selected === p.from || selected === p.to)
+            c.globalAlpha = sel ? 1.0 : 0.4
+            c.strokeStyle = sel ? "#1e88e5" : "#9e9e9e"
+            c.fillStyle = c.strokeStyle
+            c.lineWidth = sel ? 2.5 : 1.5
+            c.beginPath(); c.moveTo(pa.x, pa.y); c.lineTo(pb.x, pb.y); c.stroke()
+            drawHead(c, pa.x, pa.y, pb.x, pb.y)
+        }
+        c.globalAlpha = 1.0
+    }
+    // where the ray from `center` toward `toward` crosses the (w×h) box border
+    function edgePoint(center, w, h, toward) {
+        var dx = toward.x - center.x, dy = toward.y - center.y
+        if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return center
+        var hw = w / 2 + 2, hh = h / 2 + 2
+        var sx = Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : 1e9
+        var sy = Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : 1e9
+        var s = Math.min(sx, sy)
+        return { x: center.x + dx * s, y: center.y + dy * s }
+    }
+    function drawHead(c, x1, y1, x2, y2) {
+        var ang = Math.atan2(y2 - y1, x2 - x1)
+        var len = 9, spread = 0.5
+        c.beginPath()
+        c.moveTo(x2, y2)
+        c.lineTo(x2 - len * Math.cos(ang - spread), y2 - len * Math.sin(ang - spread))
+        c.lineTo(x2 - len * Math.cos(ang + spread), y2 - len * Math.sin(ang + spread))
+        c.closePath(); c.fill()
+    }
 
     // re-read the (deeply-mutated) context whenever it bumps its revision; the
     // revision is used in a branch (not a dead local) so the dependency survives
@@ -84,8 +142,22 @@ Item {
             anchors.margins: 8
             clip: true
 
+            // content item holding the arrow overlay (z 0, scrolls with the cards) beneath
+            // the grouped node cards (z 1)
+            Item {
+                id: scrollContent
+                implicitWidth: graph.width - 32
+                implicitHeight: col.implicitHeight
+
+                Canvas {
+                    id: arrowCanvas
+                    anchors.fill: parent
+                    onPaint: graph.drawArrows(getContext("2d"))
+                }
+
             ColumnLayout {
-                width: graph.width - 32
+                id: col
+                width: scrollContent.width
                 spacing: 10
 
                 Repeater {
@@ -113,6 +185,7 @@ Item {
                     }
                 }
             }
+            }   // scrollContent Item
         }
     }
 
@@ -127,12 +200,14 @@ Item {
             c.clearRect(0, 0, width, height)
             if (!graph.linking) return
             c.strokeStyle = "#fb8c00"
+            c.fillStyle = "#fb8c00"
             c.lineWidth = 2
             c.lineCap = "round"
             c.beginPath()
             c.moveTo(graph.linkX1, graph.linkY1)
             c.lineTo(graph.linkX2, graph.linkY2)
             c.stroke()
+            graph.drawHead(c, graph.linkX1, graph.linkY1, graph.linkX2, graph.linkY2)
         }
         Connections {
             target: graph
@@ -161,6 +236,14 @@ Item {
             width: 168
             height: 58
             radius: 6
+
+            // register with the graph so the pipe-arrow overlay can find this card, and
+            // repaint the arrows whenever the card moves (Flow reflow) or is removed
+            Component.onCompleted: graph.registerCard(nodeName, card)
+            Component.onDestruction: graph.unregisterCard(nodeName)
+            onXChanged: arrowCanvas.requestPaint()
+            onYChanged: arrowCanvas.requestPaint()
+
             color: card.connectable ? "#ffffff" : "#f0f0f5"
             border.width: (nodeName === graph.selected || card.invalid) ? 2 : 1
             border.color: (dropArea.containsDrag && card.connectable) ? "#fb8c00"
@@ -248,11 +331,23 @@ Item {
                 id: nub
                 visible: card.connectable
                 width: 14; height: 14; radius: 7
-                color: dragMA.drag.active ? "#fb8c00" : "#1e88e5"
-                border.color: "white"; border.width: 2
+                // a dot at rest; while dragging it becomes an arrow pointing at the cursor
+                color: dragMA.drag.active ? "transparent" : "#1e88e5"
+                border.color: dragMA.drag.active ? "transparent" : "white"
+                border.width: 2
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: parent.right
                 anchors.rightMargin: 3
+
+                Label {
+                    anchors.centerIn: parent
+                    visible: nub.dragging
+                    text: "➤"
+                    color: "#fb8c00"
+                    font.pixelSize: 18
+                    font.bold: true
+                    rotation: graph.linkAngle
+                }
 
                 property string sourceName: card.nodeName
                 Drag.active: dragMA.drag.active

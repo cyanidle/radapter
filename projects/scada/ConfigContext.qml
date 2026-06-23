@@ -154,6 +154,23 @@ QtObject {
         pipes = pipes.filter(function (_, j) { return j !== i })
         bump()
     }
+    // rewrite pipe i's directive in place (keeps from/to). kind: "pipe" (plain) | wrap |
+    // unwrap | on; key required for the keyed kinds. Returns false (no change) on a bad key.
+    function setPipeDirective(i, kind, key) {
+        if (i < 0 || i >= pipes.length) return false
+        var old = pipes[i]
+        var np = { from: old.from, to: old.to }
+        if (kind && kind !== "pipe") {
+            var k = key === undefined ? "" : String(key).trim()
+            if (k.length === 0) return false
+            np[kind] = k
+        }
+        var copy = pipes.slice()
+        copy[i] = np
+        pipes = copy
+        bump()
+        return true
+    }
     // how many pipes touch `name` (in or out) — shown on each graph node
     function connectionCount(name) {
         var c = 0
