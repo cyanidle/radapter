@@ -24,47 +24,41 @@ Item {
         anchors.fill: parent
         spacing: 0
 
+        // The header is a drag handle: drag it onto a host edge to dock there, into the
+        // host's middle to leave it where it is, or out of the host to float it.
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 28
-            color: "#eceff1"
+            color: dragHandle.drag.active ? "#cfd8dc" : "#eceff1"
             border.color: "#cfd8dc"; border.width: 1
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 8
-                anchors.rightMargin: 2
-                spacing: 0
+                anchors.rightMargin: 8
+                spacing: 6
+                Text { text: "⠿"; color: "#90a4ae"; font.pixelSize: 14 }
                 Label {
                     text: panel.title
                     font.bold: true
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                 }
-                ToolButton {
-                    text: "◀"; padding: 4
-                    ToolTip.text: "Dock left"; ToolTip.visible: hovered
-                    enabled: panel.side !== "left"
-                    onClicked: panel.host.dock(panel, "left")
-                }
-                ToolButton {
-                    text: "▶"; padding: 4
-                    ToolTip.text: "Dock right"; ToolTip.visible: hovered
-                    enabled: panel.side !== "right"
-                    onClicked: panel.host.dock(panel, "right")
-                }
-                ToolButton {
-                    text: "▼"; padding: 4
-                    ToolTip.text: "Dock bottom"; ToolTip.visible: hovered
-                    enabled: panel.side !== "bottom"
-                    onClicked: panel.host.dock(panel, "bottom")
-                }
-                ToolButton {
-                    text: "⤢"; padding: 4
-                    ToolTip.text: "Float"; ToolTip.visible: hovered
-                    enabled: panel.side !== "float"
-                    onClicked: panel.host.floatPanel(panel)
-                }
             }
+            MouseArea {
+                id: dragHandle
+                anchors.fill: parent
+                cursorShape: Qt.OpenHandCursor
+                // a dummy drag target so `drag.active` reflects an in-progress drag; we
+                // drive the actual docking from the global cursor position, not this item
+                drag.target: dragProxy
+                onPressed: panel.host.beginPanelDrag(panel)
+                onPositionChanged: {
+                    var g = mapToGlobal(mouse.x, mouse.y)
+                    panel.host.updatePanelDrag(g.x, g.y)
+                }
+                onReleased: panel.host.endPanelDrag()
+            }
+            Item { id: dragProxy }   // off-layout, just to satisfy drag.target
         }
         Item {
             id: body

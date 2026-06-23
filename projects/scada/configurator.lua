@@ -47,6 +47,8 @@ local view = QML {
     properties = {
         custom_forms = custom_forms,
         home = os.getenv("HOME") or "/",   -- starting dir for the file pickers
+        qt_version = app_info().qt_version,
+        github_url = "https://github.com/cyanidle/radapter",
     },
 }
 

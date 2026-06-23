@@ -49,6 +49,7 @@ Item {
         var win = floatComp.createObject(null, { panel: panel })
         win.x = gx; win.y = gy
         panel.detached = true
+        panel._win = win
         panel.parent = win.body
         panel.visible = true
         win.show(); win.raise(); win.requestActivate()
@@ -56,9 +57,14 @@ Item {
     }
     function _redock(panel) {
         panel.detached = false
+        panel._win = null
         panel.parent = dock
         _relayout()
         selectPanel(panel)
+    }
+    // clicking a detached panel's "ghost" tab brings its window forward
+    function _raise(panel) {
+        if (panel._win) { panel._win.raise(); panel._win.requestActivate() }
     }
 
     Component {
@@ -98,11 +104,11 @@ Item {
                 model: tabs.panelList
                 delegate: Rectangle {
                     id: tab
-                    visible: !modelData.detached
-                    width: visible ? row.implicitWidth + 20 : 0
+                    width: row.implicitWidth + 20
                     height: bar.height
-                    readonly property bool isCurrent: index === tabs.current
-                    color: isCurrent ? "#ffffff" : "#e8e8e8"
+                    readonly property bool isCurrent: index === tabs.current && !modelData.detached
+                    // a detached page leaves a dimmed "ghost" tab; clicking it raises its window
+                    color: modelData.detached ? "#f0f0f0" : (isCurrent ? "#ffffff" : "#e8e8e8")
                     border.color: "#d0d0d0"
                     border.width: 1
 
@@ -110,21 +116,24 @@ Item {
                         id: row
                         anchors.centerIn: parent
                         spacing: 6
+                        opacity: modelData.detached ? 0.55 : 1.0
                         Text {
                             text: modelData.title
                             font.bold: tab.isCurrent
+                            font.italic: modelData.detached
                             color: tab.isCurrent ? "#1565c0" : "#555"
                             anchors.verticalCenter: parent.verticalCenter
                         }
-                        Text {   // detach affordance
+                        Text {   // detach affordance (docked) / detached indicator (ghost)
                             visible: modelData.detachable
-                            text: "⤢"
+                            text: modelData.detached ? "⮌" : "⤢"
                             color: "#999"
                             anchors.verticalCenter: parent.verticalCenter
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -4
                                 onClicked: {
+                                    if (modelData.detached) { tabs._raise(modelData); return }
                                     var g = mapToGlobal(width / 2, height / 2)
                                     tabs._detach(modelData, g.x + 40, g.y + 40)
                                 }
@@ -136,10 +145,13 @@ Item {
                         id: tabMouse
                         anchors.fill: parent
                         z: -1   // let the ⤢ MouseArea win where they overlap
-                        onClicked: tabs.select(index)
-                        // drag the tab out of the window to detach
+                        onClicked: {
+                            if (modelData.detached) tabs._raise(modelData)
+                            else tabs.select(index)
+                        }
+                        // drag a docked tab out of the window to detach
                         onReleased: {
-                            if (!modelData.detachable || !tabs.appWindow) return
+                            if (!modelData.detachable || modelData.detached || !tabs.appWindow) return
                             var g = mapToGlobal(mouse.x, mouse.y)
                             var w = tabs.appWindow
                             var outside = g.x < w.x || g.y < w.y

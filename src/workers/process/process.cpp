@@ -161,6 +161,7 @@ void builtin::workers::process(Instance* inst) {
             {"dir",        QCoreApplication::applicationDirPath()},
             {"name",       QCoreApplication::applicationName()},
             {"pid",        qlonglong(QCoreApplication::applicationPid())},
+            {"qt_version", QString::fromLatin1(qVersion())},
         };
     });
 }

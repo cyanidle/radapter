@@ -18,6 +18,7 @@ Item {
     property Item centerContent: null
     property var panels: []
     property string dropZone: ""          // "", "left", "right", "bottom" — active while dragging a float
+    property var draggingPanel: null      // the panel whose header is being dragged
 
     Component.onCompleted: {
         var ps = []
@@ -68,6 +69,34 @@ Item {
         win.show(); win.raise(); win.requestActivate()
     }
 
+    // ── drag-and-drop docking via a panel's header ─────────────────────────
+    // The panel header reports the global cursor; we map it into host coordinates and
+    // light up the edge zone under it. Releasing over an edge docks there; over the
+    // middle leaves the panel put; outside the host floats it.
+    function beginPanelDrag(panel) { draggingPanel = panel; dropZone = "" }
+    function updatePanelDrag(gx, gy) {
+        if (!draggingPanel) return
+        var lp = mapFromGlobal(gx, gy)
+        dropZone = zoneForPoint(lp.x, lp.y)
+    }
+    function zoneForPoint(x, y) {
+        var band = 90
+        if (x < -50 || y < -50 || x > width + 50 || y > height + 50) return "out"
+        if (y > height - band) return "bottom"
+        if (x < band) return "left"
+        if (x > width - band) return "right"
+        return ""
+    }
+    function endPanelDrag() {
+        var p = draggingPanel, z = dropZone
+        draggingPanel = null
+        dropZone = ""
+        if (!p) return
+        if (z === "left" || z === "right" || z === "bottom") dock(p, z)
+        else if (z === "out" && p.side !== "float") floatPanel(p)
+        // z === "" → middle: leave the panel where it is
+    }
+
     // ── drag-to-edge snapping for a floating window ─────────────────────────
     function updateDrag(win) {
         if (!win.tracking) return
@@ -115,7 +144,7 @@ Item {
 
     // translucent preview of where a dragged float window would dock
     Rectangle {
-        visible: host.dropZone !== ""
+        visible: host.dropZone === "left" || host.dropZone === "right" || host.dropZone === "bottom"
         z: 9999
         color: "#332196f3"
         border.color: "#2196f3"; border.width: 2
