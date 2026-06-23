@@ -3,9 +3,14 @@ import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 
 // A panel that lives inside a DockHost. It can be docked to the host's left/right/bottom
-// edge or floated into its own window, and re-docked by dragging that window to an edge or
-// via the header buttons. Declare its content as children; it fills the area below the
-// header bar. Reparented (never recreated) as it moves, so live state survives.
+// edge or floated into its own window, moved by dragging its header, and minimized to just
+// its header bar (the sibling panels on that edge expand to fill the freed space, VSCode
+// style). Declare its content as children; it fills the area below the header. Reparented
+// (never recreated) as it moves, so live state survives.
+//
+// Geometry is owned by the host: when docked the panel is a child of an edge SplitView and
+// drives its size through the SplitView attached properties below; when floating the host
+// anchors it to the window body. So this Item sets NO anchors of its own.
 Item {
     id: panel
     readonly property bool isDockPanel: true
@@ -14,11 +19,21 @@ Item {
     property string homeSide: "right"   // where it re-docks if its float window is closed
     property var host: null             // set by the DockHost on completion
     property var _win: null             // the float window while side === "float"
+    property bool minimized: false
+    readonly property int headerH: 28
 
-    // content goes below the header
-    default property alias content: body.data
-    // fill whatever container we are reparented into (a dock slot or the float window body)
-    anchors.fill: parent ? parent : undefined
+    // ── size hints for the edge SplitView the host reparents us into ──────────
+    // left/right edges stack vertically (height is the shared axis); the bottom edge stacks
+    // horizontally (width). Minimizing pins the shared axis to the header so siblings grow.
+    readonly property bool _vertical: side !== "bottom"
+    SplitView.fillHeight: _vertical ? !minimized : true
+    SplitView.fillWidth:  _vertical ? true : !minimized
+    SplitView.minimumHeight: (_vertical && minimized) ? headerH : 80
+    SplitView.preferredHeight: (_vertical && minimized) ? headerH : 220
+    SplitView.maximumHeight: (_vertical && minimized) ? headerH : 1000000
+    SplitView.minimumWidth: (!_vertical && minimized) ? 150 : 140
+    SplitView.preferredWidth: (!_vertical && minimized) ? 150 : 320
+    SplitView.maximumWidth: (!_vertical && minimized) ? 150 : 1000000
 
     ColumnLayout {
         anchors.fill: parent
@@ -28,13 +43,13 @@ Item {
         // host's middle to leave it where it is, or out of the host to float it.
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 28
+            implicitHeight: panel.headerH
             color: dragHandle.drag.active ? "#cfd8dc" : "#eceff1"
             border.color: "#cfd8dc"; border.width: 1
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 8
-                anchors.rightMargin: 8
+                anchors.rightMargin: 2
                 spacing: 6
                 Text { text: "⠿"; color: "#90a4ae"; font.pixelSize: 14 }
                 Label {
@@ -43,10 +58,17 @@ Item {
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                 }
+                ToolButton {
+                    text: panel.minimized ? "＋" : "－"
+                    padding: 4
+                    ToolTip.text: panel.minimized ? "Restore" : "Minimize"; ToolTip.visible: hovered
+                    onClicked: panel.minimized = !panel.minimized
+                }
             }
             MouseArea {
                 id: dragHandle
                 anchors.fill: parent
+                anchors.rightMargin: 28   // leave the minimize button clickable
                 cursorShape: Qt.OpenHandCursor
                 // a dummy drag target so `drag.active` reflects an in-progress drag; we
                 // drive the actual docking from the global cursor position, not this item
@@ -64,7 +86,10 @@ Item {
             id: body
             Layout.fillWidth: true
             Layout.fillHeight: true
+            visible: !panel.minimized
             clip: true
         }
     }
+    // content goes below the header
+    default property alias content: body.data
 }

@@ -129,8 +129,9 @@ Item {
     function buildRows() {
         var out = []
         function walk(node, path, depth) {
+            var name = path.length === 0 ? "Root" : node.type
             out.push({ path: path, depth: depth,
-                       label: node.type + (node.tag ? "  ⟨" + node.tag + "⟩" : "") })
+                       label: name + (node.tag ? "  ⟨" + node.tag + "⟩" : "") })
             if (node.children)
                 for (var i = 0; i < node.children.length; i++)
                     walk(node.children[i], path.concat([i]), depth + 1)
@@ -536,8 +537,9 @@ Item {
         DockablePanel {
             id: hmiProps
             side: "right"; homeSide: "right"
-            title: editor.selectedPath ? ("Properties — " + editor.nodeAt(editor.selectedPath).type)
-                                       : "Properties"
+            title: !editor.selectedPath ? "Properties"
+                 : editor.selectedPath.length === 0 ? "Properties — Root"
+                 : ("Properties — " + editor.nodeAt(editor.selectedPath).type)
             ColumnLayout {
                 anchors.fill: parent ? parent : undefined
             ScrollView {

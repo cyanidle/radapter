@@ -97,7 +97,9 @@ view {
 -- to the pending config, send the config to that client, and stream its logs back to
 -- the GUI's log window. "Stop" (or a re-run) shuts the previous runner down.
 
-local SERVER = "radapter-scada-" .. tostring(next_id())
+-- unique per configurator process, so a stray runner from a previous (crashed) session
+-- can't reconnect to this one's server by reusing a fixed socket name
+local SERVER = "radapter-scada-" .. tostring(app_info().pid)
 -- per_client: address each runner individually (send its config, read its hello/logs)
 local server = LocalServer { socket = SERVER, per_client = true }
 

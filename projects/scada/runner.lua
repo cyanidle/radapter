@@ -66,9 +66,17 @@ pipe(client, function(msg)
     end
 end)
 
+-- Self-terminate when the configurator goes away. LocalClient reconnects on drop, so
+-- without this a runner whose configurator was killed (not shut down gracefully) would
+-- live forever and reconnect to the next configurator that reuses the socket name.
+local was_connected = false
 pipe(client.events, function(ev)
     if ev.state == "ConnectedState" then
+        was_connected = true
         client { hello = TOKEN }
+    elseif ev.state == "UnconnectedState" and was_connected then
+        log.info("runner: configurator disconnected; shutting down")
+        shutdown()
     end
 end)
 

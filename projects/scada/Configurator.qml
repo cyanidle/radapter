@@ -349,21 +349,20 @@ ApplicationWindow {
                 onNodeRemoved: if (configurator.registeredName === name) configurator.clear()
             }
 
+            // The inspector is three independently dockable/minimizable panels — worker
+            // config, connections, and the config preview — all docked right by default so
+            // they read as one stacked column, but each can be snapped to another edge or
+            // floated on its own.
             DockablePanel {
-                id: propsPanel
+                id: configPanelDock
                 side: "right"; homeSide: "right"; title: "Worker properties"
 
-                // worker config / pipe list / preview, stacked vertically
-                SplitView {
-                    anchors.fill: parent ? parent : undefined
-                    orientation: Qt.Vertical
-
                 ColumnLayout {
-                    SplitView.fillHeight: true
-                    SplitView.minimumHeight: 120
+                    anchors.fill: parent ? parent : undefined
                     spacing: 6
 
                     Label {
+                        Layout.leftMargin: 6; Layout.topMargin: 4
                         text: configurator.registeredName.length
                               ? ("Editing: " + configurator.registeredName)
                               : "Select or add a worker to edit"
@@ -389,50 +388,42 @@ ApplicationWindow {
                         }
                     }
                 }
+            }
 
-                // connections (pipes) of the selected worker — devices (anything not in
-                // the pickable/connectable set) have no pipes, so don't show the panel
-                ColumnLayout {
-                    SplitView.preferredHeight: 200
-                    SplitView.minimumHeight: 80
+            // connections (pipes) of the selected worker — devices (anything not in
+            // the pickable/connectable set) have no pipes
+            DockablePanel {
+                id: connPanelDock
+                side: "right"; homeSide: "right"; title: "Connections"
+
+                Frame {
+                    anchors.fill: parent ? parent : undefined
                     visible: configurator.registeredName.length > 0
                              && root.pickable.indexOf(configurator.type) !== -1
-                    spacing: 4
-
-                    Label { text: "Connections"; font.bold: true }
-                    Frame {
-                        id: connFrame
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        ConnectionsList {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            context: sharedContext
-                            worker: configurator.registeredName
-                        }
+                    ConnectionsList {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        context: sharedContext
+                        worker: configurator.registeredName
                     }
                 }
+            }
 
-                ColumnLayout {
-                    SplitView.preferredHeight: 200
-                    SplitView.minimumHeight: 60
-                    spacing: 4
+            DockablePanel {
+                id: previewPanelDock
+                side: "right"; homeSide: "right"; title: "Preview (objects + pipes)"
 
-                    Label { text: "Preview (objects + pipes)"; font.bold: true }
-                    ScrollView {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        clip: true
-                        TextArea {
-                            readOnly: true
-                            wrapMode: TextEdit.NoWrap
-                            text: root.lastJson
-                            font.family: "monospace"
-                        }
+                ScrollView {
+                    anchors.fill: parent ? parent : undefined
+                    clip: true
+                    TextArea {
+                        readOnly: true
+                        wrapMode: TextEdit.NoWrap
+                        text: root.lastJson
+                        font.family: "monospace"
                     }
                 }
-                }   // vertical SplitView
-            }       // DockablePanel
+            }
         }           // DockHost
     }
 
