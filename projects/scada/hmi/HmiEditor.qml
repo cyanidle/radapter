@@ -173,9 +173,14 @@ Item {
         commit()
     }
 
-    // ---- clipboard (duplicate a subtree) ------------------------------------
+    // ---- clipboard (copy / cut / paste a subtree) ----------------------------
     function copySelected() {
         if (selectedPath) clipboard = clone(nodeAt(selectedPath))
+    }
+    function cutSelected() {
+        if (!selectedPath || selectedPath.length === 0) return   // never cut the root
+        clipboard = clone(nodeAt(selectedPath))
+        removeSelected()
     }
     // duplicate the clipboard node as the sibling right after the selection (the root has no
     // siblings, so a copy of it — or a paste with nothing selected — appends into the root)
@@ -386,6 +391,9 @@ Item {
                         event.accepted = true
                     } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
                         editor.copySelected()
+                        event.accepted = true
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_X) {
+                        editor.cutSelected()
                         event.accepted = true
                     } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V) {
                         editor.pasteClipboard()

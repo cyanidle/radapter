@@ -151,12 +151,57 @@ Loader {
                     }
                     Menu {
                         id: addMenu
-                        Repeater {
-                            model: node.addTypes
-                            delegate: MenuItem {
-                                text: modelData
-                                onTriggered: node.addRequested(node.path, modelData)
-                            }
+
+                        // ── Layout containers ──────────────────────────
+                        MenuItem {
+                            text: "Layout"
+                            enabled: false
+                            font { bold: true; italic: true }
+                        }
+                        MenuItem {
+                            text: "↔  Row"
+                            onTriggered: node.addRequested(node.path, "Row")
+                        }
+                        MenuItem {
+                            text: "↕  Column"
+                            onTriggered: node.addRequested(node.path, "Column")
+                        }
+                        MenuItem {
+                            text: "⊞  Grid"
+                            onTriggered: node.addRequested(node.path, "Grid")
+                        }
+
+                        MenuSeparator {}
+
+                        // ── Built-in widgets ───────────────────────────
+                        MenuItem {
+                            text: "Widgets"
+                            enabled: false
+                            font { bold: true; italic: true }
+                        }
+                        MenuItem {
+                            text: "◎  Gauge"
+                            onTriggered: node.addRequested(node.path, "Gauge")
+                        }
+                        MenuItem {
+                            text: "ℹ  InfoDisplay"
+                            onTriggered: node.addRequested(node.path, "InfoDisplay")
+                        }
+                        MenuItem {
+                            text: "▤  Chart"
+                            onTriggered: node.addRequested(node.path, "Chart")
+                        }
+                        MenuItem {
+                            text: "◻  Spacer"
+                            onTriggered: node.addRequested(node.path, "Spacer")
+                        }
+
+                        MenuSeparator {}
+
+                        // ── Custom component ───────────────────────────
+                        MenuItem {
+                            text: "⚙  Custom"
+                            onTriggered: node.addRequested(node.path, "Custom")
                         }
                     }
                 }
