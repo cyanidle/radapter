@@ -570,10 +570,9 @@ function QML_Tester:screenshot(path) end
 ---Start recording user input events on the current window.
 function QML_Tester:record_start() end
 
----Stop recording and save the event log to `path` (JSON).
----@param path string
----@return string the JSON content
-function QML_Tester:record_stop(path) end
+---Stop recording and return the event log as a JSON string.
+---@return string
+function QML_Tester:record_stop() end
 
 ---Replay a recorded event log from a JSON file.
 ---@param path string
@@ -677,12 +676,17 @@ function LocalClient(params) end
 ---@field working_dir string? -- cwd for the child
 ---@field autostart boolean? -- start on construction (default true)
 ---@field merge_stderr boolean? -- fold stderr into the stdout data channel
+---@field binary BinaryConfig? -- if set, use BinaryWorker msgpack framing for stdout and stdin
 
----A child process. stdout is the data channel (`pipe(proc, fn)`); stderr and
----lifecycle land on `proc.events`: { stderr }, { started },
----{ finished=true, exit_code } on normal exit / { finished=true, signal=true } when
----killed by a signal, { error }. Inbound strings/bytes are written to stdin. Destroying the worker
----terminates the child.
+---A child process. Without `binary`: stdout arrives as `{stdout = <bytes>}` on the data
+---channel; `pipe(proc, fn)` receives each chunk. stderr and lifecycle land on
+---`proc.events`: `{stderr}`, `{started}`, `{finished=true, exit_code}` on normal exit /
+---`{finished=true, signal=true}` when killed, `{error}`. Inbound strings/bytes are
+---written to stdin.
+---
+---With `binary`: extends BinaryWorker — stdout and stdin use the configured framing
+---and msgpack protocol. Inbound messages are arbitrary objects sent as msgpack frames.
+---Destroying the worker terminates the child.
 ---@class ProcessWorker : Worker
 ProcessWorker = {}
 
@@ -804,6 +808,7 @@ function app_info() end
 ---@class BinaryParams
 ---@field framing "slip"
 ---@field protocol "msgpack"
+---@field crc "modbus"?
 
 ---@class SerialParams : BinaryParams
 ---@field port string
@@ -815,6 +820,14 @@ function app_info() end
 ---@return SerialWorker
 ---@param params SerialParams
 function Serial(params) end
+
+---Reads/writes msgpack-framed messages over stdin/stdout (not stderr).
+---The worker name is always "radapter.stdio".
+---@class StdioWorker : Worker
+
+---@return StdioWorker
+---@param params BinaryParams
+function STDIO(params) end
 
 
 
