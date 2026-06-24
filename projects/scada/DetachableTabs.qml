@@ -225,12 +225,19 @@ Item {
         if (g >= 0) groupActivate(g, panelIdx)
         else groupAdd(0, panelIdx)
     }
-    function selectPanel(p) { var i = panelList.indexOf(p); if (i >= 0) select(i) }
+    function selectPanel(p) {
+        var i = panelList.indexOf(p)
+        if (i >= 0) {
+            select(i)
+            if (panelList[i]) radapter.note("tabs:switched|" + panelList[i].title)
+        }
+    }
 
     function closePanelIdx(panelIdx) {
         if (panelIdx < 0 || panelIdx >= panelList.length) return
         var p = panelList[panelIdx]
         if (!p.closable) return
+        radapter.note("tabs:closed|" + p.title)
         if (p.detached) {
             if (p._win) { var w = p._win; p._win = null; w.close() }
             p.detached = false; return
@@ -252,6 +259,7 @@ Item {
         win.x = gx; win.y = gy
         panel.detached = true; panel._win = win
         panel.parent = win.body; panel.visible = true
+        radapter.note("tabs:detached|" + panel.title)
         win.show(); win.raise(); win.requestActivate()
         relayout()
     }
@@ -262,6 +270,7 @@ Item {
         if (groups.length === 0) groups = [{tabs: [idx], active: idx}]
         else { groups[0].tabs.push(idx); groups[0].active = idx }
         groups = groups
+        radapter.note("tabs:redocked|" + panel.title)
         relayout(); select(idx)
     }
     function _raise(panel) {

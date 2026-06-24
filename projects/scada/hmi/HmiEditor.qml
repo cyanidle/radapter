@@ -87,11 +87,13 @@ Item {
     function selectNode(path) {
         selectedPath = path
         fields = fieldsFor(path ? nodeAt(path) : null)
+        if (path) radapter.note("hmi:node_selected|" + nodeAt(path).type + "|" + path.join(","))
     }
     function deselectAll() {
         selectedPath = null
         _lastClickPath = null
         fields = []
+        radapter.note("hmi:node_deselected")
     }
 
     // Canvas click selection cycles through the stack under the cursor: the first click on a
@@ -166,6 +168,7 @@ Item {
         }
         if (!target.children) target.children = []
         target.children.push(makeNode(type))
+        radapter.note("hmi:node_added|" + type)
         commit()
     }
     // add a child of a specific container (the in-canvas "＋" button, by node path)
@@ -175,16 +178,18 @@ Item {
         if (!target.children) target.children = []
         target.children.push(makeNode(type))
         selectedPath = containerPath.concat([target.children.length - 1])
+        radapter.note("hmi:child_added|" + type + "|" + containerPath.join(","))
         commit()
     }
 
     // ---- clipboard (copy / cut / paste a subtree) ----------------------------
     function copySelected() {
-        if (selectedPath) clipboard = clone(nodeAt(selectedPath))
+        if (selectedPath) { clipboard = clone(nodeAt(selectedPath)); radapter.note("hmi:node_copied") }
     }
     function cutSelected() {
         if (!selectedPath || selectedPath.length === 0) return   // never cut the root
         clipboard = clone(nodeAt(selectedPath))
+        radapter.note("hmi:node_cut")
         removeSelected()
     }
     // Paste the clipboard node. If the selection is a container, paste into it as a new
@@ -210,12 +215,15 @@ Item {
             viz.root.children.push(node)
             selectedPath = [viz.root.children.length - 1]
         }
+        radapter.note("hmi:node_pasted")
         commit()
     }
     function removeSelected() {
         if (!selectedPath || selectedPath.length === 0) return   // never remove the root
+        var node = nodeAt(selectedPath)
         var parent = nodeAt(selectedPath.slice(0, -1))
         parent.children.splice(selectedPath[selectedPath.length - 1], 1)
+        radapter.note("hmi:node_removed|" + node.type + "|" + selectedPath.join(","))
         selectedPath = null
         commit()
     }
@@ -276,6 +284,7 @@ Item {
         var c = parent.children
         var tmp = c[idx]; c[idx] = c[j]; c[j] = tmp
         selectedPath = selectedPath.slice(0, -1).concat([j])
+        radapter.note("hmi:node_moved|" + selectedPath.join(",") + "|" + (delta > 0 ? "down" : "up"))
         commit()
     }
     function setProp(key, value) {
@@ -283,6 +292,7 @@ Item {
         var n = nodeAt(selectedPath)
         if (value === "" || value === undefined || value === null) delete n[key]
         else n[key] = value
+        radapter.note("hmi:prop_changed|" + n.type + "|" + key)
         commit()
     }
 

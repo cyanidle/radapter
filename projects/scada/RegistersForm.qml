@@ -109,12 +109,12 @@ ColumnLayout {
             }
             // capture the root id before remove(): removing destroys this delegate, after
             // which `regForm` no longer resolves through its (torn-down) context
-            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = regForm; rows.remove(row); f.rebuild() } }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = regForm; rows.remove(row); f.rebuild(); radapter.note("registers:row_removed") } }
         }
     }
 
     Button {
         text: "＋ Add register"
-        onClicked: rows.append({ rname: "", regType: "holding", addr: "0", dataType: "uint16" })
+        onClicked: { rows.append({ rname: "", regType: "holding", addr: "0", dataType: "uint16" }); radapter.note("registers:row_added") }
     }
 }

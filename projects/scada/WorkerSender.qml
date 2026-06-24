@@ -61,6 +61,7 @@ Item {
         var msg = {}
         msg[field] = value
         radapter.model.send({ send_to: workerName, msg: msg })
+        radapter.note("sender:field_sent|" + workerName + "|" + field)
     }
 
     function sendCustom() {
@@ -75,6 +76,7 @@ Item {
         }
         customError.text = ""
         radapter.model.send({ send_to: workerName, msg: obj })
+        radapter.note("sender:custom_sent|" + workerName)
     }
 
     function fieldValue(f) {

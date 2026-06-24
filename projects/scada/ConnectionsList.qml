@@ -72,9 +72,13 @@ ColumnLayout {
                 onActivated: {
                     var d = panel.kinds[currentIndex]
                     // plain commits immediately; keyed kinds wait for a key in keyField
-                    if (d.kind === "pipe") panel.context.setPipeDirective(idx, "pipe", "")
-                    else if (keyField.text.trim().length > 0)
+                    if (d.kind === "pipe") {
+                        panel.context.setPipeDirective(idx, "pipe", "")
+                        radapter.note("pipe:changed|" + p.from + "|" + p.to + "|pipe")
+                    } else if (keyField.text.trim().length > 0) {
                         panel.context.setPipeDirective(idx, d.kind, keyField.text)
+                        radapter.note("pipe:changed|" + p.from + "|" + p.to + "|" + d.kind + ":" + keyField.text)
+                    }
                 }
             }
             TextField {
@@ -85,8 +89,10 @@ ColumnLayout {
                 Component.onCompleted: text = panel.context.pipeKey(p)
                 onEditingFinished: {
                     var d = panel.kinds[kindBox.currentIndex]
-                    if (d.kind !== "pipe")
+                    if (d.kind !== "pipe") {
                         panel.context.setPipeDirective(idx, d.kind, text)
+                        radapter.note("pipe:changed|" + p.from + "|" + p.to + "|" + d.kind + ":" + text)
+                    }
                 }
             }
             Button {
@@ -94,7 +100,10 @@ ColumnLayout {
                 implicitWidth: 22
                 implicitHeight: 22
                 padding: 0
-                onClicked: panel.context.removePipe(idx)
+                onClicked: {
+                    radapter.note("pipe:removed|" + p.from + "|" + p.to)
+                    panel.context.removePipe(idx)
+                }
             }
         }
     }

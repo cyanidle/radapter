@@ -58,7 +58,11 @@ Item {
                     text: panel.minimized ? "＋" : "－"
                     padding: 4
                     ToolTip.text: panel.minimized ? "Restore" : "Minimize"; ToolTip.visible: hovered
-                    onClicked: panel.minimized = !panel.minimized
+                    onClicked: {
+                        panel.minimized = !panel.minimized
+                        radapter.note(panel.minimized ? "dock:minimized|" + panel.title
+                                                       : "dock:restored|" + panel.title)
+                    }
                 }
             }
             MouseArea {

@@ -52,7 +52,10 @@ ColumnLayout {
             if (registeredName.length) { context.remove(registeredName); registeredName = "" }
             return
         }
-        if (registeredName.length && registeredName !== n) context.rename(registeredName, n)
+        if (registeredName.length && registeredName !== n) {
+            radapter.note("configurator:renamed|" + registeredName + "|" + n)
+            context.rename(registeredName, n)
+        }
         context.put(n, cfg.type, values)
         registeredName = n
     }
@@ -68,6 +71,7 @@ ColumnLayout {
         loading = false
         formLoader.reload()
         changed()
+        radapter.note("configurator:selected|" + name + "|" + o.type)
     }
     // detach from any node, leaving an empty editor
     function clear() {
@@ -79,6 +83,7 @@ ColumnLayout {
         loading = false
         formLoader.reload()
         changed()
+        radapter.note("configurator:cleared")
     }
 
     function currentWorker() {
@@ -95,7 +100,7 @@ ColumnLayout {
 
     // reset the form when the user changes the configured type (but not while a
     // node is being loaded via select()/clear(), which sets type deliberately)
-    onTypeChanged: { if (loading) return; values = {}; register(); formLoader.reload(); changed() }
+    onTypeChanged: { if (loading) return; radapter.note("configurator:type_changed|" + cfg.type); values = {}; register(); formLoader.reload(); changed() }
 
     RowLayout {
         Layout.fillWidth: true

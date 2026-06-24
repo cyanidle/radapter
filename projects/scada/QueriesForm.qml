@@ -80,12 +80,12 @@ ColumnLayout {
             }
             // capture the root id before remove(): removing destroys this delegate, after
             // which `qForm` no longer resolves through its (torn-down) context
-            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = qForm; rows.remove(row); f.rebuild() } }
+            Button { text: "✕"; implicitWidth: 32; onClicked: { var f = qForm; rows.remove(row); f.rebuild(); radapter.note("queries:row_removed") } }
         }
     }
 
     Button {
         text: "＋ Add query"
-        onClicked: rows.append({ qtype: "holding", addr: "0", cnt: "1" })
+        onClicked: { rows.append({ qtype: "holding", addr: "0", cnt: "1" }); radapter.note("queries:row_added") }
     }
 }

@@ -42,7 +42,11 @@ RowLayout {
         model: ref.modelList()
         onActivated: {
             var cands = ref.candidates()
-            if (index < cands.length) { ref.values[ref.valueKey] = { ref: cands[index] }; ref.changed() }
+            if (index < cands.length) {
+                ref.values[ref.valueKey] = { ref: cands[index] }
+                ref.changed()
+                radapter.note("ref:selected|" + ref.className + "|" + cands[index])
+            }
             else newDialog.open()
         }
     }
@@ -82,6 +86,7 @@ RowLayout {
             ref.values[ref.valueKey] = { ref: nm }
             combo.currentIndex = ref.candidates().indexOf(nm)
             ref.changed()
+            radapter.note("ref:device_created|" + ref.className + "|" + typeBox.currentText + "|" + nm)
         }
         Component.onCompleted: syncOk()
         onNameErrorChanged: syncOk()

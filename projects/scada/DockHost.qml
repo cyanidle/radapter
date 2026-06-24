@@ -124,11 +124,12 @@ Item {
         panels = arr
         relayout()
     }
-    function dock(panel, side) { movePanel(panel, side, 1e9); closeFloat(panel) }
+    function dock(panel, side) { radapter.note("dock:docked|" + panel.title + "|" + side); movePanel(panel, side, 1e9); closeFloat(panel) }
     function closeFloat(panel) {
         if (panel._win) { var w = panel._win; panel._win = null; w.close() }
     }
     function floatPanel(panel) {
+        radapter.note("dock:floated|" + panel.title)
         panel.side = "float"
         relayout()
         var win = floatComp.createObject(null, { panel: panel })

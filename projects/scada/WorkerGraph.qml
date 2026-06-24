@@ -45,7 +45,7 @@ Item {
         return connectableTypes.indexOf(context.get(name).type) >= 0
     }
     function beginPipe(from, to) { dirPopup.begin(from, to) }
-    function clearSelection() { selected = ""; selectionCleared() }
+    function clearSelection() { selected = ""; selectionCleared(); radapter.note("graph:selection_cleared") }
 
     function registerCard(name, item) { cardItems[name] = item; repaintArrows() }
     // identity-guarded: when the Repeater resets (e.g. a worker is removed) it recreates
@@ -142,8 +142,10 @@ Item {
         graph.selected = name
         graph.forceActiveFocus()
         nodeClicked(name)
+        radapter.note("graph:node_selected|" + name)
     }
     function removeNode(name) {
+        radapter.note("graph:node_removed|" + name)
         context.remove(name)
         if (selected === name) selected = ""
         nodeRemoved(name)
@@ -532,8 +534,13 @@ Item {
                     enabled: kindBox.currentIndex === 0 || keyField.text.trim().length > 0
                     onClicked: {
                         var d = kindBox.model[kindBox.currentIndex]
-                        graph.context.addPipe(dirPopup.fromName, dirPopup.toName,
+                        var ok = graph.context.addPipe(dirPopup.fromName, dirPopup.toName,
                                               { kind: d.kind, key: keyField.text })
+                        if (ok) {
+                            radapter.note("graph:pipe_connected|" + dirPopup.fromName + "|"
+                                          + dirPopup.toName + "|" + d.kind
+                                          + (keyField.text ? ":" + keyField.text : ""))
+                        }
                         dirPopup.close()
                     }
                 }

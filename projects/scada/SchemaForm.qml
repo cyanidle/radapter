@@ -117,8 +117,8 @@ ColumnLayout {
     }
 
     // ---- value helpers (mutate `values` in place) --------------------------
-    function setVal(key, v) { values[key] = v; changed() }
-    function clearVal(key)  { delete values[key]; changed() }
+    function setVal(key, v) { values[key] = v; changed(); radapter.note("form:field_set|" + path + key) }
+    function clearVal(key)  { delete values[key]; changed(); radapter.note("form:field_cleared|" + path + key) }
     function ensureObj(key) {
         if (!isObj(values[key])) values[key] = {}
         return values[key]
@@ -347,6 +347,7 @@ ColumnLayout {
                 map()[n] = {}
                 rows = rows.concat([{ k: n }])
                 form.changed()
+                radapter.note("form:map_row_added|" + form.path + fkey)
             }
             function rename(i, nk) {
                 nk = (nk || "").trim()
@@ -360,6 +361,7 @@ ColumnLayout {
                 delete map()[rows[i].k]
                 rows = rows.filter(function (_, j) { return j !== i })
                 form.changed()
+                radapter.note("form:map_row_removed|" + form.path + fkey)
             }
 
             Repeater {
@@ -405,8 +407,8 @@ ColumnLayout {
                 if (!Array.isArray(form.values[fkey])) form.values[fkey] = []
                 return form.values[fkey]
             }
-            function addRow() { arr().push({}); count = arr().length; form.changed() }
-            function removeRow(i) { arr().splice(i, 1); count = arr().length; form.changed() }
+            function addRow() { arr().push({}); count = arr().length; form.changed(); radapter.note("form:list_row_added|" + form.path + fkey) }
+            function removeRow(i) { arr().splice(i, 1); count = arr().length; form.changed(); radapter.note("form:list_row_removed|" + form.path + fkey) }
 
             Repeater {
                 model: listEd.count

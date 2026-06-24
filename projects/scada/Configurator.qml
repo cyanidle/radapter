@@ -79,17 +79,20 @@ ApplicationWindow {
     function saveProject() {
         if (root.projectPath.length > 0) {
             radapter.model.send({ save_file: root.projectPath, config: root.projectConfig() })
+            radapter.note("app:save_requested|" + root.projectPath)
         } else {
             saveProjectAs()
         }
     }
 
     function saveProjectAs() {
+        radapter.note("app:save_as_dialog")
         saveDialog.folder = "file://" + (root.projectPath.length ? root.dirOf(root.projectPath) : root.homeDir)
         saveDialog.open()
     }
 
     function openProject() {
+        radapter.note("app:open_dialog")
         openDialog.folder = "file://" + (root.projectPath.length ? root.dirOf(root.projectPath) : root.homeDir)
         openDialog.open()
     }
@@ -97,6 +100,7 @@ ApplicationWindow {
     function newProject() {
         sharedContext.load({ objects: {}, pipes: [], visualization: { root: { type: "Column", spacing: 8, children: [] } } })
         root.projectPath = ""
+        radapter.note("app:new_project")
     }
 
     // schemas arrive as a plain { schemas: {...} } message; received() delivers the
@@ -111,6 +115,7 @@ ApplicationWindow {
         // streamed back from the headless runner launched by "Run"
         if (msg.run_state !== undefined) {
             root.runState = String(msg.run_state)
+            radapter.note("runner:state|" + root.runState)
             // a fresh run clears the overlay; a finished/lost run stops marking it live
             if (root.runState === "starting") {
                 root.liveValues = ({}); root.liveQuality = ({}); root.runnerLive = false
@@ -136,19 +141,23 @@ ApplicationWindow {
         }
         // file I/O responses
         if (msg.save_ok !== undefined) {
+            radapter.note("file:saved|" + msg.save_ok)
             messageDialog.text = "Saved to " + msg.save_ok
             messageDialog.open()
         }
         if (msg.save_err !== undefined) {
+            radapter.note("file:save_error|" + msg.save_msg)
             messageDialog.text = "Failed to save: " + msg.save_msg
             messageDialog.open()
         }
         if (msg.open_ok !== undefined) {
+            radapter.note("file:loaded|" + msg.open_ok)
             root.projectPath = msg.open_ok
             messageDialog.text = "Opened " + msg.open_ok
             messageDialog.open()
         }
         if (msg.open_err !== undefined) {
+            radapter.note("file:open_error|" + msg.open_msg)
             messageDialog.text = "Failed to open: " + msg.open_msg
             messageDialog.open()
         }
@@ -183,11 +192,13 @@ ApplicationWindow {
         sharedContext.put(n, type, {})
         configurator.select(n)
         graph.selected = n
+        radapter.note("worker:added|" + type + "|" + n)
     }
 
     Component.onCompleted: {
         radapter.model.received.connect(onMsg)
         sharedContext.changed.connect(refreshPreview)
+        radapter.note("app:loaded")
         // custom_forms is a global context property set from Lua (QML properties=...)
         if (typeof custom_forms !== "undefined") root.formOverrides = custom_forms
     }
@@ -208,38 +219,38 @@ ApplicationWindow {
             Action {
                 text: "Open…"
                 shortcut: "Ctrl+O"
-                onTriggered: root.openProject()
+                onTriggered: { radapter.note("menu:file_open"); root.openProject() }
             }
             Action {
                 text: "Save"
                 shortcut: "Ctrl+S"
-                onTriggered: root.saveProject()
+                onTriggered: { radapter.note("menu:file_save"); root.saveProject() }
             }
             Action {
                 text: "Save As…"
                 shortcut: "Ctrl+Shift+S"
-                onTriggered: root.saveProjectAs()
+                onTriggered: { radapter.note("menu:file_save_as"); root.saveProjectAs() }
             }
             MenuSeparator {}
             Action {
                 text: "Exit"
                 shortcut: "Alt+F4"
-                onTriggered: Qt.quit()
+                onTriggered: { radapter.note("app:exit"); Qt.quit() }
             }
         }
         Menu {
             title: "Windows"
             Action {
                 text: "Configurator"
-                onTriggered: tabs.selectPanel(configPanel)
+                onTriggered: { radapter.note("tabs:switched|Configurator"); tabs.selectPanel(configPanel) }
             }
             Action {
                 text: "Visualization"
-                onTriggered: tabs.selectPanel(vizPanel)
+                onTriggered: { radapter.note("tabs:switched|Visualization"); tabs.selectPanel(vizPanel) }
             }
             Action {
                 text: "Runner"
-                onTriggered: tabs.selectPanel(runnerPanel)
+                onTriggered: { radapter.note("tabs:switched|Runner"); tabs.selectPanel(runnerPanel) }
             }
         }
         Menu {
@@ -252,7 +263,7 @@ ApplicationWindow {
             MenuSeparator {}
             Action {
                 text: "About"
-                onTriggered: aboutDialog.open()
+                onTriggered: { radapter.note("dialog:opened|About"); aboutDialog.open() }
             }
         }
     }
@@ -314,16 +325,19 @@ ApplicationWindow {
             Label { text: "Add worker"; font.bold: true }
             ComboBox {
                 id: typeBox
+                objectName: "typeBox"
                 Layout.preferredWidth: 200
                 model: root.pickable
             }
             Button {
+                objectName: "addWorkerBtn"
                 text: "＋ Add"
                 enabled: typeBox.currentText.length > 0
                 onClicked: root.addWorker(typeBox.currentText)
             }
             ToolSeparator {}
             Button {
+                objectName: "runBtn"
                 text: "▶ Run"
                 // depend on revision (objects/config edits) and schemas (arrive async)
                 // so it re-evaluates; disabled while any worker has a required field unset
@@ -335,6 +349,7 @@ ApplicationWindow {
                                  && Object.keys(sharedContext.objects).length > 0
                 ToolTip.text: "Some workers are missing required fields"
                 onClicked: {
+                    radapter.note("runner:start_requested")
                     radapter.model.send({ run: root.projectConfig() })
                     tabs.selectPanel(runnerPanel)
                 }
@@ -522,6 +537,7 @@ ApplicationWindow {
                              && Object.keys(sharedContext.objects).length > 0
                              && sharedContext.allComplete()
                     onClicked: {
+                        radapter.note("runner:start_requested")
                         radapter.model.send({ run: root.projectConfig() })
                         logModel.clear()
                     }
@@ -530,6 +546,7 @@ ApplicationWindow {
                 Button {
                     text: "■ Stop"
                     onClicked: {
+                        radapter.note("runner:stop_requested")
                         radapter.model.send({ stop: true })
                         root.runState = "stopped"
                         // killing the runner via destroy() may emit no "exited" message, so
