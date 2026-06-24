@@ -141,12 +141,12 @@ public:
     }
 
     // interleave a debug marker into the recording (radapter.note from QML)
-    void addNote(QString const& msg) {
+    void addNote(QVariant const& data) {
         flushPendingMove();
         QJsonObject rec;
         rec["type"] = QStringLiteral("note");
         rec["t"] = qint64(timer.elapsed());
-        rec["msg"] = msg;
+        rec["data"] = QJsonValue::fromVariant(data);
         events.append(rec);
     }
 
@@ -648,6 +648,9 @@ public:
     QString record_stop(std::optional<QString> path) { return stopRecording(path.value_or(QString{})); }
 };
 
+} // namespace qml_test
+
+
 // ---------------------------------------------------------------------------
 // CLI entry points for --gui-record / --gui-replay (called directly from
 // app/main.cpp; no Lua round-trip). The recorder is parented to the Instance so
@@ -656,38 +659,36 @@ public:
 // created later during eval are captured.
 // ---------------------------------------------------------------------------
 
-RADAPTER_API void StartGuiRecording(Instance* inst) {
-    auto* rec = inst->findChild<RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
-    if (!rec) rec = new RecordFilter(inst);
+RADAPTER_API void gui::StartRecording(Instance* inst) {
+    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+    if (!rec) rec = new qml_test::RecordFilter(inst);
     rec->start();
     qApp->installEventFilter(rec);
 }
 
-// radapter.note(msg) from QML: append a marker to the active --gui-record stream;
+// radapter.note(data) from QML: append a marker to the active --gui-record stream;
 // noop when no recording is running.
-RADAPTER_API void RecordGuiNote(Instance* inst, QString const& msg) {
-    auto* rec = inst->findChild<RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
-    if (rec && rec->active) rec->addNote(msg);
+RADAPTER_API void gui::RecordNote(Instance* inst, QVariant const& data) {
+    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+    if (rec && rec->active) rec->addNote(data);
 }
 
-RADAPTER_API QString StopGuiRecording(Instance* inst, QString const& path) {
-    auto* rec = inst->findChild<RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+RADAPTER_API QString gui::StopRecording(Instance* inst, QString const& path) {
+    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
     if (!rec || !rec->active) return {};
     qApp->removeEventFilter(rec);
-    return writeEventsJson(path, rec->stop());
+    return qml_test::writeEventsJson(path, rec->stop());
 }
 
-RADAPTER_API void ReplayGuiFile(QString const& path, double speed) {
+RADAPTER_API void gui::ReplayFile(QString const& path, double speed) {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly))
         Raise("--gui-replay: cannot open '{}'", path);
-    auto wins = guiWindows();
+    auto wins = qml_test::guiWindows();
     if (wins.isEmpty())
         Raise("--gui-replay: no QML window to replay into");
-    replayEventsOn(wins.first(), parseEventsArray(f.readAll(), "--gui-replay"), speed);
+    qml_test::replayEventsOn(wins.first(), qml_test::parseEventsArray(f.readAll(), "--gui-replay"), speed);
 }
-
-} // namespace qml_test
 
 namespace builtin::workers {
 

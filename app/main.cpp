@@ -10,12 +10,6 @@
 #ifdef RADAPTER_GUI
 #include <QGuiApplication>
 #include <QApplication>
-// CLI record/replay entry points, defined in the GUI build of radapter-sdk.
-namespace radapter::qml_test {
-    RADAPTER_API void StartGuiRecording(radapter::Instance* inst);
-    RADAPTER_API QString StopGuiRecording(radapter::Instance* inst, QString const& path);
-    RADAPTER_API void ReplayGuiFile(QString const& path, double speed);
-}
 #endif
 
 #ifdef Q_OS_UNIX
@@ -123,12 +117,12 @@ public:
         if constexpr (radapter::GUI) {
             if (auto recPath = config->cli.present<std::string>("gui-record")) {
                 auto path = QString::fromStdString(*recPath);
-                radapter::qml_test::StartGuiRecording(inst);
+                radapter::gui::StartRecording(inst);
                 std::cerr << "# --gui-record: recording to " << *recPath << std::endl;
 
                 auto saveRec = [this, path] {
                     try {
-                        radapter::qml_test::StopGuiRecording(inst, path);
+                        radapter::gui::StopRecording(inst, path);
                     } catch (std::exception& e) {
                         std::cerr << "# --gui-record: save error: " << e.what() << std::endl;
                     }
@@ -179,7 +173,7 @@ public:
                 auto path = QString::fromStdString(*replayPath);
                 QTimer::singleShot(1000, qApp, [this, path] {
                     try {
-                        radapter::qml_test::ReplayGuiFile(path, 1.0);
+                        radapter::gui::ReplayFile(path, 1.0);
                     } catch (std::exception& e) {
                         std::cerr << "# --gui-replay error: " << e.what() << std::endl;
                     }

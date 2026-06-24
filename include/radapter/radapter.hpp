@@ -193,6 +193,15 @@ void RADAPTER_API Unflatten(QVariant& out, FlatMap const& flat);
 //! @return amount of affected keys
 size_t RADAPTER_API MergePatch(QVariant& out, QVariant const& patch, QVariant* diff = nullptr);
 
+namespace gui
+{
+// Only available in GUI builds
+RADAPTER_API void StartRecording(Instance* inst);
+RADAPTER_API QString StopRecording(Instance* inst, QString const& path);
+RADAPTER_API void ReplayFile(QString const& path, double speed);
+RADAPTER_API void RecordNote(radapter::Instance* inst, QVariant const& data);
+}
+
 
 namespace detail {
 

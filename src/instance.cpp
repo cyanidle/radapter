@@ -453,4 +453,12 @@ void Instance::RegisterFunc(const char *name, ExtraFunction func)
     lua_setglobal(d->L, name);
 }
 
+#ifndef RADAPTER_GUI
+constexpr auto unav_fmt = "{}: available only in GUI builds";
+RADAPTER_API void gui::StartGuiRecording(Instance*) {Raise(unav_fmt, __func__);}
+RADAPTER_API QString gui::StopGuiRecording(Instance*, QString const&) {Raise(unav_fmt, __func__);}
+RADAPTER_API void gui::ReplayGuiFile(QString const&, double) {Raise(unav_fmt, __func__);}
+RADAPTER_API void gui::RecordGuiNote(radapter::Instance*, QVariant const&) {Raise(unav_fmt, __func__);}
+#endif
+
 }
