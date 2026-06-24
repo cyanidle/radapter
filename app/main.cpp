@@ -9,9 +9,7 @@
 
 #ifdef RADAPTER_GUI
 #include <QGuiApplication>
-#ifdef RADAPTER_GUI
 #include <QApplication>
-#endif
 #endif
 
 #ifdef Q_OS_UNIX
@@ -294,12 +292,12 @@ int main (int argc, char **argv) try {
         std::cerr << cli << std::endl;
         return 1;
     }
-    if constexpr (radapter::GUI) {
+#ifdef RADAPTER_GUI
         // auto-quit on last window close is the default for --gui; --gui-no-auto-quit opts out
         if (cli["gui"] == true && cli["gui-no-auto-quit"] != true) {
             static_cast<QGuiApplication*>(app.get())->setQuitOnLastWindowClosed(true);
         }
-    }
+#endif
 
     auto sigs = QCtrlSignalHandler::instance();
     sigs->registerForSignal(QCtrlSignalHandler::SigInt);

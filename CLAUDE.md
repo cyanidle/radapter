@@ -47,6 +47,23 @@ System deps (Ubuntu): `cmake ninja-build build-essential` plus Qt5 dev packages
 (`libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev`, the `libqt5sql5-*`
 drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
 
+### DEB packaging
+
+Two mutually-conflicting DEB packages (`radapter-gui` / `radapter-headless`) are built
+from separate configurations (`RADAPTER_GUI=ON` vs `OFF`) via CPack:
+
+```bash
+cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=OFF -D CMAKE_INSTALL_PREFIX=/usr -B build-headless
+cmake --build build-headless -j $(nproc) && (cd build-headless && cpack -G DEB)
+
+cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=ON -D CMAKE_INSTALL_PREFIX=/usr -B build-gui
+cmake --build build-gui -j $(nproc) && (cd build-gui && cpack -G DEB)
+```
+
+QML module deps (invisible to dpkg-shlibdeps) are declared explicitly in CMakeLists.txt
+via CPACK_DEBIAN_PACKAGE_DEPENDS. When adding new QML imports, update the
+RADAPTER_DEB_GUI_QML_DEPS list.
+
 ### Key CMake options
 
 - `RADAPTER_JIT` / `RADAPTER_JIT_STATIC` — use LuaJit instead of PUC-Rio Lua 5.4. JIT mode

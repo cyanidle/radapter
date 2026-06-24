@@ -87,6 +87,34 @@ build/bin/radapter tests/smoke.lua   # smoke test (self-checking, no hardware ne
 
 Set `CPM_SOURCE_CACHE=$HOME/.cache/CPM` to cache dependencies across builds.
 
+## Packaging (DEB)
+
+Two DEB packages are produced from separate build configurations — `radapter-headless`
+and `radapter-gui`. They conflict with each other: only one can be installed at a time.
+
+```bash
+# radapter-headless — no GUI dependencies
+cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=OFF \
+    -D CMAKE_INSTALL_PREFIX=/usr -B build-headless
+cmake --build build-headless -j $(nproc)
+(cd build-headless && cpack -G DEB)
+
+# radapter-gui — with QML/GUI support + QML module dependencies
+cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=ON \
+    -D CMAKE_INSTALL_PREFIX=/usr -B build-gui
+cmake --build build-gui -j $(nproc)
+(cd build-gui && cpack -G DEB)
+```
+
+The packages install to `/usr/bin/radapter`, `/usr/lib/`, and `/usr/include/radapter/`.
+Shared library dependencies are auto-detected by `dpkg-shlibdeps`; QML module dependencies
+(`qml-module-qtquick2`, `qml-module-qtcharts`, etc.) are declared explicitly since they're
+loaded dynamically at runtime.
+
+Built packages:
+- `build-headless/radapter-headless_3.0_amd64.deb`
+- `build-gui/radapter-gui_3.0_amd64.deb`
+
 ## Running
 
 ```bash
