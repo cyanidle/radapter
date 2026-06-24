@@ -570,8 +570,11 @@ function QML_Tester:screenshot(path) end
 ---Start recording user input events on the current window.
 function QML_Tester:record_start() end
 
----Stop recording and return the event log as a JSON string.
----@return string
+---Stop recording and return the captured events as a table (array of event maps).
+---Events have at least a `type` field: "note" for radapter.note markers (with `data`
+---and `t`), or input events ("mousePress", "mouseRelease", "mouseMove", "keyPress",
+---"keyRelease", "wheel") with coordinates/button/key fields and a `t` timestamp.
+---@return table
 function QML_Tester:record_stop() end
 
 ---Replay a recorded event log from a JSON file.
@@ -676,7 +679,7 @@ function LocalClient(params) end
 ---@field working_dir string? -- cwd for the child
 ---@field autostart boolean? -- start on construction (default true)
 ---@field merge_stderr boolean? -- fold stderr into the stdout data channel
----@field binary BinaryConfig? -- if set, use BinaryWorker msgpack framing for stdout and stdin
+---@field binary BinaryParams? -- if set, use BinaryWorker msgpack framing for stdout and stdin
 
 ---A child process. Without `binary`: stdout arrives as `{stdout = <bytes>}` on the data
 ---channel; `pipe(proc, fn)` receives each chunk. stderr and lifecycle land on

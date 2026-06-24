@@ -197,7 +197,7 @@ namespace gui
 {
 // Only available in GUI builds
 RADAPTER_API void StartRecording(Instance* inst);
-RADAPTER_API QString StopRecording(Instance* inst, QString const& path);
+RADAPTER_API QVariantList StopRecording(Instance* inst);
 RADAPTER_API void ReplayFile(QString const& path, double speed);
 RADAPTER_API void RecordNote(radapter::Instance* inst, QVariant const& data);
 }

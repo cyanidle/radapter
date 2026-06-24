@@ -8,7 +8,6 @@
 #include <QThread>
 #include <QJsonDocument>
 #include <QJsonArray>
-#include <QJsonObject>
 #include <QImage>
 #include <QFile>
 #include <QPointer>
@@ -121,24 +120,26 @@ static QString btnToStr(Qt::MouseButton b) {
 class RecordFilter : public QObject {
     Q_OBJECT
 public:
-    QJsonArray events;
+    QVariantList events;
     QElapsedTimer timer;
     Instance* inst;
     bool active = false;
-    std::optional<QJsonObject> pendingMove;   // last move, flushed before the next non-move
+    std::optional<QVariantMap> pendingMove;   // last move, flushed before the next non-move
 
     explicit RecordFilter(Instance* inst = nullptr) : QObject(inst), inst(inst) {
     }
 
     void start() {
+        qApp->installEventFilter(this);
         inst->_GetPrivate()->guiRecordFilter = this;
-        events = QJsonArray{};
+        events = {};
         pendingMove.reset();
         timer.start();
         active = true;
     }
 
-    QJsonArray stop() {
+    QVariantList stop() {
+        qApp->removeEventFilter(this);
         inst->_GetPrivate()->guiRecordFilter = nullptr;
         active = false;
         flushPendingMove();
@@ -148,10 +149,10 @@ public:
     // interleave a debug marker into the recording (radapter.note from QML)
     void addNote(QVariant const& data) {
         flushPendingMove();
-        QJsonObject rec;
+        QVariantMap rec;
         rec["type"] = QStringLiteral("note");
         rec["t"] = qint64(timer.elapsed());
-        rec["data"] = QJsonValue::fromVariant(data);
+        rec["data"] = data;
         events.append(rec);
     }
 
@@ -181,7 +182,7 @@ protected:
         // final destination instead of replaying every intermediate pixel.
         if (event->type() == QEvent::MouseMove) {
             auto* me = static_cast<QMouseEvent*>(event);
-            QJsonObject rec;
+            QVariantMap rec;
             rec["t"] = qint64(elapsed);
             rec["type"] = QStringLiteral("mouseMove");
             rec["x"] = me->pos().x();
@@ -195,7 +196,7 @@ protected:
         case QEvent::MouseButtonPress:
         case QEvent::MouseButtonRelease: {
             auto* me = static_cast<QMouseEvent*>(event);
-            QJsonObject rec;
+            QVariantMap rec;
             rec["t"] = qint64(elapsed);
             rec["type"] = event->type() == QEvent::MouseButtonPress
                 ? QStringLiteral("mousePress")
@@ -209,7 +210,7 @@ protected:
         case QEvent::KeyPress:
         case QEvent::KeyRelease: {
             auto* ke = static_cast<QKeyEvent*>(event);
-            QJsonObject rec;
+            QVariantMap rec;
             rec["t"] = qint64(elapsed);
             rec["type"] = event->type() == QEvent::KeyPress
                 ? QStringLiteral("keyPress") : QStringLiteral("keyRelease");
@@ -222,11 +223,11 @@ protected:
         }
         case QEvent::Wheel: {
             auto* we = static_cast<QWheelEvent*>(event);
-            QJsonObject rec;
+            QVariantMap rec;
             rec["t"] = qint64(elapsed);
             rec["type"] = QStringLiteral("wheel");
-            rec["x"] = we->posF().x();
-            rec["y"] = we->posF().y();
+            rec["x"] = we->position().x();
+            rec["y"] = we->position().y();
             rec["delta"] = we->angleDelta().y();
             events.append(rec);
             break;
@@ -269,34 +270,25 @@ static bool grabWindowTo(QQuickWindow* win, QString const& path) {
     return true;
 }
 
-static QString writeEventsJson(QString const& path, QJsonArray const& events) {
-    auto data = QJsonDocument(events).toJson(QJsonDocument::Indented);
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly))
-        Raise("QML_Tester: cannot write '{}'", path);
-    f.write(data);
-    return QString::fromUtf8(data);
-}
-
-static QJsonArray parseEventsArray(QByteArray const& json, QString const& what) {
+static QVariantList parseEventsArray(QByteArray const& json, QString const& what) {
     QJsonParseError err;
     auto doc = QJsonDocument::fromJson(json, &err);
     if (err.error != QJsonParseError::NoError || !doc.isArray())
         Raise("{}: not a JSON array", what);
-    return doc.array();
+    return doc.array().toVariantList();
 }
 
 // Feed a recorded event array back through QCoreApplication::sendEvent on `win`,
 // honouring the inter-event delays (divided by `speed`).
-static void replayEventsOn(QQuickWindow* win, QJsonArray const& events, double speed) {
+static void replayEventsOn(QQuickWindow* win, QVariantList const& events, double speed) {
     auto toGlobal = [win](qreal x, qreal y) { return win->mapToGlobal(QPoint(int(x), int(y))); };
     qint64 prevT = 0;
     for (auto const& val : events) {
-        auto obj = val.toObject();
-        qint64 t = qint64(obj["t"].toDouble());
+        auto obj = val.toMap();
+        qint64 t = obj["t"].toLongLong();
         qint64 delay = qMax(qint64(0), t - prevT);
         prevT = t;
-        if (delay > 0) busyWaitMs(static_cast<int>(delay / speed));
+        if (delay > 0) busyWaitMs(int(qRound(double(delay) / speed)));
 
         QString type = obj["type"].toString();
         if (type == "mousePress" || type == "mouseRelease" || type == "mouseMove") {
@@ -320,8 +312,8 @@ static void replayEventsOn(QQuickWindow* win, QJsonArray const& events, double s
         } else if (type == "wheel") {
             auto x = obj["x"].toDouble(), y = obj["y"].toDouble();
             int delta = obj["delta"].toInt();
-            QWheelEvent e(QPointF(x, y), toGlobal(x, y), QPoint(), QPoint(0, delta), delta,
-                          Qt::Vertical, Qt::NoButton, Qt::NoModifier);
+            QWheelEvent e(QPointF(x, y), toGlobal(x, y), QPoint(), QPoint(0, delta),
+                          Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
             QCoreApplication::sendEvent(win, &e);
         } else if (type == "screenshot") {
             auto spath = obj["path"].toString();
@@ -495,8 +487,8 @@ public:
         auto* win = checkWindow();
         auto gp = toGlobal(win, x, y);
         auto angleDelta = QPoint(0, delta);
-        QWheelEvent e(QPointF(x, y), gp, QPoint(), angleDelta, delta, Qt::Vertical,
-                       Qt::NoButton, Qt::NoModifier);
+        QWheelEvent e(QPointF(x, y), gp, QPoint(), angleDelta,
+                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
         QCoreApplication::sendEvent(win, &e);
         processEvents();
     }
@@ -549,16 +541,15 @@ public:
     }
 
     void startRecording() {
-        if (!recordFilter) recordFilter = new RecordFilter(_Inst);
+        if (!recordFilter)
+            recordFilter = new RecordFilter(_Inst);
         recordFilter->start();
-        qApp->installEventFilter(recordFilter);
     }
 
-    QString stopRecording(QString const& path) {
+    QVariantList stopRecording() {
         if (!recordFilter || !recordFilter->active)
             Raise("QML_Tester.record_stop: not recording");
-        qApp->removeEventFilter(recordFilter);
-        return writeEventsJson(path, recordFilter->stop());
+        return recordFilter->stop();
     }
 
     void replayFile(QString const& path, double speed) {
@@ -656,7 +647,7 @@ public:
     QVariant key_press(QVariantList a)   { pressKey(parseKey(a.value(0)), parseMods(a, 1), QString{}); return {}; }
     QVariant key_release(QVariantList a) { releaseKey(parseKey(a.value(0)), parseMods(a, 1), QString{}); return {}; }
 
-    QString record_stop(std::optional<QString> path) { return stopRecording(path.value_or(QString{})); }
+    QVariantList record_stop() { return stopRecording(); }
 };
 
 } // namespace qml_test
@@ -674,7 +665,6 @@ RADAPTER_API void gui::StartRecording(Instance* inst) {
     auto* rec = inst->_GetPrivate()->guiRecordFilter.data();
     if (!rec) rec = new qml_test::RecordFilter(inst);
     rec->start();
-    qApp->installEventFilter(rec);
 }
 
 // radapter.note(data) from QML: append a marker to the active --gui-record stream;
@@ -685,11 +675,10 @@ RADAPTER_API void gui::RecordNote(Instance* inst, QVariant const& data) {
         rec->addNote(data);
 }
 
-RADAPTER_API QString gui::StopRecording(Instance* inst, QString const& path) {
+RADAPTER_API QVariantList gui::StopRecording(Instance* inst) {
     auto* rec = inst->_GetPrivate()->guiRecordFilter.data();
     if (!rec || !rec->active) return {};
-    qApp->removeEventFilter(rec);
-    return qml_test::writeEventsJson(path, rec->stop());
+    return rec->stop();
 }
 
 RADAPTER_API void gui::ReplayFile(QString const& path, double speed) {

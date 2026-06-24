@@ -2,6 +2,7 @@
 #include <QThread>
 #include <QTimer>
 #include <QJsonDocument>
+#include <QFile>
 #include <efsw/efsw.hpp>
 #include <qctrlsignalhandler.h>
 #include "radapter/radapter.hpp"
@@ -120,9 +121,16 @@ public:
                 radapter::gui::StartRecording(inst);
                 std::cerr << "# --gui-record: recording to " << *recPath << std::endl;
 
-                auto saveRec = [this, path] {
+                auto saveRec = [this, path, saved = std::make_shared<bool>(false)] {
+                    if (*saved) return;
+                    *saved = true;
                     try {
-                        radapter::gui::StopRecording(inst, path);
+                        auto evs = radapter::gui::StopRecording(inst);
+                        auto data = QJsonDocument::fromVariant(evs).toJson(QJsonDocument::Indented);
+                        QFile f(path);
+                        if (!f.open(QIODevice::WriteOnly))
+                            radapter::Raise("QML_Tester: cannot write '{}'", path);
+                        f.write(data);
                     } catch (std::exception& e) {
                         std::cerr << "# --gui-record: save error: " << e.what() << std::endl;
                     }
