@@ -1,8 +1,10 @@
 #include "radapter/radapter.hpp"
 #include "builtin.hpp"
+#include "../binary_worker.hpp"
 #include <QProcess>
 #include <QCoreApplication>
 #include <QMetaEnum>
+#include <QJsonDocument>
 
 namespace radapter {
 
@@ -11,7 +13,8 @@ struct ProcessConfig : WorkerConfig {
     WithDefault<vector<QString>> arguments {};
     optional<QString> working_dir;
     WithDefault<bool> autostart = true;
-    WithDefault<bool> merge_stderr = false;   // fold stderr into the stdout data channel
+    WithDefault<bool> merge_stderr = false;
+    std::optional<BinaryConfig> binary;
 };
 
 RAD_DESCRIBE(ProcessConfig) {
@@ -21,21 +24,22 @@ RAD_DESCRIBE(ProcessConfig) {
     RAD_MEMBER(working_dir);
     RAD_MEMBER(autostart);
     RAD_MEMBER(merge_stderr);
+    RAD_MEMBER(binary);
 }
 
-// Wraps a child process (QProcess). stdout is the data channel (pipe(proc, fn));
-// stderr and lifecycle land on the event channel (proc.events): { stderr }, { started },
-// { finished=true, exit_code } on normal exit / { finished=true, signal=true } when killed
-// by a signal, { error }. Inbound messages (strings/bytes) are written to stdin.
-// The child is terminated when the worker is destroyed, so it never outlives the instance.
-class ProcessWorker : public Worker {
+// Wraps a child process (QProcess). stdout lands on the data channel: in text
+// mode as {stdout = <bytes>}, in binary mode through the BinaryWorker framing.
+// stderr and lifecycle land on the event channel. Inbound messages are written
+// to stdin (text mode: strings/bytes/JSON; binary mode: arbitrary objects via
+// msgpack framing through BinaryWorker::OnMsg).
+class ProcessWorker : public BinaryWorker {
     Q_OBJECT
 
     ProcessConfig config;
     QProcess* proc;
 public:
     ProcessWorker(ProcessConfig conf, Instance* inst) :
-        Worker(inst, EnsureName(conf, conf.program), "process")
+        BinaryWorker(conf.binary.value_or(BinaryConfig{}), inst, "process")
     {
         config = std::move(conf);
         if (config.program.isEmpty()) {
@@ -49,9 +53,17 @@ public:
             proc->setProcessChannelMode(QProcess::MergedChannels);
         }
 
-        connect(proc, &QProcess::readyReadStandardOutput, this, [this]{
-            emit SendMsgField("stdout", proc->readAllStandardOutput());
-        });
+        if (config.binary) {
+            connect(proc, &QProcess::readyReadStandardOutput, this, [this]{
+                auto data = proc->readAllStandardOutput();
+                ReceiveBinary(data);
+            });
+        } else {
+            connect(proc, &QProcess::readyReadStandardOutput, this, [this]{
+                emit SendMsgField("stdout", proc->readAllStandardOutput());
+            });
+        }
+
         connect(proc, &QProcess::readyReadStandardError, this, [this]{
             emit SendEventField("stderr", proc->readAllStandardError());
         });
@@ -63,8 +75,6 @@ public:
                 [this](int code, QProcess::ExitStatus status){
             QVariantMap ev{ {"finished", true} };
             if (status == QProcess::CrashExit) {
-                // QProcess has no public API for the signal number; surface that the
-                // process was terminated by a signal rather than exiting normally.
                 ev["signal"] = true;
                 Info("finished (terminated by signal)");
             } else {
@@ -95,6 +105,11 @@ public:
     }
 
     void OnMsg(QVariant const& msg) override {
+        if (config.binary) {
+            BinaryWorker::OnMsg(msg);
+            return;
+        }
+        // Text mode: write to stdin
         if (proc->state() != QProcess::Running) {
             Warn("stdin write ignored: process not running");
             return;
@@ -130,6 +145,11 @@ public:
         return {};
     }
 
+    void SendBinary(string_view buffer) override {
+        if (proc->state() == QProcess::Running)
+            proc->write(buffer.data(), qint64(buffer.size()));
+    }
+
     void Destroy() override {
         if (proc->state() != QProcess::NotRunning) {
             proc->terminate();
@@ -154,7 +174,6 @@ void builtin::workers::process(Instance* inst) {
     });
     inst->RegisterSchema<ProcessConfig>("Process");
 
-    // running-process info via Qt APIs — notably the path to spawn a sibling adapter
     inst->RegisterFunc("app_info", [](Instance*, QVariantList const&) -> QVariant {
         return QVariantMap{
             {"executable", QCoreApplication::applicationFilePath()},

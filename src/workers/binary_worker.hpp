@@ -55,9 +55,8 @@ public:
 protected:
 	void ReceiveBinary(QByteArray& buffer);
 	virtual void SendBinary(string_view buffer) = 0;
-private:
 	void OnMsg(QVariant const& msg) override;
-
+private:
 	struct Impl;
 	std::unique_ptr<Impl> d;
 };
