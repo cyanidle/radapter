@@ -220,9 +220,9 @@ void Parse(std::tuple<Ts...>& tup, QVariant const& conf, TraceFrame const& frame
 }
 
 template<typename T>
-T ParseAs(QVariant const& conf) {
+T ParseAs(QVariant const& conf, TraceFrame const& frame = {}) {
     T res;
-    Parse(res, conf);
+    Parse(res, conf, frame);
     return res;
 }
 

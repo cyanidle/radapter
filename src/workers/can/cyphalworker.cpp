@@ -292,8 +292,7 @@ public:
             Raise("Could not push msg of type: {}: Out of memory", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
     }
-    QVariant Request(std::tuple<RequestParams, QVariant, std::optional<LuaFunction>> args) {
-        auto& [params, msg, cb] = args;
+    QVariant Request(RequestParams params, QVariant msg, std::optional<LuaFunction> cb) {
         auto [req, resp] = lookup_service_types(params.type);
         if (!req || !resp)
             Raise("Could not find types for service: {}", params.type);

@@ -31,12 +31,11 @@ void RADAPTER_API luaL_requiref(lua_State *L, const char *modname, lua_CFunction
 void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
 }
 
-namespace detail {
-template<typename Cls, typename Ret, typename... Args>
-Cls* getcls(Ret(Cls::*)(Args...));
+struct WorkerArguments;
 
-template<typename T> struct is_tuple : std::false_type {};
-template<typename...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+namespace detail {
+template<typename R, typename Cls, typename...Args>
+static QVariant InvokeExtraMethod(Worker* self, R(Cls::*method)(Args...), WorkerArguments&& args);
 }
 
 class Instance;
@@ -65,11 +64,7 @@ struct WorkerArguments
 
     template<typename T>
     operator T() {
-        if constexpr (detail::is_tuple<T>::value) {
-            return ParseAs<T>(QVariant(args));
-        } else {
-            return ParseAs<T>(*this);
-        }
+        return ParseAs<T>(QVariant(*this));
     }
 };
 
@@ -84,12 +79,16 @@ Worker* FactoryFor(QVariantList const& args, Instance* parent) {
     return new T{WorkerArguments{args}, parent};
 }
 
-// If f takes QVariantList/QVariantList const&, pass args directly.
-// Otherwise f must take a single std::tuple<...> which is filled via Parse.
+// Adapts a worker member function to an ExtraMethod. Each parameter is parsed
+// positionally from the Lua call arguments (args[i] -> param i via Parse), and a
+// non-void/non-QVariant return is Dump'd back to a QVariant. As an escape hatch
+// for variadic/raw methods, a single-parameter method returning QVariant gets
+// the argument filled by WorkerArguments' implicit conversion: a QVariantList
+// parameter receives the whole argument list, any other type receives args[0].
+
 template<auto f>
 QVariant AsExtraMethod(Worker* w, QVariantList const& argList) {
-    using Cls = std::remove_pointer_t<decltype(detail::getcls(f))>;
-    return (static_cast<Cls*>(w)->*f)(WorkerArguments{argList});
+    return detail::InvokeExtraMethod(w, f, WorkerArguments{argList});
 }
 
 QVariant RADAPTER_API MakeFunction(ExtraFunction func);
@@ -193,6 +192,34 @@ void RADAPTER_API Flatten(FlatMap& out, QVariant const& input);
 void RADAPTER_API Unflatten(QVariant& out, FlatMap const& flat);
 //! @return amount of affected keys
 size_t RADAPTER_API MergePatch(QVariant& out, QVariant const& patch, QVariant* diff = nullptr);
+
+
+namespace detail {
+
+template<typename R, typename Cls, typename...Args, size_t...Is>
+static QVariant DoInvokeExtraMethod(Worker* _self, R(Cls::*method)(Args...), WorkerArguments& args, std::index_sequence<Is...>)
+{
+    Cls* self = static_cast<Cls*>(_self);
+    QVariant res;
+    TraceFrame root;
+    if constexpr (sizeof...(Args) == 1 && std::is_same_v<R, QVariant>) {
+        res = (self->*method)(args);
+    } else if constexpr (std::is_void_v<R>) {
+        (self->*method)(ParseAs<std::decay_t<Args>>(args.args.value(Is), TraceFrame(Is, root))...);
+    } else {
+        R ret = (self->*method)(ParseAs<std::decay_t<Args>>(args.args.value(Is), TraceFrame(Is, root))...);
+        Dump(ret, res);
+    }
+    return res;
+}
+
+template<typename R, typename Cls, typename...Args>
+static QVariant InvokeExtraMethod(Worker* _self, R(Cls::*method)(Args...), WorkerArguments&& args)
+{
+    return DoInvokeExtraMethod(_self, method, args, std::make_index_sequence<sizeof...(Args)>{});
+}
+
+}
 
 }
 

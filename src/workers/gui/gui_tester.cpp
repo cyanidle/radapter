@@ -423,6 +423,10 @@ private:
         return itemCenter();
     }
 
+    // Action methods below are bound straight to Lua by name where the C++
+    // signature already matches (see qml_test_init); wrappers exist only where a
+    // call needs default/optional/variadic handling.
+public:
     void runWait(int ms) { busyWaitMs(ms); }
 
     void mouseClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
@@ -577,87 +581,61 @@ private:
     }
 
     // ---- ExtraMethods (Lua-facing) ----
-    // Methods with 0 or 1 QVariant-convertible arg use WorkerArguments to avoid
-    // std::tuple's perfect-forwarding-ctor ambiguity (see TestWorker::Call for
-    // the pattern with radapter-specific types that don't have this issue).
-    // Methods with 2+ args use std::tuple<…> for structured unpacking.
+    // Arguments are bound positionally by AsExtraMethod: each parameter is parsed
+    // from the matching Lua call argument, trailing std::optional<…> params are
+    // absent-tolerant, and the return value is converted back for Lua. Genuinely
+    // variadic calls (key + modifiers) take the raw QVariantList.
 
 public:
-    QVariant wait(WorkerArguments a)               { runWait(a.args.value(0).toInt()); return {}; }
-    QVariant process_events(WorkerArguments)       { processEvents(); return {}; }
-
-    QVariant set_window(WorkerArguments a) {
-        auto arg = a.args.value(0);
+    void set_window(QVariant arg) {
         if (arg.type() == QVariant::Int || arg.type() == QVariant::LongLong)
             setWindowIndex(arg.toInt());
         else setWindowTitle(arg.toString());
-        return {};
     }
 
-    QVariant windows(WorkerArguments) {
+    QVariantList windows() {
         QVariantList vl;
         for (auto* w : allWindows()) { auto t = w->title(); vl.append(t.isEmpty() ? QStringLiteral("<untitled>") : t); }
         return vl;
     }
 
-    QVariant find(WorkerArguments a)           { return QVariant(findItem(a.args.value(0).toString()) != nullptr); }
-    QVariant find_all(WorkerArguments a)       { auto items = findItems(a.args.value(0).toString()); QVariantList vl; vl.reserve(items.size()); for (auto* it : items) vl.append(it->objectName()); return vl; }
-
-    QVariant prop(WorkerArguments a) {
-        if (a.args.size() == 1) return itemProperty(a.args.value(0).toString());
-        return itemProperty(a.args.value(0).toString(), a.args.value(1).toString());
+    bool find(QString name)            { return findItem(name) != nullptr; }
+    QVariantList find_all(QString name) {
+        auto items = findItems(name); QVariantList vl; vl.reserve(items.size());
+        for (auto* it : items) vl.append(it->objectName()); return vl;
     }
 
-    QVariant set_prop(WorkerArguments a) {
-        if (a.args.size() == 2) setItemProperty(a.args.value(0).toString(), a.args.value(1));
-        else setItemProperty(a.args.value(0).toString(), a.args.value(1).toString(), a.args.value(2));
-        return {};
+    QVariant prop(QString name, std::optional<QString> sub) {
+        return sub ? itemProperty(name, *sub) : itemProperty(name);
     }
 
-    QVariant center(WorkerArguments a) {
-        QPointF c = a.args.isEmpty() ? itemCenter() : itemCenter(a.args.value(0).toString());
-        QVariantList vl; vl.append(c.x()); vl.append(c.y()); return vl;
+    void set_prop(QString name, QVariant a, std::optional<QVariant> b) {
+        if (b) setItemProperty(name, a.toString(), *b);
+        else setItemProperty(name, a);
     }
 
-    // 2+ arg methods → safe for std::tuple (multi-element can't match single-arg ctor)
-    QVariant click(std::tuple<qreal, qreal, std::optional<QString>> a) {
-        auto& [x, y, btn] = a; mouseClick(x, y, btn.value_or(QStringLiteral("left"))); return {};
-    }
-    QVariant dblclick(std::tuple<qreal, qreal, std::optional<QString>> a) {
-        auto& [x, y, btn] = a; mouseDblClick(x, y, btn.value_or(QStringLiteral("left"))); return {};
-    }
-    QVariant press(std::tuple<qreal, qreal, std::optional<QString>> a) {
-        auto& [x, y, btn] = a; mousePress(x, y, btn.value_or(QStringLiteral("left"))); return {};
-    }
-    QVariant release(std::tuple<qreal, qreal, std::optional<QString>> a) {
-        auto& [x, y, btn] = a; mouseRelease(x, y, btn.value_or(QStringLiteral("left"))); return {};
-    }
-    QVariant move(std::tuple<qreal, qreal> a) {
-        auto& [x, y] = a; mouseMove(x, y); return {};
-    }
-    QVariant wheel(std::tuple<qreal, qreal, int> a) {
-        auto& [x, y, d] = a; mouseWheel(x, y, d); return {};
-    }
-    QVariant replay(std::tuple<QString, std::optional<double>> a) {
-        auto& [p, s] = a; replayFile(p, s.value_or(1.0)); return {};
-    }
-    QVariant replay_data(std::tuple<QString, std::optional<double>> a) {
-        auto& [j, s] = a; replayJson(j, s.value_or(1.0)); return {};
+    QVariantList center(std::optional<QString> name) {
+        QPointF c = name ? itemCenter(*name) : itemCenter();
+        return { c.x(), c.y() };
     }
 
-    // Vararg / optional-single-arg → WorkerArguments
-    QVariant click_item(WorkerArguments a) {
-        if (a.args.isEmpty()) clickItem(); else clickItem(a.args.value(0).toString()); return {};
+    void click(qreal x, qreal y, std::optional<QString> btn)    { mouseClick(x, y, btn.value_or(QStringLiteral("left"))); }
+    void dblclick(qreal x, qreal y, std::optional<QString> btn) { mouseDblClick(x, y, btn.value_or(QStringLiteral("left"))); }
+    void press(qreal x, qreal y, std::optional<QString> btn)    { mousePress(x, y, btn.value_or(QStringLiteral("left"))); }
+    void release(qreal x, qreal y, std::optional<QString> btn)  { mouseRelease(x, y, btn.value_or(QStringLiteral("left"))); }
+    void replay(QString path, std::optional<double> speed)      { replayFile(path, speed.value_or(1.0)); }
+    void replay_data(QString json, std::optional<double> speed) { replayJson(json, speed.value_or(1.0)); }
+
+    void click_item(std::optional<QString> name) {
+        if (name) clickItem(*name); else clickItem();
     }
 
-    QVariant key_click(WorkerArguments a)   { clickKey(parseKey(a.args.value(0)), parseMods(a.args, 1)); return {}; }
-    QVariant key_press(WorkerArguments a)   { pressKey(parseKey(a.args.value(0)), parseMods(a.args, 1), QString{}); return {}; }
-    QVariant key_release(WorkerArguments a) { releaseKey(parseKey(a.args.value(0)), parseMods(a.args, 1), QString{}); return {}; }
+    // key + arbitrary modifiers → raw arg list
+    QVariant key_click(QVariantList a)   { clickKey(parseKey(a.value(0)), parseMods(a, 1)); return {}; }
+    QVariant key_press(QVariantList a)   { pressKey(parseKey(a.value(0)), parseMods(a, 1), QString{}); return {}; }
+    QVariant key_release(QVariantList a) { releaseKey(parseKey(a.value(0)), parseMods(a, 1), QString{}); return {}; }
 
-    QVariant type(WorkerArguments a)          { typeText(a.args.value(0).toString()); return {}; }
-    QVariant screenshot(WorkerArguments a)    { return QVariant(doScreenshot(a.args.value(0).toString())); }
-    QVariant record_start(WorkerArguments)    { startRecording(); return {}; }
-    QVariant record_stop(WorkerArguments a)   { return QVariant(stopRecording(a.args.value(0).toString())); }
+    QString record_stop(std::optional<QString> path) { return stopRecording(path.value_or(QString{})); }
 };
 
 // ---------------------------------------------------------------------------
@@ -699,8 +677,8 @@ namespace builtin::workers {
 void qml_test_init(Instance* inst) {
     using namespace radapter::qml_test;
     inst->RegisterWorker<QML_Tester>("QML_Tester", {
-        {"wait",           AsExtraMethod<&QML_Tester::wait>},
-        {"process_events", AsExtraMethod<&QML_Tester::process_events>},
+        {"wait",           AsExtraMethod<&QML_Tester::runWait>},
+        {"process_events", AsExtraMethod<&QML_Tester::processEvents>},
         {"set_window",     AsExtraMethod<&QML_Tester::set_window>},
         {"windows",        AsExtraMethod<&QML_Tester::windows>},
         {"find",           AsExtraMethod<&QML_Tester::find>},
@@ -712,15 +690,15 @@ void qml_test_init(Instance* inst) {
         {"dblclick",       AsExtraMethod<&QML_Tester::dblclick>},
         {"press",          AsExtraMethod<&QML_Tester::press>},
         {"release",        AsExtraMethod<&QML_Tester::release>},
-        {"move",           AsExtraMethod<&QML_Tester::move>},
-        {"wheel",          AsExtraMethod<&QML_Tester::wheel>},
+        {"move",           AsExtraMethod<&QML_Tester::mouseMove>},
+        {"wheel",          AsExtraMethod<&QML_Tester::mouseWheel>},
         {"click_item",     AsExtraMethod<&QML_Tester::click_item>},
         {"key_click",      AsExtraMethod<&QML_Tester::key_click>},
         {"key_press",      AsExtraMethod<&QML_Tester::key_press>},
         {"key_release",    AsExtraMethod<&QML_Tester::key_release>},
-        {"type",           AsExtraMethod<&QML_Tester::type>},
-        {"screenshot",     AsExtraMethod<&QML_Tester::screenshot>},
-        {"record_start",   AsExtraMethod<&QML_Tester::record_start>},
+        {"type",           AsExtraMethod<&QML_Tester::typeText>},
+        {"screenshot",     AsExtraMethod<&QML_Tester::doScreenshot>},
+        {"record_start",   AsExtraMethod<&QML_Tester::startRecording>},
         {"record_stop",    AsExtraMethod<&QML_Tester::record_stop>},
         {"replay",         AsExtraMethod<&QML_Tester::replay>},
         {"replay_data",    AsExtraMethod<&QML_Tester::replay_data>},
