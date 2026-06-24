@@ -152,27 +152,6 @@ Loader {
                     Menu {
                         id: addMenu
 
-                        // ── Layout containers ──────────────────────────
-                        MenuItem {
-                            text: "Layout"
-                            enabled: false
-                            font { bold: true; italic: true }
-                        }
-                        MenuItem {
-                            text: "↔  Row"
-                            onTriggered: node.addRequested(node.path, "Row")
-                        }
-                        MenuItem {
-                            text: "↕  Column"
-                            onTriggered: node.addRequested(node.path, "Column")
-                        }
-                        MenuItem {
-                            text: "⊞  Grid"
-                            onTriggered: node.addRequested(node.path, "Grid")
-                        }
-
-                        MenuSeparator {}
-
                         // ── Built-in widgets ───────────────────────────
                         MenuItem {
                             text: "Widgets"
@@ -194,6 +173,27 @@ Loader {
                         MenuItem {
                             text: "◻  Spacer"
                             onTriggered: node.addRequested(node.path, "Spacer")
+                        }
+
+                        MenuSeparator {}
+
+                        // ── Layout containers ──────────────────────────
+                        MenuItem {
+                            text: "Layout"
+                            enabled: false
+                            font { bold: true; italic: true }
+                        }
+                        MenuItem {
+                            text: "↔  Row"
+                            onTriggered: node.addRequested(node.path, "Row")
+                        }
+                        MenuItem {
+                            text: "↕  Column"
+                            onTriggered: node.addRequested(node.path, "Column")
+                        }
+                        MenuItem {
+                            text: "⊞  Grid"
+                            onTriggered: node.addRequested(node.path, "Grid")
                         }
 
                         MenuSeparator {}
@@ -265,6 +265,10 @@ Loader {
         Item {
             implicitWidth: w.item ? w.item.implicitWidth : 120
             implicitHeight: w.item ? w.item.implicitHeight : 60
+            // Explicit size ensures the leaf MouseArea always covers a real area,
+            // even when the Loader chain's implicit-size propagation lags in Qt 5.
+            width: implicitWidth
+            height: implicitHeight
 
             Loader {
                 id: w
@@ -288,6 +292,7 @@ Loader {
                 visible: node.mode === "design" && node.pathEq(node.path, node.selectedPath)
             }
             MouseArea {
+                z: 1   // above the widget Loader (z 0), so clicks hit selection first
                 anchors.fill: parent
                 enabled: node.mode === "design"
                 onClicked: node.selectRequested(node.path)

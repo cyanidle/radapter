@@ -88,6 +88,11 @@ Item {
         selectedPath = path
         fields = fieldsFor(path ? nodeAt(path) : null)
     }
+    function deselectAll() {
+        selectedPath = null
+        _lastClickPath = null
+        fields = []
+    }
 
     // Canvas click selection cycles through the stack under the cursor: the first click on a
     // spot selects the deepest (lowest) node there; clicking the same spot again walks the
@@ -182,16 +187,24 @@ Item {
         clipboard = clone(nodeAt(selectedPath))
         removeSelected()
     }
-    // duplicate the clipboard node as the sibling right after the selection (the root has no
-    // siblings, so a copy of it — or a paste with nothing selected — appends into the root)
+    // Paste the clipboard node. If the selection is a container, paste into it as a new
+    // child; otherwise paste as the sibling right after the selection. With nothing selected
+    // (or the root), append into the root.
     function pasteClipboard() {
         if (!clipboard) return
         var node = clone(clipboard)
         if (selectedPath && selectedPath.length > 0) {
-            var parent = nodeAt(selectedPath.slice(0, -1))
-            var at = selectedPath[selectedPath.length - 1] + 1
-            parent.children.splice(at, 0, node)
-            selectedPath = selectedPath.slice(0, -1).concat([at])
+            var sel = nodeAt(selectedPath)
+            if (isContainerType(sel.type)) {
+                if (!sel.children) sel.children = []
+                sel.children.push(node)
+                selectedPath = selectedPath.concat([sel.children.length - 1])
+            } else {
+                var parent = nodeAt(selectedPath.slice(0, -1))
+                var at = selectedPath[selectedPath.length - 1] + 1
+                parent.children.splice(at, 0, node)
+                selectedPath = selectedPath.slice(0, -1).concat([at])
+            }
         } else {
             if (!viz.root.children) viz.root.children = []
             viz.root.children.push(node)
@@ -635,5 +648,11 @@ Item {
         }
         }   // DockablePanel hmiProps
     }       // DockHost
+    }
+
+    // Esc deselects whatever is selected
+    Shortcut {
+        sequence: "Escape"
+        onActivated: editor.deselectAll()
     }
 }
