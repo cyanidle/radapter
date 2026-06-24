@@ -53,7 +53,7 @@ static QByteArray dumpMsgpackProto(QVariant const& msg) {
 	jv::DefaultArena alloc;
 	auto json = jv::JsonView::From(msg, alloc);
     membuff::StringOut<QByteArray> buff;
-    DumpJsonInto(buff, json);
+    DumpMsgPackInto(buff, json);
     return buff.Consume();
 }
 
