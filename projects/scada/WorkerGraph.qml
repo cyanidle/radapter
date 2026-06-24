@@ -222,6 +222,15 @@ Item {
                         spacing: 4
                         property var group: modelData
 
+                        // a card's absolute position also shifts when its group is
+                        // (re)positioned by the outer layout — e.g. after a delete rebuilds
+                        // the groups, the polish pass moves this delegate from y=0 to its
+                        // row without touching any card's local y. Repaint so the pipe
+                        // arrows follow (the card-level onX/YChanged only catch reflow
+                        // *within* a group).
+                        onYChanged: graph.repaintArrows()
+                        onXChanged: graph.repaintArrows()
+
                         Label {
                             text: group.type + "  (" + group.names.length + ")"
                             font.bold: true
@@ -283,6 +292,7 @@ Item {
         id: nodeCard
         Rectangle {
             id: card
+            objectName: "card_" + nodeName
             property string nodeName: modelData
             property bool connectable: graph.isConnectable(nodeName)
             // recompute when pipes change (revision used in a branch so it stays a dep)
@@ -379,6 +389,7 @@ Item {
                 }
 
                 Button {
+                    objectName: "del_" + card.nodeName
                     text: "✕"
                     implicitWidth: 24
                     implicitHeight: 24
