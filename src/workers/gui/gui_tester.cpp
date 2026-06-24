@@ -16,6 +16,7 @@
 
 #include "radapter/radapter.hpp"
 #include "builtin.hpp"
+#include "instance_impl.hpp"
 
 namespace radapter {
 namespace qml_test {
@@ -122,12 +123,15 @@ class RecordFilter : public QObject {
 public:
     QJsonArray events;
     QElapsedTimer timer;
+    Instance* inst;
     bool active = false;
     std::optional<QJsonObject> pendingMove;   // last move, flushed before the next non-move
 
-    explicit RecordFilter(QObject* parent = nullptr) : QObject(parent) {}
+    explicit RecordFilter(Instance* inst = nullptr) : QObject(inst), inst(inst) {
+    }
 
     void start() {
+        inst->_GetPrivate()->guiRecordFilter = this;
         events = QJsonArray{};
         pendingMove.reset();
         timer.start();
@@ -135,6 +139,7 @@ public:
     }
 
     QJsonArray stop() {
+        inst->_GetPrivate()->guiRecordFilter = nullptr;
         active = false;
         flushPendingMove();
         return events;
@@ -544,7 +549,7 @@ public:
     }
 
     void startRecording() {
-        if (!recordFilter) recordFilter = new RecordFilter(this);
+        if (!recordFilter) recordFilter = new RecordFilter(_Inst);
         recordFilter->start();
         qApp->installEventFilter(recordFilter);
     }
@@ -609,10 +614,16 @@ public:
         return vl;
     }
 
-    bool find(QString name)            { return findItem(name) != nullptr; }
+    bool find(QString name) {
+        return findItem(name) != nullptr;
+    }
+
     QVariantList find_all(QString name) {
-        auto items = findItems(name); QVariantList vl; vl.reserve(items.size());
-        for (auto* it : items) vl.append(it->objectName()); return vl;
+        auto items = findItems(name);
+        QVariantList vl; vl.reserve(items.size());
+        for (auto* it : items)
+            vl.append(it->objectName());
+        return vl;
     }
 
     QVariant prop(QString name, std::optional<QString> sub) {
@@ -660,7 +671,7 @@ public:
 // ---------------------------------------------------------------------------
 
 RADAPTER_API void gui::StartRecording(Instance* inst) {
-    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+    auto* rec = inst->_GetPrivate()->guiRecordFilter.data();
     if (!rec) rec = new qml_test::RecordFilter(inst);
     rec->start();
     qApp->installEventFilter(rec);
@@ -669,12 +680,13 @@ RADAPTER_API void gui::StartRecording(Instance* inst) {
 // radapter.note(data) from QML: append a marker to the active --gui-record stream;
 // noop when no recording is running.
 RADAPTER_API void gui::RecordNote(Instance* inst, QVariant const& data) {
-    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
-    if (rec && rec->active) rec->addNote(data);
+    auto* rec = inst->_GetPrivate()->guiRecordFilter.data();
+    if (rec && rec->active)
+        rec->addNote(data);
 }
 
 RADAPTER_API QString gui::StopRecording(Instance* inst, QString const& path) {
-    auto* rec = inst->findChild<qml_test::RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+    auto* rec = inst->_GetPrivate()->guiRecordFilter.data();
     if (!rec || !rec->active) return {};
     qApp->removeEventFilter(rec);
     return qml_test::writeEventsJson(path, rec->stop());

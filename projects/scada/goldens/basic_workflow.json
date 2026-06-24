@@ -1,0 +1,55 @@
+[
+    {
+        "data": "app:loaded",
+        "t": 84,
+        "type": "note"
+    },
+    {
+        "btn": "left",
+        "t": 1590,
+        "type": "mousePress",
+        "x": 381,
+        "y": 102
+    },
+    {
+        "btn": "left",
+        "t": 1590,
+        "type": "mouseRelease",
+        "x": 381,
+        "y": 102
+    },
+    {
+        "data": "configurator:selected|modbusMaster1|ModbusMaster",
+        "t": 1609,
+        "type": "note"
+    },
+    {
+        "data": "worker:added|ModbusMaster|modbusMaster1",
+        "t": 1609,
+        "type": "note"
+    },
+    {
+        "btn": "left",
+        "t": 2117,
+        "type": "mousePress",
+        "x": 381,
+        "y": 102
+    },
+    {
+        "btn": "left",
+        "t": 2117,
+        "type": "mouseRelease",
+        "x": 381,
+        "y": 102
+    },
+    {
+        "data": "configurator:selected|modbusMaster2|ModbusMaster",
+        "t": 2126,
+        "type": "note"
+    },
+    {
+        "data": "worker:added|ModbusMaster|modbusMaster2",
+        "t": 2126,
+        "type": "note"
+    }
+]

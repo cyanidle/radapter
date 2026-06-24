@@ -4,6 +4,10 @@
 #include "builtin.hpp"
 #include "tags.hpp"
 
+namespace radapter::qml_test {
+class RecordFilter;
+}
+
 struct radapter::Instance::Impl {
     lua_State* L;
     lua_State* currentCaller = nullptr; // thread invoking a worker factory (may be a coroutine)
@@ -18,6 +22,8 @@ struct radapter::Instance::Impl {
     int luaLogHandler = LUA_NOREF;
     unsigned logCatLen = 12;
     optional<fs::path> currentFile;
+    QPointer<qml_test::RecordFilter> guiRecordFilter;
+
 
     static int luaLog(lua_State* L);
     static int log_level(lua_State* L);

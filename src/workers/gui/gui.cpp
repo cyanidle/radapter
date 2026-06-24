@@ -254,7 +254,9 @@ GuiModel* GuiInstanceProxy::model() const { return w->dataModel(); }
 QObject* GuiInstanceProxy::tags() const { return w->tagsProxy(); }
 QObject* GuiInstanceProxy::quality() const { return w->qualityProxy(); }
 void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeout); }
-void GuiInstanceProxy::note(QVariant const& data) { gui::RecordNote(w->_Inst, data); }
+void GuiInstanceProxy::note(QVariant const& data) {
+    gui::RecordNote(w->_Inst, data);
+}
 
 }
 

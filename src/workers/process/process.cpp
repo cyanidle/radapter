@@ -50,7 +50,7 @@ public:
         }
 
         connect(proc, &QProcess::readyReadStandardOutput, this, [this]{
-            emit SendMsg(proc->readAllStandardOutput());
+            emit SendMsgField("stdout", proc->readAllStandardOutput());
         });
         connect(proc, &QProcess::readyReadStandardError, this, [this]{
             emit SendEventField("stderr", proc->readAllStandardError());
