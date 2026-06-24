@@ -37,6 +37,7 @@ static int workers_index(lua_State* L) {
 void Instance::EnableGui() {
     if constexpr (GUI) {
         builtin::workers::gui(this);
+        builtin::workers::qml_test_init(this);
     } else {
         Raise("GUI support was not enabled during build");
     }
@@ -183,6 +184,7 @@ Instance::Instance(QObject *parent) :
     // reports the cause instead of a bare "attempt to call/index a nil value". The
     // real value overwrites the stub when the feature is enabled.
     registerUnavailable(L, "QML", "QML worker is unavailable: run with --gui (needs a RADAPTER_GUI build)");
+    registerUnavailable(L, "QML_Tester", "QML_Tester is unavailable: run with --gui (needs a RADAPTER_GUI build)");
     registerUnavailable(L, "tags", "tag API is unavailable: run with --tags");
 }
 

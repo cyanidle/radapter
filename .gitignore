@@ -13,3 +13,4 @@ toolchains/
 .claude/
 .mcp.json
 build*/
+qml_record.json

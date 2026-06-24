@@ -459,6 +459,135 @@ function QML(params) end;
 ---@param qmlSource string
 function QML(qmlSource) end;
 
+-- QML UI test worker (available only with --gui).  Construct with no arguments.
+---@class QML_Tester : Worker
+QML_Tester = {}
+
+---Process events for `ms` milliseconds, blocking.
+---@param ms integer
+function QML_Tester:wait(ms) end
+
+---Process all pending events (single pass, non-blocking).
+function QML_Tester:process_events() end
+
+---Select the current window by index (0-based) or title substring.
+---@param idx_or_title integer|string
+function QML_Tester:set_window(idx_or_title) end
+
+---Return a list of window titles (1-based Lua array).
+---@return string[]
+function QML_Tester:windows() end
+
+---Find an item by objectName in the current window. Sets it as current item.
+---@param objectName string
+---@return boolean true if found
+function QML_Tester:find(objectName) end
+
+---Return the objectNames of all items matching `objectName` in the current window.
+---@param objectName string
+---@return string[]
+function QML_Tester:find_all(objectName) end
+
+---Read a property of the current item, or of a named item.
+---@overload fun(self: QML_Tester, propName: string): any
+---@overload fun(self: QML_Tester, itemName: string, propName: string): any
+function QML_Tester:prop(itemName, propName) end
+
+---Set a property on the current item, or on a named item.
+---@overload fun(self: QML_Tester, propName: string, value: any)
+---@overload fun(self: QML_Tester, itemName: string, propName: string, value: any)
+function QML_Tester:set_prop(itemName, propName, value) end
+
+---Return the center (x, y) of the current item in window coordinates.
+---@overload fun(self: QML_Tester): number, number
+---@overload fun(self: QML_Tester, itemName: string): number, number
+function QML_Tester:center(itemName) end
+
+---Left-click at window coordinates (x, y).  Optional button: "left" (default), "right", "middle".
+---@param x number
+---@param y number
+---@param button? string
+function QML_Tester:click(x, y, button) end
+
+---Double-click at window coordinates (x, y).
+---@param x number
+---@param y number
+---@param button? string
+function QML_Tester:dblclick(x, y, button) end
+
+---Mouse press (without release) at (x, y).
+---@param x number
+---@param y number
+---@param button? string
+function QML_Tester:press(x, y, button) end
+
+---Mouse release at (x, y).
+---@param x number
+---@param y number
+---@param button? string
+function QML_Tester:release(x, y, button) end
+
+---Move the mouse to (x, y).
+---@param x number
+---@param y number
+function QML_Tester:move(x, y) end
+
+---Scroll wheel at (x, y) by delta (positive = up).
+---@param x number
+---@param y number
+---@param delta integer
+function QML_Tester:wheel(x, y, delta) end
+
+---Click the center of the current item, or of a named item.
+---@param objectName? string
+function QML_Tester:click_item(objectName) end
+
+---Press and release a key.  Optional modifiers: "shift", "ctrl", "alt", "meta".
+---Key names are case-insensitive ("return", "RETURN", "Return" all work).
+---@param key string|integer key name (e.g. "Return", "Tab", "A") or Qt key code
+---@param ... string optional modifier strings
+function QML_Tester:key_click(key, ...) end
+
+---Press a key (without release).
+---@param key string|integer
+---@param ... string
+function QML_Tester:key_press(key, ...) end
+
+---Release a held key.
+---@param key string|integer
+---@param ... string
+function QML_Tester:key_release(key, ...) end
+
+---Type a string of text, one character at a time (with 5ms gaps).
+---@param text string
+function QML_Tester:type(text) end
+
+---Save a screenshot of the current window to `path` (PNG).
+---@param path string
+---@return boolean true on success
+function QML_Tester:screenshot(path) end
+
+---Start recording user input events on the current window.
+function QML_Tester:record_start() end
+
+---Stop recording and save the event log to `path` (JSON).
+---@param path string
+---@return string the JSON content
+function QML_Tester:record_stop(path) end
+
+---Replay a recorded event log from a JSON file.
+---@param path string
+---@param speed? number replay speed multiplier (default 1.0)
+function QML_Tester:replay(path, speed) end
+
+---Replay events from an inline JSON string.
+---@param json string
+---@param speed? number
+function QML_Tester:replay_data(json, speed) end
+
+---@return QML_Tester
+function QML_Tester() end
+
 ---@class RedisCacheWorker: Worker
 RedisCacheWorker = {}
 

@@ -10,6 +10,12 @@
 #ifdef RADAPTER_GUI
 #include <QGuiApplication>
 #include <QApplication>
+// CLI record/replay entry points, defined in the GUI build of radapter-sdk.
+namespace radapter::qml_test {
+    RADAPTER_API void StartGuiRecording(radapter::Instance* inst);
+    RADAPTER_API QString StopGuiRecording(radapter::Instance* inst, QString const& path);
+    RADAPTER_API void ReplayGuiFile(QString const& path, double speed);
+}
 #endif
 
 #ifdef Q_OS_UNIX
@@ -108,8 +114,28 @@ public:
             shutdown();
         });
 
-        if (radapter::GUI && (config->cli["gui"] == true || config->cli["gui-no-auto-quit"] == true)) {
+        if (radapter::GUI && qobject_cast<QGuiApplication*>(qApp)) {
             inst->EnableGui();
+        }
+
+        // --gui-record: start recording before user code runs (so windows created
+        // during eval are captured) and save on any exit path.
+        if constexpr (radapter::GUI) {
+            if (auto recPath = config->cli.present<std::string>("gui-record")) {
+                auto path = QString::fromStdString(*recPath);
+                radapter::qml_test::StartGuiRecording(inst);
+                std::cerr << "# --gui-record: recording to " << *recPath << std::endl;
+
+                auto saveRec = [this, path] {
+                    try {
+                        radapter::qml_test::StopGuiRecording(inst, path);
+                    } catch (std::exception& e) {
+                        std::cerr << "# --gui-record: save error: " << e.what() << std::endl;
+                    }
+                };
+                QObject::connect(inst, &radapter::Instance::ShutdownRequest, saveRec);
+                QObject::connect(qApp, &QCoreApplication::aboutToQuit, saveRec);
+            }
         }
 
         if (config->cli["tags"] == true) {
@@ -145,6 +171,23 @@ public:
         if (auto f = config->cli.present("file")) {
             inst->EvalFile(radapter::fs::u8path(*f));
         }
+
+        // --gui-replay: once the event loop is running and windows exist, replay the
+        // recorded events then exit. The single-shot fires after eval, inside the loop.
+        if constexpr (radapter::GUI) {
+            if (auto replayPath = config->cli.present<std::string>("gui-replay")) {
+                auto path = QString::fromStdString(*replayPath);
+                QTimer::singleShot(1000, qApp, [this, path] {
+                    try {
+                        radapter::qml_test::ReplayGuiFile(path, 1.0);
+                    } catch (std::exception& e) {
+                        std::cerr << "# --gui-replay error: " << e.what() << std::endl;
+                    }
+                    inst->Shutdown();
+                });
+            }
+        }
+
         if (config->listener) {
             QObject::connect(config->listener, &Listener::FileChanged, this, [this] {
                 if (g_reloading)
@@ -198,7 +241,7 @@ int main (int argc, char **argv) try {
     std::unique_ptr<QCoreApplication> app;
 #ifdef RADAPTER_GUI
     for (auto it = argv; it != argv + argc; ++it) {
-        if (strcmp(*it, "--gui") == 0 || strcmp(*it, "--gui-no-auto-quit") == 0) {
+        if (strncmp(*it, "--gui", 5) == 0) {
             // QApplication, not QGuiApplication: QtCharts' QML module renders through
             // QtWidgets and crashes without a widget-capable application instance.
             auto gapp = new QApplication(argc, argv);
@@ -252,6 +295,10 @@ int main (int argc, char **argv) try {
         cli.add_argument("--gui-no-auto-quit")
             .flag()
             .help("Like --gui, but keep running after the last GUI window is closed");
+        cli.add_argument("--gui-record")
+            .help("Implies --gui. Record all GUI interactions to a JSON file for later replay");
+        cli.add_argument("--gui-replay")
+            .help("Implies --gui. Replay a recorded JSON file of GUI interactions, then exit");
     }
     cli.add_argument("--watch-dir", "-w")
         .append()
@@ -293,9 +340,12 @@ int main (int argc, char **argv) try {
         return 1;
     }
 #ifdef RADAPTER_GUI
-        // auto-quit on last window close is the default for --gui; --gui-no-auto-quit opts out
-        if (cli["gui"] == true && cli["gui-no-auto-quit"] != true) {
-            static_cast<QGuiApplication*>(app.get())->setQuitOnLastWindowClosed(true);
+        // auto-quit on last window close is the default for any --gui* mode;
+        // --gui-no-auto-quit opts out
+        if (cli["gui-no-auto-quit"] != true) {
+            if (auto* guiApp = qobject_cast<QGuiApplication*>(app.get())) {
+                guiApp->setQuitOnLastWindowClosed(true);
+            }
         }
 #endif
 

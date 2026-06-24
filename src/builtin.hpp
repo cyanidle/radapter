@@ -190,6 +190,7 @@ namespace workers {
 inline int Marker;
 
 void gui(Instance* inst);
+void qml_test_init(Instance* inst);
 void test(Instance* inst);
 void modbus(Instance* inst);
 void websocket(Instance* inst);

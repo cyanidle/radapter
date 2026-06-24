@@ -183,6 +183,100 @@ Self-checking scripts under `tests/` that the binary runs and exits 0/1 on:
 | `tests/modbus_loopback.lua` | Deep ModbusSlave ↔ ModbusMaster loopback |
 | `tests/tags.lua` | Tag system (run with `--tags`) |
 
+## GUI testing (offscreen)
+
+The `QML_Tester` worker (available with `--gui`) lets you script QML UI interactions,
+capture screenshots, and record/replay sessions — all headless under
+`QT_QPA_PLATFORM=offscreen`, no display needed:
+
+```bash
+QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
+local qt = QML_Tester()
+local view = QML { url = "projects/scada/Configurator.qml",
+    properties = { pickable_types = {}, initial_schemas = {} } }
+qt:wait(500)
+qt:screenshot("/tmp/configurator.png")
+shutdown()
+'
+```
+
+### Finding and inspecting items
+
+Assign `objectName` in QML, then locate and inspect from Lua:
+
+```lua
+local qt = QML_Tester()
+qt:windows()                              -- list open QML window titles
+qt:set_window(0)                          -- select window by index (or title substring)
+qt:find("submitBtn")                      -- find item by objectName; returns boolean
+qt:find_all("regRow")                     -- all matching items
+qt:prop("submitBtn", "text")              -- read a QML property
+qt:prop("enabled")                        -- read property of the current item (last :find result)
+qt:set_prop("label", "text", "OK")        -- set a property
+local cx, cy = qt:center("btn")           -- get center coordinates in window space
+```
+
+### Emulating input
+
+```lua
+qt:click(200, 150)                        -- left-click at window coordinates
+qt:click(200, 150, "right")               -- right-click
+qt:dblclick(200, 150)                    -- double-click
+qt:click_item("submitBtn")                -- click the center of a found item
+qt:move(300, 200)                         -- mouse move
+qt:wheel(200, 150, 120)                   -- scroll wheel (delta)
+qt:key_click("Return")                   -- press + release a key
+qt:key_click("A", "ctrl")                -- with modifiers ("shift","ctrl","alt","meta")
+qt:key_press("Shift")                    -- press without releasing
+qt:key_release("Shift")                  -- release a held key
+qt:type("hello world")                   -- type a string one character at a time
+```
+
+Key names are case-insensitive: `"return"`, `"Return"`, `"RETURN"` all work. Supported names:
+`"Return"`, `"Enter"`, `"Tab"`, `"Backspace"`, `"Space"`, `"Escape"`,
+`"Left"`/`"Right"`/`"Up"`/`"Down"`, `"Home"`, `"End"`, `"PageUp"`/`"PageDown"`,
+`"Insert"`, `"Delete"`, `"F1"`–`"F35"`, `"A"`–`"Z"`, `"0"`–`"9"`, `"Shift"`,
+`"Control"`/`"Ctrl"`, `"Alt"`, `"Meta"`. Raw Qt key codes (integers) are also accepted.
+
+### Screenshots
+
+```lua
+qt:screenshot("/tmp/result.png")          -- save window contents to PNG; returns boolean
+```
+
+### Record and replay
+
+Record real user interactions (mouse clicks, moves, key presses, wheel events) to a JSON
+file, then replay them later — useful for regression testing:
+
+```lua
+-- Record a session (user interacts manually while the script waits)
+qt:record_start()
+after(30000, function()
+    local json = qt:record_stop("/tmp/session.json")
+    shutdown()
+end)
+
+-- Replay at original speed, or 2x faster
+qt:replay("/tmp/session.json")
+qt:replay("/tmp/session.json", 2.0)
+
+-- Replay from an inline JSON string
+qt:replay_data(json_string, 5.0)
+```
+
+Replay injects the same Qt events (`QMouseEvent`, `QKeyEvent`, `QWheelEvent`) through
+`QCoreApplication::sendEvent()` with the original inter-event delays (divided by the
+speed multiplier). The recording format is a JSON array of `{t, type, x, y, btn, key,
+mods, text, delta}` objects.
+
+### Waiting
+
+```lua
+qt:wait(500)                              -- block and process events for N ms
+qt:process_events()                       -- single non-blocking pass through the event loop
+```
+
 ## Special thanks
 
 - smokie-l for inspiration

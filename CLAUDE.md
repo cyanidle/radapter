@@ -33,6 +33,7 @@ build/bin/radapter --schema
 build/bin/radapter --watch-dir . examples/modbus/modbus.lua  # hot reload on file change
 build/bin/radapter --gui examples/chat/client.lua  # quits when the last window closes
 build/bin/radapter --gui-no-auto-quit examples/chat/client.lua  # keep running after the window closes
+build/bin/radapter --gui --gui-record /tmp/out.json script.lua  # record all GUI interactions
 build/bin/radapter --debug tests/basic.lua          # Mobdebug remote debugger :8172
 build/bin/radapter --debug-vscode tests/basic.lua   # VSCode Mobdebug variant
 build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables QML
@@ -110,25 +111,111 @@ event loop keeps running and the process hangs instead of exiting on success.
 #### Offscreen visual verification with screenshots
 
 For QML changes, prefer capturing a screenshot to verify rendering. Use `QT_QPA_PLATFORM=offscreen`
-and a small QML inline script that calls `grabToImage` from within QML (QML items have this
-method natively; it's not exposed as a worker extra method):
+and the `QML_Tester` worker (available under `--gui`) to script interactions and capture
+screenshots directly from Lua — no QML-side hooks needed:
 
-```lua
--- QML-side grabs itself on a timer and saves to /tmp; the Lua side just opens the window
--- and shuts down after giving the timer time to fire.
-local view = QML {
-    url = "projects/scada/Configurator.qml",
-    properties = { grab_path = "/tmp/radapter_smoke.png" },
-}
-after(2, function() shutdown() end)
+```bash
+QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
+local qt = QML_Tester()
+local view = QML { url = "projects/scada/Configurator.qml",
+    properties = { pickable_types = {}, initial_schemas = {} } }
+qt:wait(500)
+qt:screenshot("/tmp/radapter_smoke.png")
+shutdown()
+'
 ```
-
-In the QML add a `Connections` or `Timer` that calls `root.grabToImage(...)` and saves the
-result once the window is painted. Alternatively just rely on stderr silence: QML runtime
-errors (broken anchors, null references) print to stderr and the smoke test fails.
 
 After the test, inspect with `Read /tmp/radapter_smoke.png` — Claude Code can display PNGs
 inline, making it easy to spot rendering regressions (blank areas, layout collapse, etc.).
+
+##### Emulating UI input with `QML_Tester`
+
+The `QML_Tester` worker can find QML items by `objectName`, read/write their properties,
+inject mouse/keyboard events, and record/replay interaction sequences:
+
+```lua
+local qt = QML_Tester()
+qt:wait(500)                            -- let the window render
+qt:windows()                            -- list open QML windows
+qt:find("submitBtn")                    -- locate an item by objectName
+qt:prop("submitBtn", "text")            -- read a QML property
+qt:set_prop("label", "text", "Done")    -- set a property
+qt:click_item("submitBtn")              -- click center of an item
+qt:click(200, 150)                     -- click at window coordinates
+qt:key_click("Return")                 -- press a key
+qt:type("hello")                       -- type text into focused control
+qt:screenshot("/tmp/out.png")          -- capture window to PNG
+
+-- Record a sequence of interactions, then replay it at 2x speed
+qt:record_start()
+qt:click(100, 200)
+qt:key_click("Tab")
+qt:replay_data(qt:record_stop("/tmp/rec.json"), 2.0)
+```
+
+Keys are named (`"Return"`, `"Tab"`, `"Escape"`, `"A"`, `"F1"`, …) or raw Qt key codes.
+Key names are case-insensitive. Optional modifiers: `qt:key_click("A", "ctrl")` for Ctrl+A.
+Mouse buttons: `qt:click(x, y, "right")` / `"middle"` (default `"left"`).
+
+To make an item findable, set `objectName` on it in QML:
+```qml
+Button { objectName: "submitBtn"; text: "Submit" }
+```
+
+The tool records timestamps, coordinates, key codes, and button types. Replay injects the
+same Qt events with the original delays (divided by the speed multiplier). Recording
+captures real user input (mouse/key events via an event filter on the QQuickWindow);
+replay feeds them back through `QCoreApplication::sendEvent()`.
+
+##### Serious QML testing workflow
+
+After making QML changes, verify them systematically — don't just eyeball the code:
+
+1. **Screenshot the relevant state.** Use `QT_QPA_PLATFORM=offscreen` with `QML_Tester`:
+   ```bash
+   QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
+   local qt = QML_Tester()
+   QML { url = "projects/scada/Configurator.qml", properties = { ... } }
+   qt:wait(500)
+   qt:screenshot("/tmp/before.png")
+   shutdown()
+   '
+   ```
+   Inspect with `Read /tmp/before.png` — blank areas, layout collapse, clipped text are
+   immediately visible.
+
+2. **Emulate interactions and capture the result.** Script clicks, key presses, and text
+   entry; screenshot after each step:
+   ```lua
+   qt:click_item("addWorkerBtn")
+   qt:wait(300)
+   qt:click_item("ModbusMaster")
+   qt:wait(300)
+   qt:screenshot("/tmp/after_add.png")
+   ```
+
+3. **Record/replay for rapid iteration.** Record a sequence once, replay it at speed:
+   ```lua
+   qt:record_start()
+   -- … interact manually or via script …
+   local json = qt:record_stop("/tmp/seq.json")
+   -- Then replay at 2x, 5x speed:
+   qt:replay("/tmp/seq.json", 2.0)
+   ```
+   Use `replay_data` to embed the JSON inline in a test snippet.
+
+4. **Use `--gui-record` to capture full sessions.** Launch with `--gui-record <path>` to
+   automatically record every GUI interaction from startup to shutdown (path is mandatory):
+   ```bash
+   build/bin/radapter --gui --gui-record /tmp/session.json script.lua
+   ```
+   The recording is saved on exit (normal shutdown, Ctrl+C, reload, or last-window-close).
+
+5. **For difficult bugs, ask the user to record a reproduction.** If a QML bug resists
+   scripting (complex drag-and-drop, timing-dependent behavior, a mystery interaction),
+   ask: *"Could you record a JSON reproduction with `--gui-record /tmp/bug.json` and share
+   it?"* The recording captures exact mouse/key/wheel events with timestamps — replay it
+   verbatim, or inspect the JSON to understand the trigger sequence.
 
 Always run tests with some timeout provided to avoid hanging
 
