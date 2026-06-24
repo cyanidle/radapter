@@ -48,8 +48,12 @@ Item {
     function clearSelection() { selected = ""; selectionCleared() }
 
     function registerCard(name, item) { cardItems[name] = item; repaintArrows() }
-    function unregisterCard(name) {
-        if (cardItems[name] !== undefined) { delete cardItems[name]; repaintArrows() }
+    // identity-guarded: when the Repeater resets (e.g. a worker is removed) it recreates
+    // every card — the new card registers under its name BEFORE the old one is destroyed,
+    // so an unconditional delete here would wipe the live entry and the pipe arrows touching
+    // it would vanish. Only forget the card if the stored item is still this one.
+    function unregisterCard(name, item) {
+        if (cardItems[name] === item) { delete cardItems[name]; repaintArrows() }
     }
     // two overlays: unselected pipes paint BELOW the cards, the selected worker's pipes paint
     // ABOVE them (so a selected worker's connections pop to the front)
@@ -298,7 +302,7 @@ Item {
             // register with the graph so the pipe-arrow overlay can find this card, and
             // repaint the arrows whenever the card moves (Flow reflow) or is removed
             Component.onCompleted: graph.registerCard(nodeName, card)
-            Component.onDestruction: graph.unregisterCard(nodeName)
+            Component.onDestruction: graph.unregisterCard(nodeName, card)
             onXChanged: graph.repaintArrows()
             onYChanged: graph.repaintArrows()
 
