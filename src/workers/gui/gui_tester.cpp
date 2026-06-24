@@ -140,6 +140,16 @@ public:
         return events;
     }
 
+    // interleave a debug marker into the recording (radapter.note from QML)
+    void addNote(QString const& msg) {
+        flushPendingMove();
+        QJsonObject rec;
+        rec["type"] = QStringLiteral("note");
+        rec["t"] = qint64(timer.elapsed());
+        rec["msg"] = msg;
+        events.append(rec);
+    }
+
 private:
     void flushPendingMove() {
         if (pendingMove) { events.append(*pendingMove); pendingMove.reset(); }
@@ -651,6 +661,13 @@ RADAPTER_API void StartGuiRecording(Instance* inst) {
     if (!rec) rec = new RecordFilter(inst);
     rec->start();
     qApp->installEventFilter(rec);
+}
+
+// radapter.note(msg) from QML: append a marker to the active --gui-record stream;
+// noop when no recording is running.
+RADAPTER_API void RecordGuiNote(Instance* inst, QString const& msg) {
+    auto* rec = inst->findChild<RecordFilter*>(QString{}, Qt::FindDirectChildrenOnly);
+    if (rec && rec->active) rec->addNote(msg);
 }
 
 RADAPTER_API QString StopGuiRecording(Instance* inst, QString const& path) {

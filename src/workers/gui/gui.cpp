@@ -11,6 +11,10 @@
 #include <memory>
 #include <unordered_map>
 
+namespace radapter::qml_test {
+    RADAPTER_API void RecordGuiNote(radapter::Instance* inst, QString const& msg);
+}
+
 namespace radapter::gui
 {
 
@@ -154,6 +158,8 @@ public:
     QObject* quality() const;
 public slots:
     void shutdown(unsigned timeout = 5000);
+    // debug helper: log a message from QML through radapter's logger (radapter.note(...))
+    void note(QString const& msg);
 };
 
 class QMLWorker final : public radapter::Worker
@@ -253,6 +259,7 @@ GuiModel* GuiInstanceProxy::model() const { return w->dataModel(); }
 QObject* GuiInstanceProxy::tags() const { return w->tagsProxy(); }
 QObject* GuiInstanceProxy::quality() const { return w->qualityProxy(); }
 void GuiInstanceProxy::shutdown(unsigned int timeout) { w->_Inst->Shutdown(timeout); }
+void GuiInstanceProxy::note(QString const& msg) { qml_test::RecordGuiNote(w->_Inst, msg); }
 
 }
 

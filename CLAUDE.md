@@ -211,6 +211,12 @@ After making QML changes, verify them systematically — don't just eyeball the 
    ```
    The recording is saved on exit (normal shutdown, Ctrl+C, reload, or last-window-close).
 
+   From QML, **`radapter.note("msg")`** interleaves a `{type:"note", t, msg}` marker into
+   the active `--gui-record` stream (a noop when no recording is running — it does *not*
+   log). Use it to annotate what the UI is doing at a given moment while diagnosing a
+   timing bug: sprinkle `radapter.note(...)` in the suspect QML, record with `--gui-record`,
+   then read the JSON to see the notes in event order. Replay ignores `note` entries.
+
 5. **For difficult bugs, ask the user to record a reproduction.** If a QML bug resists
    scripting (complex drag-and-drop, timing-dependent behavior, a mystery interaction),
    ask: *"Could you record a JSON reproduction with `--gui-record /tmp/bug.json` and share
