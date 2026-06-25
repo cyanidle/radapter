@@ -77,6 +77,7 @@ struct AppConfig {
     Strings& exprs;
     QCtrlSignalHandler* sigs;
     Listener* listener;
+    bool shutdownOnLastClosed;
 };
 
 class AppState : public QObject {
@@ -89,6 +90,12 @@ public:
 
     AppState(const AppConfig* _config) : config(_config) {
         inst = new radapter::Instance(this);
+
+        if (auto* gapp = qobject_cast<QGuiApplication*>(qApp); gapp && config->shutdownOnLastClosed) {
+            connect(gapp, &QGuiApplication::lastWindowClosed, inst, [inst=inst]{
+                inst->Shutdown();
+            });
+        }
 
         QObject::connect(inst, &radapter::Instance::ShutdownDone, this, &QObject::deleteLater);
 
@@ -241,11 +248,10 @@ public:
 int main (int argc, char **argv) try {
     g_argv.assign(argv, argv + argc);
     std::unique_ptr<QCoreApplication> app;
+    bool shutdownOnLastClosed = false;
 #ifdef RADAPTER_GUI
     for (auto it = argv; it != argv + argc; ++it) {
         if (strncmp(*it, "--gui", 5) == 0) {
-            // QApplication, not QGuiApplication: QtCharts' QML module renders through
-            // QtWidgets and crashes without a widget-capable application instance.
             auto gapp = new QApplication(argc, argv);
             gapp->setQuitOnLastWindowClosed(false);
             app.reset(gapp);
@@ -346,7 +352,7 @@ int main (int argc, char **argv) try {
         // --gui-no-auto-quit opts out
         if (cli["gui-no-auto-quit"] != true) {
             if (auto* guiApp = qobject_cast<QGuiApplication*>(app.get())) {
-                guiApp->setQuitOnLastWindowClosed(true);
+                shutdownOnLastClosed = true;
             }
         }
 #endif
@@ -371,7 +377,7 @@ int main (int argc, char **argv) try {
         }
     }
 
-    AppConfig cfg{cli, lua_args, exprs, sigs, listener ? &*listener : nullptr};
+    AppConfig cfg{cli, lua_args, exprs, sigs, listener ? &*listener : nullptr, shutdownOnLastClosed};
 
     new AppState{&cfg};
 

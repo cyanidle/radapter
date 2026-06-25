@@ -23,9 +23,7 @@ static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
 
 int Instance::Impl::onShutdown(lua_State* L) {
     luaL_checktype(L, 1, LUA_TFUNCTION);
-    lua_pushvalue(L, 1);
-    auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
-    Instance::FromLua(L)->d->shutdownHandlers.push_back(ref);
+    Instance::FromLua(L)->d->shutdownHandlers.emplace_back(L, 1);
     return 0;
 }
 
@@ -415,14 +413,14 @@ void Instance::Shutdown(unsigned int timeout)
     }
     d->shutdown = true;
     Warn("radapter", "Shutting down...");
-    for (auto ref : d->shutdownHandlers) {
-        auto top = lua_gettop(d->L);
-        lua_rawgeti(d->L, LUA_REGISTRYINDEX, ref);
-        if (lua_pcall(d->L, 0, 0, 0) != LUA_OK) {
-            Error("radapter", "on_shutdown handler error: {}", lua_tostring(d->L, -1));
+    for (auto& fn : d->shutdownHandlers) {
+        try {
+            fn.Call({});
+        } catch (std::exception& e) {
+            Error("radapter", "on_shutdown handler error: {}", e.what());
         }
-        lua_settop(d->L, top);
     }
+    d->shutdownHandlers.clear();
     emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
         if (!std::exchange(d->shutdownDone, true)) {
@@ -443,12 +441,10 @@ lua_State *Instance::LuaState()
 
 Instance::~Instance()
 {
+    d->shutdownHandlers.clear();
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
     luaL_unref(d->L, LUA_REGISTRYINDEX, d->luaLogHandler);
-    for (auto ref : d->shutdownHandlers) {
-        luaL_unref(d->L, LUA_REGISTRYINDEX, ref);
-    }
     // the tag registry holds LuaFunctions whose destructors luaL_unref into L, so it
     // must be torn down before lua_close (else it unrefs into a freed state -> crash)
     d->tagRegistry.reset();
