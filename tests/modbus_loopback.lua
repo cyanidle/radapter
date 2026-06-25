@@ -76,12 +76,14 @@ pipe(master, function(msg)
 end)
 
 -- Master -> Slave: write over the wire, slave reports the change
-after(500, function()
-    master {
-        to_slave = 9,
-        flag = true,
-    }
-end)
+await(match_msg(master.events, function(ev)
+    return ev.state == "ConnectedState" end)
+)
+
+master {
+    to_slave = 9,
+    flag = true,
+}
 
 local got = {}
 pipe(slave, function(msg)

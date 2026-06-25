@@ -44,8 +44,10 @@ public:
         connect(config.device, &MasterDevice::ConnectedChanged, this, [=](bool state){
             if (state) {
                 poller->start();
+                emit SendEvent(QVariantMap{{"state", "ConnectedState"}});
             } else {
                 poller->stop();
+                emit SendEvent(QVariantMap{{"state", "UnconnectedState"}});
             }
         });
         config.device->Start();
