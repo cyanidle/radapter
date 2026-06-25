@@ -8,7 +8,7 @@ assert(type(info.pid) == "number", "app_info.pid")
 local out = {}
 local proc = Process { program = "echo", arguments = { "hello", "radapter" } }
 
-pipe(proc, function(chunk) out[#out + 1] = tostring(chunk) end)
+pipe(proc, function(chunk) out[#out + 1] = tostring(chunk.stdout) end)
 
 pipe(proc.events, function(ev)
     if ev.finished then
