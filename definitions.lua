@@ -23,6 +23,11 @@ function get(table, key, sep) end
 ---@return table
 function set(table, key, value, sep) end
 
+---Register a callback to be called during shutdown, before workers are destroyed.
+---Multiple callbacks accumulate; each is called in registration order.
+---@param handler fun()
+function on_shutdown(handler) end
+
 ---@param timeout number?
 function shutdown(timeout) end
 

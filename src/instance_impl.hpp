@@ -1,6 +1,7 @@
 #pragma once
 #include "radapter/radapter.hpp"
 #include <QSet>
+#include <vector>
 #include "builtin.hpp"
 #include "tags.hpp"
 
@@ -16,6 +17,7 @@ struct radapter::Instance::Impl {
     LogLevel globalLevel = LogLevel::debug;
     std::map<string, LogLevel, std::less<>> perCat;
     std::map<string, ExtraSchema> schemas;
+    std::vector<int> shutdownHandlers;
     bool shutdown = false;
     bool shutdownDone = false;
     int insideLogHandler = false;
@@ -29,5 +31,6 @@ struct radapter::Instance::Impl {
     static int log_level(lua_State* L);
     static int log__call(lua_State* L); // convert __call(t, ...) -> luaLog(...)
     static int log_handler(lua_State* L);
+    static int onShutdown(lua_State* L);
 };
 

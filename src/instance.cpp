@@ -21,6 +21,14 @@ static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
     Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
 }
 
+int Instance::Impl::onShutdown(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    lua_pushvalue(L, 1);
+    auto ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    Instance::FromLua(L)->d->shutdownHandlers.push_back(ref);
+    return 0;
+}
+
 // workers["unique-name"] -> the worker object with that name, or nil
 static int workers_index(lua_State* L) {
     auto* inst = Instance::FromLua(L);
@@ -139,6 +147,7 @@ Instance::Instance(QObject *parent) :
     lua_register(L, "json_encode", glua::protect<builtin::json_encode>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
+    lua_register(L, "on_shutdown", glua::protect<Impl::onShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
     lua_register(L, "each", glua::protect<builtin::api::Each>);
     lua_register(L, "after", glua::protect<builtin::api::After>);
@@ -406,6 +415,14 @@ void Instance::Shutdown(unsigned int timeout)
     }
     d->shutdown = true;
     Warn("radapter", "Shutting down...");
+    for (auto ref : d->shutdownHandlers) {
+        auto top = lua_gettop(d->L);
+        lua_rawgeti(d->L, LUA_REGISTRYINDEX, ref);
+        if (lua_pcall(d->L, 0, 0, 0) != LUA_OK) {
+            Error("radapter", "on_shutdown handler error: {}", lua_tostring(d->L, -1));
+        }
+        lua_settop(d->L, top);
+    }
     emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
         if (!std::exchange(d->shutdownDone, true)) {
@@ -429,6 +446,9 @@ Instance::~Instance()
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
     luaL_unref(d->L, LUA_REGISTRYINDEX, d->luaLogHandler);
+    for (auto ref : d->shutdownHandlers) {
+        luaL_unref(d->L, LUA_REGISTRYINDEX, ref);
+    }
     // the tag registry holds LuaFunctions whose destructors luaL_unref into L, so it
     // must be torn down before lua_close (else it unrefs into a freed state -> crash)
     d->tagRegistry.reset();
