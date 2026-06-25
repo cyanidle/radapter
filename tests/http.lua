@@ -62,8 +62,12 @@ end)
 
 local http = Http { base_url = "http://127.0.0.1:" .. PORT, response_format = "json" }
 
+await(match_msg(server.events, function (msg)
+    return msg.started
+end))
+
 -- Give the server a moment to bind, then drive the requests from a coroutine.
-after(800, async(function()
+after(200, async(function()
     local r = await(http:Get("/hello"))
     assert(r.status == 200, "GET status: " .. tostring(r.status))
     assert(r.body.method == "GET", "GET method")

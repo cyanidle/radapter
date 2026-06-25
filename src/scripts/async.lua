@@ -2,7 +2,6 @@
 local co = coroutine
 
 ---@alias callback<T> fun(res: T?, err: string?)
----@alias promise<T> fun(cb: callback<T>)
 
 local function is_callable(v)
     if type(v) == "function" then return true end
@@ -123,6 +122,25 @@ end
 function await(promise)
     assert(is_callable(promise), "callable (promise) expected")
     return co.yield(promise)
+end
+
+--- Wait for a message matching a filter from a pipe-able source.
+--- Returns a promise that resolves with the first message for which
+--- `filter(msg)` returns true, then automatically unsubscribes.
+---@generic T
+---@param source table|userdata pipe-able source (has get_listeners)
+---@param filter fun(msg: T): boolean
+---@return promise<T>
+function match_msg(source, filter)
+    return function(cb)
+        local cancel
+        cancel = pipe(source, function(msg)
+            if filter(msg) then
+                cancel()
+                cb(msg)
+            end
+        end)
+    end
 end
 
 -- Runs a main chunk (Eval/EvalFile) inside a coroutine so that await() works

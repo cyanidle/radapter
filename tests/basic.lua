@@ -45,7 +45,8 @@ pipe(test, test)
 
 assert(not pcall(pipe), "Empty pipe() should fail")
 
-assert(pipe(test) == test, "pipe(x) == x")
+local cancel = pipe(test)
+assert(type(cancel) == "function", "pipe(x) should return a cancel function")
 
 assert(pcall(pipe, function() end), "convert function to callable")
 
@@ -59,7 +60,7 @@ pipe(
     end
 )
 
-first = pipe (
+local first_cancel = pipe (
     test,
     function(msg)
         log("Original: {}", msg)
@@ -75,12 +76,31 @@ first = pipe (
     end
 )
 
-assert(first == test, "pipe(x, y, z) should return x")
+assert(type(first_cancel) == "function", "pipe(x, y, z) should return a cancel function")
+
+-- Verify cancellation works: after cancelling, new messages don't reach the listener
+local collected = {}
+local tmp = create_worker(function(self, msg, sender)
+    collected[#collected + 1] = msg
+    notify_all(self, msg, sender)
+end)
+local cc = pipe(tmp, function(msg) collected[#collected + 1] = "via_pipe:" .. tostring(msg) end)
+tmp(42)
+assert(#collected == 2 and collected[1] == 42 and collected[2] == "via_pipe:42", "pipe should forward messages")
+cc()  -- cancel the subscription
+tmp(99)
+assert(#collected == 3 and collected[1] == 42 and collected[2] == "via_pipe:42" and collected[3] == 99,
+    "after cancel, tmp still gets its own messages but pipe listener is gone")
+
+-- Cancelling a single-element pipe is a no-op (no connections to remove)
+local c2 = pipe(tmp)
+assert(type(c2) == "function", "pipe(single) returns cancel function")
+c2()  -- should not error
 
 local test_func = function() end
 
-assert(pipe(test_func) ~= test_func, "pipe(func) -> wrapper for func")
-assert(pipe(test_func, test_func) ~= test_func, "pipe(func) -> wrapper for func")
+assert(type(pipe(test_func)) == "function", "pipe(func) returns cancel function")
+assert(type(pipe(test_func, test_func)) == "function", "pipe(func, func) returns cancel function")
 
 -- Extra interop
 -- TestWorker:Call(func), calls func with 3 args

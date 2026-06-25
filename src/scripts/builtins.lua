@@ -22,12 +22,14 @@ end
 local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")
-    all[#all + 1] = function(msg, sender)
+    local listener = function(msg, sender)
         local ok, err = xpcall(ipipe.call, debug.traceback, ipipe, msg, sender)
         if not ok then
             log.error("In (Pipe): {}", err)
         end
     end
+    all[#all + 1] = listener
+    return listener
 end
 
 function notify_all(worker, msg, sender)
@@ -65,6 +67,7 @@ function pipe(first, ...)
     local toPipe = {first, ...}
     local res = nil
     local curr = nil
+    local subs = {}
     for i, v in ipairs(toPipe) do
         local t = type(v)
         if t == "function" then
@@ -76,7 +79,7 @@ function pipe(first, ...)
             error("Pipe target #"..i.." is not Pipable")
         end
         if curr ~= nil then
-            connect(curr, v)
+            subs[#subs + 1] = {curr, connect(curr, v)}
         end
         curr = v
         if res == nil then
@@ -84,7 +87,19 @@ function pipe(first, ...)
         end
     end
     assert(res ~= nil, "expected at least on param")
-    return res
+    local function cancel()
+        for _, sub in ipairs(subs) do
+            local target, fn = sub[1], sub[2]
+            local listeners = target:get_listeners()
+            for j = #listeners, 1, -1 do
+                if listeners[j] == fn then
+                    table.remove(listeners, j)
+                    break
+                end
+            end
+        end
+    end
+    return cancel
 end
 
 function on(worker, part, handler)

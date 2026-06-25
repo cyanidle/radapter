@@ -274,6 +274,15 @@ function async(fn) end
 ---@return T
 function await(p) end
 
+--- Wait for a message matching a filter from a pipe-able source.
+--- Returns a promise that resolves with the first matching message and
+--- automatically unsubscribes from the source when the filter matches.
+---@generic T
+---@param source table|userdata pipe-able source (has get_listeners)
+---@param filter fun(msg: T): boolean
+---@return promise<T>
+function match_msg(source, filter) end
+
 ---@param fn fun(...) wrapped function whose last arg is a callback(result, err)
 ---@return fun(...): promise<any>
 function promisify(fn) end
@@ -319,17 +328,15 @@ log = {
 
 ---@alias pipeInput (Events | MsgHandler)
 
----@generic T1 : pipeInput
----@param first T1
+---@param first pipeInput
 ---@vararg pipeInput
----@return T1
+---@return fun() cancel -- removes all subscriptions created by this pipe() call
 function pipe(first, ...) end
 
----@generic T1 : pipeInput
----@param source T1
+---@param source pipeInput
 ---@param part string
 ---@param handler pipeInput
----@return T1
+---@return fun() cancel -- removes the subscription created by this on() call
 function on(source, part, handler) end
 
 ---@param worker Worker
