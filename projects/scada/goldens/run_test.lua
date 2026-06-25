@@ -62,7 +62,7 @@ if mode == "record" then
 
     if #replay_events > 0 then
         log.info("Replaying {} events at 5x speed...", #replay_events)
-        qt:replay_data(json_encode(replay_events), 5.0)
+        qt:replay_data(json_encode(replay_events), 3.0)
         qt:wait(1000)
     end
 

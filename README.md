@@ -262,7 +262,7 @@ qt:replay("/tmp/session.json")
 qt:replay("/tmp/session.json", 2.0)
 
 -- Replay from an inline JSON string
-qt:replay_data(json_string, 5.0)
+qt:replay_data(json_string, 3.0)
 ```
 
 Replay injects the same Qt events (`QMouseEvent`, `QKeyEvent`, `QWheelEvent`) through

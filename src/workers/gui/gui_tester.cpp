@@ -11,6 +11,7 @@
 #include <QImage>
 #include <QFile>
 #include <QPointer>
+#include <QTimer>
 #include <optional>
 
 #include "radapter/radapter.hpp"
@@ -127,6 +128,9 @@ public:
     std::optional<QVariantMap> pendingMove;   // last move, flushed before the next non-move
 
     explicit RecordFilter(Instance* inst = nullptr) : QObject(inst), inst(inst) {
+        auto* flusher = new QTimer(this);
+        flusher->callOnTimeout(this, &RecordFilter::flushPendingMove);
+        flusher->start(150);
     }
 
     void start() {
@@ -281,26 +285,33 @@ static QVariantList parseEventsArray(QByteArray const& json, QString const& what
 // Feed a recorded event array back through QCoreApplication::sendEvent on `win`,
 // honouring the inter-event delays (divided by `speed`).
 static void replayEventsOn(QQuickWindow* win, QVariantList const& events, double speed) {
-    auto toGlobal = [win](qreal x, qreal y) { return win->mapToGlobal(QPoint(int(x), int(y))); };
+    auto toGlobal = [win](qreal x, qreal y) {
+        return win->mapToGlobal(QPoint(qRound(x), qRound(y)));
+    };
     qint64 prevT = 0;
+    Qt::MouseButtons heldButtons = Qt::NoButton;   // <-- track drag state
     for (auto const& val : events) {
         auto obj = val.toMap();
         qint64 t = obj["t"].toLongLong();
         qint64 delay = qMax(qint64(0), t - prevT);
         prevT = t;
-        if (delay > 0) busyWaitMs(int(qRound(double(delay) / speed)));
+        if (delay > 0)
+            busyWaitMs(qRound(double(delay) / speed));
 
         QString type = obj["type"].toString();
         if (type == "mousePress" || type == "mouseRelease" || type == "mouseMove") {
             auto x = obj["x"].toDouble(), y = obj["y"].toDouble();
             auto gp = toGlobal(x, y);
             if (type == "mouseMove") {
-                QMouseEvent e(QEvent::MouseMove, QPointF(x, y), gp, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                QMouseEvent e(QEvent::MouseMove, QPointF(x, y), gp, Qt::NoButton, heldButtons, Qt::NoModifier);
                 QCoreApplication::sendEvent(win, &e);
             } else {
                 auto btn = btnFromStr(obj["btn"].toString());
                 auto eType = type == "mousePress" ? QEvent::MouseButtonPress : QEvent::MouseButtonRelease;
-                QMouseEvent e(eType, QPointF(x, y), gp, btn, type == "mousePress" ? btn : Qt::NoButton, Qt::NoModifier);
+                bool isPress = (eType == QEvent::MouseButtonPress);
+                if (isPress) heldButtons |=  btn;
+                else         heldButtons &= ~btn;
+                QMouseEvent e(eType, QPointF(x, y), gp, btn, heldButtons, Qt::NoModifier);
                 QCoreApplication::sendEvent(win, &e);
             }
         } else if (type == "keyPress" || type == "keyRelease") {
