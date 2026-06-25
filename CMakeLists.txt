@@ -207,24 +207,37 @@ foreach(test_file ${RADAPTER_TESTS})
         COMMAND radapter ${test_argv}
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests"
     )
-    # Per-test timeouts (seconds) — generous upper bound past the self-imposed deadline
-    if(test_name STREQUAL "basic")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 10)
-    elseif(test_name STREQUAL "http")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 20)
-    elseif(test_name STREQUAL "local")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 10)
-    elseif(test_name STREQUAL "modbus_loopback")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 15)
-    elseif(test_name STREQUAL "process")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 10)
-    elseif(test_name STREQUAL "smoke")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 20)
-    elseif(test_name STREQUAL "stdio")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 15)
-    elseif(test_name STREQUAL "tags")
-        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 15)
-    endif()
+    set_tests_properties("${test_name}" PROPERTIES TIMEOUT 10)
 endforeach()
+
+
+if (NOT RADAPTER_SDK_ONLY)
+    add_custom_target(scada
+        DEPENDS radapter
+        COMMAND $<TARGET_FILE:radapter>
+                --gui-record ${CMAKE_CURRENT_SOURCE_DIR}/qml_record.json
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/configurator.lua
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        USES_TERMINAL
+    )
+
+    file(GLOB RADAPTER_GOLDENS "${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/*.json")
+
+    add_custom_target(test_golden_all)
+
+    foreach(golden_file ${RADAPTER_GOLDENS})
+        get_filename_component(golden_name ${golden_file} NAME_WE)
+        add_custom_target(test_golden_${golden_name}
+            DEPENDS radapter
+            COMMAND
+                $<TARGET_FILE:radapter>
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/run_test.lua
+                ${golden_name}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            USES_TERMINAL
+        )
+        add_dependencies(test_golden_all test_golden_${golden_name})
+    endforeach()
+endif()
 
 include(cmake/Packaging.cmake)
