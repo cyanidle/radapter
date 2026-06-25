@@ -1,0 +1,319 @@
+[
+    {
+        "data": "app:loaded",
+        "t": 258,
+        "type": "note"
+    },
+    {
+        "t": 2185,
+        "type": "mouseMove",
+        "x": 660,
+        "y": 126
+    },
+    {
+        "btn": "left",
+        "t": 2225,
+        "type": "mousePress",
+        "x": 660,
+        "y": 126
+    },
+    {
+        "t": 2689,
+        "type": "mouseMove",
+        "x": 19,
+        "y": 222
+    },
+    {
+        "btn": "left",
+        "t": 2829,
+        "type": "mouseRelease",
+        "x": 19,
+        "y": 222
+    },
+    {
+        "t": 3553,
+        "type": "mouseMove",
+        "x": 685,
+        "y": 134
+    },
+    {
+        "btn": "left",
+        "t": 3873,
+        "type": "mousePress",
+        "x": 685,
+        "y": 134
+    },
+    {
+        "t": 5241,
+        "type": "mouseMove",
+        "x": 320,
+        "y": 843
+    },
+    {
+        "btn": "left",
+        "t": 6284,
+        "type": "mouseRelease",
+        "x": 320,
+        "y": 843
+    },
+    {
+        "t": 7768,
+        "type": "mouseMove",
+        "x": 928,
+        "y": 879
+    },
+    {
+        "btn": "left",
+        "t": 7896,
+        "type": "mousePress",
+        "x": 928,
+        "y": 879
+    },
+    {
+        "t": 7936,
+        "type": "mouseMove",
+        "x": 929,
+        "y": 879
+    },
+    {
+        "btn": "left",
+        "t": 7996,
+        "type": "mouseRelease",
+        "x": 929,
+        "y": 879
+    },
+    {
+        "data": "dock:restored|Connections",
+        "t": 7997,
+        "type": "note"
+    },
+    {
+        "t": 9560,
+        "type": "mouseMove",
+        "x": 382,
+        "y": 338
+    },
+    {
+        "btn": "left",
+        "t": 9592,
+        "type": "mousePress",
+        "x": 382,
+        "y": 338
+    },
+    {
+        "btn": "left",
+        "t": 9676,
+        "type": "mouseRelease",
+        "x": 382,
+        "y": 338
+    },
+    {
+        "data": "configurator:selected|slave1|ModbusSlave",
+        "t": 9719,
+        "type": "note"
+    },
+    {
+        "data": "graph:node_selected|slave1",
+        "t": 9720,
+        "type": "note"
+    },
+    {
+        "t": 10160,
+        "type": "mouseMove",
+        "x": 350,
+        "y": 420
+    },
+    {
+        "btn": "left",
+        "t": 10173,
+        "type": "mousePress",
+        "x": 350,
+        "y": 420
+    },
+    {
+        "btn": "left",
+        "t": 10252,
+        "type": "mouseRelease",
+        "x": 350,
+        "y": 420
+    },
+    {
+        "data": "configurator:selected|stream1|RedisStream",
+        "t": 10271,
+        "type": "note"
+    },
+    {
+        "data": "graph:node_selected|stream1",
+        "t": 10271,
+        "type": "note"
+    },
+    {
+        "t": 11144,
+        "type": "mouseMove",
+        "x": 376,
+        "y": 478
+    },
+    {
+        "btn": "left",
+        "t": 11160,
+        "type": "mousePress",
+        "x": 376,
+        "y": 478
+    },
+    {
+        "btn": "left",
+        "t": 11228,
+        "type": "mouseRelease",
+        "x": 376,
+        "y": 478
+    },
+    {
+        "data": "configurator:selected|stream2|RedisStream",
+        "t": 11239,
+        "type": "note"
+    },
+    {
+        "data": "graph:node_selected|stream2",
+        "t": 11239,
+        "type": "note"
+    },
+    {
+        "t": 12200,
+        "type": "mouseMove",
+        "x": 669,
+        "y": 126
+    },
+    {
+        "btn": "left",
+        "t": 12320,
+        "type": "mousePress",
+        "x": 669,
+        "y": 126
+    },
+    {
+        "t": 12867,
+        "type": "mouseMove",
+        "x": 591,
+        "y": 769
+    },
+    {
+        "btn": "left",
+        "t": 13172,
+        "type": "mouseRelease",
+        "x": 591,
+        "y": 769
+    },
+    {
+        "t": 14456,
+        "type": "mouseMove",
+        "x": 930,
+        "y": 672
+    },
+    {
+        "btn": "left",
+        "t": 14696,
+        "type": "mousePress",
+        "x": 930,
+        "y": 672
+    },
+    {
+        "t": 14760,
+        "type": "mouseMove",
+        "x": 930,
+        "y": 670
+    },
+    {
+        "btn": "left",
+        "t": 14764,
+        "type": "mouseRelease",
+        "x": 930,
+        "y": 670
+    },
+    {
+        "data": "dock:restored|Preview (objects + pipes)",
+        "t": 14764,
+        "type": "note"
+    },
+    {
+        "t": 15407,
+        "type": "mouseMove",
+        "x": 463,
+        "y": 676
+    },
+    {
+        "btn": "left",
+        "t": 15443,
+        "type": "mousePress",
+        "x": 463,
+        "y": 676
+    },
+    {
+        "btn": "left",
+        "t": 15550,
+        "type": "mouseRelease",
+        "x": 463,
+        "y": 676
+    },
+    {
+        "data": "dock:minimized|Connections",
+        "t": 15550,
+        "type": "note"
+    },
+    {
+        "t": 16337,
+        "type": "mouseMove",
+        "x": 925,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 16364,
+        "type": "mousePress",
+        "x": 925,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 16444,
+        "type": "mouseRelease",
+        "x": 925,
+        "y": 666
+    },
+    {
+        "data": "dock:minimized|Preview (objects + pipes)",
+        "t": 16446,
+        "type": "note"
+    },
+    {
+        "t": 17847,
+        "type": "mouseMove",
+        "x": 93,
+        "y": 128
+    },
+    {
+        "btn": "left",
+        "t": 17935,
+        "type": "mousePress",
+        "x": 93,
+        "y": 128
+    },
+    {
+        "t": 18673,
+        "type": "mouseMove",
+        "x": 822,
+        "y": 532
+    },
+    {
+        "btn": "left",
+        "t": 18851,
+        "type": "mouseRelease",
+        "x": 822,
+        "y": 532
+    },
+    {
+        "t": 20383,
+        "type": "mouseMove",
+        "x": 956,
+        "y": 0
+    }
+]

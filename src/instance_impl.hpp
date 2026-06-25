@@ -17,7 +17,7 @@ struct radapter::Instance::Impl {
     LogLevel globalLevel = LogLevel::debug;
     std::map<string, LogLevel, std::less<>> perCat;
     std::map<string, ExtraSchema> schemas;
-    std::vector<int> shutdownHandlers;
+    std::vector<LuaFunction> shutdownHandlers;
     bool shutdown = false;
     bool shutdownDone = false;
     int insideLogHandler = false;
