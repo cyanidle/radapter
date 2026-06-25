@@ -708,6 +708,12 @@ function ProcessWorker:Write(data) end
 function ProcessWorker:Terminate() end
 ---Force-kill the child (SIGKILL).
 function ProcessWorker:Kill() end
+---Send a signal to the child process. Accepts a signal name ("INT", "SIGINT",
+---"TERM", "HUP", "USR1", "USR2", "QUIT") or a signal number (2, 15, 1, ...).
+---SIGTERM and SIGKILL delegate to Terminate/Kill; other signals are Unix-only.
+---Raises if the process is not running or the signal name is unknown.
+---@param signal string|integer
+function ProcessWorker:Signal(signal) end
 ---Close the child's stdin (EOF).
 function ProcessWorker:CloseStdin() end
 ---@return integer -- the child's PID (0 if not running)

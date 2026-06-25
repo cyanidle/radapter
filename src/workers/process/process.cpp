@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QMetaEnum>
 #include <QJsonDocument>
+#include <signal.h>
 
 namespace radapter {
 
@@ -126,6 +127,60 @@ public:
     QVariant Start(QVariantList const&)      { launch(); return {}; }
     QVariant Terminate(QVariantList const&)  { proc->terminate(); return {}; }
     QVariant Kill(QVariantList const&)       { proc->kill(); return {}; }
+    QVariant Signal(QVariantList const& a) {
+        if (a.isEmpty()) Raise("Signal(name_or_num): missing argument");
+        auto& arg = a[0];
+        int sig = 0;
+        if (arg.type() == QVariant::Int || arg.type() == QVariant::LongLong) {
+            sig = arg.toInt();
+        } else {
+            auto name = arg.toString().toUpper().toLatin1();
+            if (name.startsWith("SIG")) name = name.mid(3);
+            bool ok = false;
+            sig = name.toInt(&ok);
+            if (!ok) {
+                static QHash<QByteArray, int> names{
+#ifdef SIGINT
+                    {"INT", SIGINT},
+#endif
+#ifdef SIGHUP
+                    {"HUP", SIGHUP},
+#endif
+#ifdef SIGTERM
+                    {"TERM", SIGTERM},
+#endif
+#ifdef SIGKILL
+                    {"KILL", SIGKILL},
+#endif
+#ifdef SIGQUIT
+                    {"QUIT", SIGQUIT},
+#endif
+#ifdef SIGUSR1
+                    {"USR1", SIGUSR1},
+#endif
+#ifdef SIGUSR2
+                    {"USR2", SIGUSR2},
+#endif
+                };
+                if (names.contains(name)) {
+                    sig = names[name];
+                } else {
+                    Raise("Signal: unknown signal name '{}'", arg.toString());
+                }
+            }
+        }
+        auto pid = proc->processId();
+        if (pid <= 0) Raise("Signal: process not running");
+        if (sig == SIGTERM) { proc->terminate(); return {}; }
+        if (sig == SIGKILL) { proc->kill(); return {}; }
+#ifdef Q_OS_UNIX
+        if (::kill(static_cast<pid_t>(pid), sig) != 0)
+            Raise("Signal: kill({}, {}) failed: {}", pid, sig, strerror(errno));
+#else
+        Warn("Signal: arbitrary signal delivery not supported on this platform");
+#endif
+        return {};
+    }
     QVariant CloseStdin(QVariantList const&) { proc->closeWriteChannel(); return {}; }
     QVariant Pid(QVariantList const&)        { return qlonglong(proc->processId()); }
 
@@ -168,6 +223,7 @@ void builtin::workers::process(Instance* inst) {
         {"Write",      AsExtraMethod<&ProcessWorker::Write>},
         {"Terminate",  AsExtraMethod<&ProcessWorker::Terminate>},
         {"Kill",       AsExtraMethod<&ProcessWorker::Kill>},
+        {"Signal",     AsExtraMethod<&ProcessWorker::Signal>},
         {"CloseStdin", AsExtraMethod<&ProcessWorker::CloseStdin>},
         {"Pid",        AsExtraMethod<&ProcessWorker::Pid>},
         {"State",      AsExtraMethod<&ProcessWorker::State>},
