@@ -191,7 +191,10 @@ Item {
         draggingPanel = null
         dropZone = ""
         if (!p) return
-        if (z === "left" || z === "right" || z === "bottom") { movePanel(p, z, idx); closeFloat(p) }
+        if (z === "left" || z === "right" || z === "bottom") {
+            movePanel(p, z, idx); closeFloat(p)
+            radapter.note("dock:docked|" + p.title + "|" + z)
+        }
         else if (z === "out" && p.side !== "float") floatPanel(p)
         // z === "" → middle: leave the panel where it is
     }

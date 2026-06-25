@@ -242,15 +242,15 @@ ApplicationWindow {
             title: "Windows"
             Action {
                 text: "Configurator"
-                onTriggered: { radapter.note("tabs:switched|Configurator"); tabs.selectPanel(configPanel) }
+                onTriggered: { tabs.selectPanel(configPanel) }
             }
             Action {
                 text: "Visualization"
-                onTriggered: { radapter.note("tabs:switched|Visualization"); tabs.selectPanel(vizPanel) }
+                onTriggered: { tabs.selectPanel(vizPanel) }
             }
             Action {
                 text: "Runner"
-                onTriggered: { radapter.note("tabs:switched|Runner"); tabs.selectPanel(runnerPanel) }
+                onTriggered: { tabs.selectPanel(runnerPanel) }
             }
         }
         Menu {

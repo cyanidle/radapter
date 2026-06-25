@@ -262,6 +262,7 @@ Item {
                 toParentPath = targetPath
                 toIndex = t.children ? t.children.length : 0
                 moveNode(fromPath, toParentPath, toIndex)
+                radapter.note("hmi:node_dropped_into|" + targetPath.join(","))
                 return
             }
             zone = 1   // a leaf can't contain — fall back to "after"
@@ -273,6 +274,7 @@ Item {
         toParentPath = targetPath.slice(0, -1)
         var idx = targetPath[targetPath.length - 1]
         moveNode(fromPath, toParentPath, zone < 0 ? idx : idx + 1)
+        radapter.note("hmi:node_dropped|" + targetPath.join(",") + "|" + (zone < 0 ? "before" : "after"))
     }
 
     function moveSelected(delta) {

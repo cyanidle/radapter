@@ -1,0 +1,675 @@
+[
+    {
+        "data": "app:loaded",
+        "t": 212,
+        "type": "note"
+    },
+    {
+        "t": 1351,
+        "type": "mouseMove",
+        "x": 22,
+        "y": 608
+    },
+    {
+        "t": 1503,
+        "type": "mouseMove",
+        "x": 194,
+        "y": 601
+    },
+    {
+        "t": 1655,
+        "type": "mouseMove",
+        "x": 421,
+        "y": 465
+    },
+    {
+        "t": 1807,
+        "type": "mouseMove",
+        "x": 477,
+        "y": 300
+    },
+    {
+        "t": 1959,
+        "type": "mouseMove",
+        "x": 371,
+        "y": 147
+    },
+    {
+        "t": 2110,
+        "type": "mouseMove",
+        "x": 271,
+        "y": 64
+    },
+    {
+        "t": 2143,
+        "type": "mouseMove",
+        "x": 257,
+        "y": 59
+    },
+    {
+        "t": 2335,
+        "type": "mouseMove",
+        "x": 259,
+        "y": 42
+    },
+    {
+        "btn": "left",
+        "t": 2367,
+        "type": "mousePress",
+        "x": 259,
+        "y": 42
+    },
+    {
+        "t": 2406,
+        "type": "mouseMove",
+        "x": 262,
+        "y": 41
+    },
+    {
+        "t": 2551,
+        "type": "mouseMove",
+        "x": 685,
+        "y": 66
+    },
+    {
+        "t": 2703,
+        "type": "mouseMove",
+        "x": 773,
+        "y": 70
+    },
+    {
+        "t": 2855,
+        "type": "mouseMove",
+        "x": 802,
+        "y": 78
+    },
+    {
+        "t": 2895,
+        "type": "mouseMove",
+        "x": 805,
+        "y": 79
+    },
+    {
+        "btn": "left",
+        "t": 2987,
+        "type": "mouseRelease",
+        "x": 805,
+        "y": 79
+    },
+    {
+        "data": "tabs:split|Runner|right",
+        "t": 2989,
+        "type": "note"
+    },
+    {
+        "t": 3159,
+        "type": "mouseMove",
+        "x": 412,
+        "y": 81
+    },
+    {
+        "t": 3303,
+        "type": "mouseMove",
+        "x": 165,
+        "y": 50
+    },
+    {
+        "t": 3375,
+        "type": "mouseMove",
+        "x": 122,
+        "y": 42
+    },
+    {
+        "t": 3591,
+        "type": "mouseMove",
+        "x": 142,
+        "y": 38
+    },
+    {
+        "btn": "left",
+        "t": 3598,
+        "type": "mousePress",
+        "x": 142,
+        "y": 38
+    },
+    {
+        "t": 3606,
+        "type": "mouseMove",
+        "x": 143,
+        "y": 38
+    },
+    {
+        "t": 3753,
+        "type": "mouseMove",
+        "x": 326,
+        "y": 117
+    },
+    {
+        "t": 3806,
+        "type": "mouseMove",
+        "x": 374,
+        "y": 134
+    },
+    {
+        "btn": "left",
+        "t": 3906,
+        "type": "mouseRelease",
+        "x": 374,
+        "y": 134
+    },
+    {
+        "data": "tabs:split|Visualization|right",
+        "t": 3908,
+        "type": "note"
+    },
+    {
+        "t": 4039,
+        "type": "mouseMove",
+        "x": 387,
+        "y": 156
+    },
+    {
+        "t": 4207,
+        "type": "mouseMove",
+        "x": 399,
+        "y": 121
+    },
+    {
+        "t": 4359,
+        "type": "mouseMove",
+        "x": 342,
+        "y": 38
+    },
+    {
+        "t": 4455,
+        "type": "mouseMove",
+        "x": 329,
+        "y": 36
+    },
+    {
+        "t": 4623,
+        "type": "mouseMove",
+        "x": 323,
+        "y": 34
+    },
+    {
+        "t": 4734,
+        "type": "mouseMove",
+        "x": 325,
+        "y": 36
+    },
+    {
+        "btn": "left",
+        "t": 4927,
+        "type": "mousePress",
+        "x": 325,
+        "y": 36
+    },
+    {
+        "t": 5102,
+        "type": "mouseMove",
+        "x": 199,
+        "y": 70
+    },
+    {
+        "t": 5254,
+        "type": "mouseMove",
+        "x": 378,
+        "y": 89
+    },
+    {
+        "t": 5407,
+        "type": "mouseMove",
+        "x": 162,
+        "y": 154
+    },
+    {
+        "t": 5559,
+        "type": "mouseMove",
+        "x": 175,
+        "y": 150
+    },
+    {
+        "t": 5702,
+        "type": "mouseMove",
+        "x": 282,
+        "y": 146
+    },
+    {
+        "t": 5767,
+        "type": "mouseMove",
+        "x": 282,
+        "y": 150
+    },
+    {
+        "btn": "left",
+        "t": 5794,
+        "type": "mouseRelease",
+        "x": 282,
+        "y": 150
+    },
+    {
+        "t": 5854,
+        "type": "mouseMove",
+        "x": 303,
+        "y": 119
+    },
+    {
+        "t": 6008,
+        "type": "mouseMove",
+        "x": 334,
+        "y": 50
+    },
+    {
+        "t": 6104,
+        "type": "mouseMove",
+        "x": 329,
+        "y": 41
+    },
+    {
+        "t": 6167,
+        "type": "mouseMove",
+        "x": 327,
+        "y": 40
+    },
+    {
+        "btn": "left",
+        "t": 6174,
+        "type": "mousePress",
+        "x": 327,
+        "y": 40
+    },
+    {
+        "t": 6303,
+        "type": "mouseMove",
+        "x": 197,
+        "y": 41
+    },
+    {
+        "t": 6455,
+        "type": "mouseMove",
+        "x": 182,
+        "y": 42
+    },
+    {
+        "t": 6495,
+        "type": "mouseMove",
+        "x": 179,
+        "y": 45
+    },
+    {
+        "btn": "left",
+        "t": 6563,
+        "type": "mouseRelease",
+        "x": 179,
+        "y": 45
+    },
+    {
+        "data": "tabs:drag_moved|Visualization|group0",
+        "t": 6568,
+        "type": "note"
+    },
+    {
+        "t": 6607,
+        "type": "mouseMove",
+        "x": 186,
+        "y": 44
+    },
+    {
+        "t": 6759,
+        "type": "mouseMove",
+        "x": 483,
+        "y": 42
+    },
+    {
+        "t": 6903,
+        "type": "mouseMove",
+        "x": 544,
+        "y": 41
+    },
+    {
+        "t": 7055,
+        "type": "mouseMove",
+        "x": 547,
+        "y": 41
+    },
+    {
+        "t": 7143,
+        "type": "mouseMove",
+        "x": 534,
+        "y": 44
+    },
+    {
+        "btn": "left",
+        "t": 7191,
+        "type": "mousePress",
+        "x": 534,
+        "y": 44
+    },
+    {
+        "t": 7207,
+        "type": "mouseMove",
+        "x": 532,
+        "y": 44
+    },
+    {
+        "t": 7358,
+        "type": "mouseMove",
+        "x": 290,
+        "y": 45
+    },
+    {
+        "t": 7478,
+        "type": "mouseMove",
+        "x": 246,
+        "y": 46
+    },
+    {
+        "btn": "left",
+        "t": 7635,
+        "type": "mouseRelease",
+        "x": 246,
+        "y": 46
+    },
+    {
+        "data": "tabs:drag_moved|Runner|group0",
+        "t": 7638,
+        "type": "note"
+    },
+    {
+        "t": 7807,
+        "type": "mouseMove",
+        "x": 253,
+        "y": 59
+    },
+    {
+        "t": 7959,
+        "type": "mouseMove",
+        "x": 263,
+        "y": 55
+    },
+    {
+        "t": 8015,
+        "type": "mouseMove",
+        "x": 257,
+        "y": 45
+    },
+    {
+        "btn": "left",
+        "t": 8078,
+        "type": "mousePress",
+        "x": 257,
+        "y": 45
+    },
+    {
+        "t": 8094,
+        "type": "mouseMove",
+        "x": 256,
+        "y": 42
+    },
+    {
+        "t": 8251,
+        "type": "mouseMove",
+        "x": 99,
+        "y": 42
+    },
+    {
+        "btn": "left",
+        "t": 8603,
+        "type": "mouseRelease",
+        "x": 99,
+        "y": 42
+    },
+    {
+        "data": "tabs:reordered|Runner",
+        "t": 8606,
+        "type": "note"
+    },
+    {
+        "data": "tabs:drag_reordered|Runner",
+        "t": 8606,
+        "type": "note"
+    },
+    {
+        "t": 8703,
+        "type": "mouseMove",
+        "x": 101,
+        "y": 45
+    },
+    {
+        "t": 8823,
+        "type": "mouseMove",
+        "x": 118,
+        "y": 45
+    },
+    {
+        "t": 8919,
+        "type": "mouseMove",
+        "x": 128,
+        "y": 41
+    },
+    {
+        "btn": "left",
+        "t": 8951,
+        "type": "mousePress",
+        "x": 128,
+        "y": 41
+    },
+    {
+        "t": 9006,
+        "type": "mouseMove",
+        "x": 125,
+        "y": 41
+    },
+    {
+        "t": 9159,
+        "type": "mouseMove",
+        "x": 48,
+        "y": 40
+    },
+    {
+        "t": 9271,
+        "type": "mouseMove",
+        "x": 35,
+        "y": 40
+    },
+    {
+        "t": 9374,
+        "type": "mouseMove",
+        "x": 30,
+        "y": 42
+    },
+    {
+        "t": 9488,
+        "type": "mouseMove",
+        "x": 29,
+        "y": 42
+    },
+    {
+        "btn": "left",
+        "t": 9555,
+        "type": "mouseRelease",
+        "x": 29,
+        "y": 42
+    },
+    {
+        "data": "tabs:reordered|Runner",
+        "t": 9558,
+        "type": "note"
+    },
+    {
+        "data": "tabs:drag_reordered|Runner",
+        "t": 9558,
+        "type": "note"
+    },
+    {
+        "t": 9759,
+        "type": "mouseMove",
+        "x": 50,
+        "y": 51
+    },
+    {
+        "t": 9895,
+        "type": "mouseMove",
+        "x": 82,
+        "y": 47
+    },
+    {
+        "t": 10055,
+        "type": "mouseMove",
+        "x": 109,
+        "y": 44
+    },
+    {
+        "t": 10111,
+        "type": "mouseMove",
+        "x": 115,
+        "y": 44
+    },
+    {
+        "btn": "left",
+        "t": 10118,
+        "type": "mousePress",
+        "x": 115,
+        "y": 44
+    },
+    {
+        "t": 10201,
+        "type": "mouseMove",
+        "x": 218,
+        "y": 66
+    },
+    {
+        "t": 10361,
+        "type": "mouseMove",
+        "x": 464,
+        "y": 185
+    },
+    {
+        "t": 10510,
+        "type": "mouseMove",
+        "x": 642,
+        "y": 250
+    },
+    {
+        "t": 10588,
+        "type": "mouseMove",
+        "x": 723,
+        "y": 258
+    },
+    {
+        "btn": "left",
+        "t": 10811,
+        "type": "mouseRelease",
+        "x": 723,
+        "y": 258
+    },
+    {
+        "data": "tabs:split|Configurator|right",
+        "t": 10814,
+        "type": "note"
+    },
+    {
+        "t": 10959,
+        "type": "mouseMove",
+        "x": 491,
+        "y": 192
+    },
+    {
+        "t": 11103,
+        "type": "mouseMove",
+        "x": 254,
+        "y": 102
+    },
+    {
+        "t": 11255,
+        "type": "mouseMove",
+        "x": 189,
+        "y": 81
+    },
+    {
+        "t": 11407,
+        "type": "mouseMove",
+        "x": 152,
+        "y": 49
+    },
+    {
+        "t": 11471,
+        "type": "mouseMove",
+        "x": 137,
+        "y": 34
+    },
+    {
+        "btn": "left",
+        "t": 11503,
+        "type": "mousePress",
+        "x": 137,
+        "y": 34
+    },
+    {
+        "t": 11558,
+        "type": "mouseMove",
+        "x": 142,
+        "y": 38
+    },
+    {
+        "t": 11710,
+        "type": "mouseMove",
+        "x": 293,
+        "y": 98
+    },
+    {
+        "t": 11843,
+        "type": "mouseMove",
+        "x": 326,
+        "y": 111
+    },
+    {
+        "t": 12006,
+        "type": "mouseMove",
+        "x": 342,
+        "y": 118
+    },
+    {
+        "btn": "left",
+        "t": 12091,
+        "type": "mouseRelease",
+        "x": 342,
+        "y": 118
+    },
+    {
+        "data": "tabs:split|Visualization|right",
+        "t": 12093,
+        "type": "note"
+    },
+    {
+        "t": 12159,
+        "type": "mouseMove",
+        "x": 350,
+        "y": 127
+    },
+    {
+        "t": 12303,
+        "type": "mouseMove",
+        "x": 538,
+        "y": 160
+    },
+    {
+        "t": 12455,
+        "type": "mouseMove",
+        "x": 867,
+        "y": 74
+    },
+    {
+        "t": 12607,
+        "type": "mouseMove",
+        "x": 952,
+        "y": 14
+    },
+    {
+        "t": 12687,
+        "type": "mouseMove",
+        "x": 954,
+        "y": 2
+    }
+]

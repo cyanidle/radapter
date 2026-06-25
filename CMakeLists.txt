@@ -77,8 +77,7 @@ function(radapter_scripts)
     set(scripts_dir ${CMAKE_CURRENT_BINARY_DIR}/_scripts)
     set(scripts_qrc ${scripts_dir}/radapter.qrc)
 
-    file(WRITE ${scripts_qrc} "<RCC>\n")
-    file(APPEND ${scripts_qrc} "<qresource prefix=\"/scripts\">\n")
+    set(qrc_content "<RCC>\n<qresource prefix=\"/scripts\">\n")
 
     foreach(file ${ARGN})
         get_filename_component(name ${file} NAME)
@@ -95,12 +94,12 @@ function(radapter_scripts)
                 COMMENT "Precompiling => ${out}"
             )
         endif()
-        file(APPEND ${scripts_qrc} "<file>${name}</file>\n")
+        string(APPEND qrc_content "<file>${name}</file>\n")
     endforeach()
 
-    file(APPEND ${scripts_qrc} "</qresource>\n")
+    string(APPEND qrc_content "</qresource>\n</RCC>\n")
 
-    file(APPEND ${scripts_qrc} "</RCC>\n")
+    file(GENERATE OUTPUT ${scripts_qrc} CONTENT ${qrc_content})
 
     qt5_add_resources(RADAPTER_QRC ${scripts_qrc}
         OPTIONS --compress 9 --threshold 70
@@ -193,7 +192,7 @@ endif()
 
 enable_testing()
 
-file(GLOB RADAPTER_TESTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.lua")
+file(GLOB RADAPTER_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.lua")
 
 foreach(test_file ${RADAPTER_TESTS})
     get_filename_component(test_name ${test_file} NAME_WE)
@@ -221,12 +220,21 @@ if (NOT RADAPTER_SDK_ONLY)
         USES_TERMINAL
     )
 
-    file(GLOB RADAPTER_GOLDENS "${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/*.json")
+    file(GLOB RADAPTER_GOLDENS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/*.json")
 
     add_custom_target(test_golden_all)
 
     foreach(golden_file ${RADAPTER_GOLDENS})
         get_filename_component(golden_name ${golden_file} NAME_WE)
+        add_custom_target(record_golden_${golden_name}
+            DEPENDS radapter
+            COMMAND
+                $<TARGET_FILE:radapter>
+                --gui-record ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/${golden_name}.json
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/configurator.lua
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            USES_TERMINAL
+        )
         add_custom_target(test_golden_${golden_name}
             DEPENDS radapter
             COMMAND

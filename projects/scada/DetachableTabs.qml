@@ -202,6 +202,7 @@ Item {
 
         groups.splice(insertAt, 0, {tabs: [panelIdx], active: panelIdx})
         groups = groups
+        radapter.note("tabs:split|" + panelList[panelIdx].title + "|" + side)
         relayout()
     }
 
@@ -214,23 +215,24 @@ Item {
         arr.splice(ti, 0, g.tabs[fromIdx])
         g.tabs = arr
         groups = groups
+        radapter.note("tabs:reordered|" + panelList[g.tabs[ti]].title)
         relayout()
     }
 
     // ── panel lifecycle ──────────────────────────────────────────────────
     function select(panelIdx) {
         if (panelIdx < 0 || panelIdx >= panelList.length) return
-        if (panelList[panelIdx].detached) { _raise(panelList[panelIdx]); return }
+        var panel = panelList[panelIdx]
+        if (panel.detached) { _raise(panel); return }
         var g = groupOf(panelIdx)
+        var wasActive = g >= 0 && groups[g].active === panelIdx
         if (g >= 0) groupActivate(g, panelIdx)
         else groupAdd(0, panelIdx)
+        if (!wasActive && panelList[panelIdx]) radapter.note("tabs:switched|" + panel.title)
     }
     function selectPanel(p) {
         var i = panelList.indexOf(p)
-        if (i >= 0) {
-            select(i)
-            if (panelList[i]) radapter.note("tabs:switched|" + panelList[i].title)
-        }
+        if (i >= 0) select(i)
     }
 
     function closePanelIdx(panelIdx) {
@@ -341,15 +343,16 @@ Item {
         var idx = dragPanelIdx, fromG = dragFromGroup
         dragging = false; dragPanelIdx = -1; dragFromGroup = -1
         var zone = dropZone; var tg = dropTargetGroup; dropZone = ""
+        var title = idx >= 0 && idx < panelList.length ? panelList[idx].title : "?"
 
         if (zone === "bar") {
             if (tg < 0 || tg >= groups.length) tg = groups.length - 1
             if (tg === fromG) {
                 var g2 = groups[tg]
                 var fromPos = g2.tabs.indexOf(idx)
-                if (fromPos >= 0) moveInGroup(tg, fromPos, dropBarIdx)
-                else groupActivate(tg, idx)
-            } else { groupAdd(tg, idx) }
+                if (fromPos >= 0) { moveInGroup(tg, fromPos, dropBarIdx); radapter.note("tabs:drag_reordered|" + title) }
+                else { groupActivate(tg, idx); radapter.note("tabs:drag_moved|" + title + "|group" + tg) }
+            } else { groupAdd(tg, idx); radapter.note("tabs:drag_moved|" + title + "|group" + tg) }
         } else if (zone === "left-edge") {
             makeSplit(idx, "left", 0)
         } else if (zone === "right-edge") {
@@ -359,7 +362,7 @@ Item {
         } else if (zone === "split-right") {
             makeSplit(idx, "right", tg >= 0 ? tg : groups.length - 1)
         } else if (zone === "content") {
-            if (isSplit && tg >= 0) groupAdd(tg, idx)
+            if (isSplit && tg >= 0) { groupAdd(tg, idx); radapter.note("tabs:drag_moved|" + title + "|group" + tg) }
             else select(idx)
         } else if (zone === "out") {
             var p = panelList[idx]
@@ -433,6 +436,7 @@ Item {
                 delegate: Rectangle {
                     id: tab
                     readonly property bool _isOverlay: false
+                    objectName: panel ? "tab_" + panel.title : ""
                     width: tabRow2.implicitWidth + 20; height: barRow.height
                     readonly property int panelIdx: barRow.tabIndices[index]
                     readonly property var panel: panelIdx !== undefined && panelIdx < tabs.panelList.length

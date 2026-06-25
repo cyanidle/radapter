@@ -199,7 +199,7 @@ After making QML changes, verify them systematically — don't just eyeball the 
    qt:record_start()
    -- … interact manually or via script …
    local json = qt:record_stop("/tmp/seq.json")
-   -- Then replay at 2x, 5x speed:
+   -- Then replay at 2x speed:
    qt:replay("/tmp/seq.json", 2.0)
    ```
    Use `replay_data` to embed the JSON inline in a test snippet.
