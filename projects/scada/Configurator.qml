@@ -21,6 +21,8 @@ ApplicationWindow {
     height: 900
     title: "Radapter Configurator" + (root.projectName.length > 0 ? " — " + root.projectName : "")
 
+    WindowSettings { key: "main"; win: root; defaultWidth: 960; defaultHeight: 900 }
+
     property var schemas: ({})
     property var pickable: []
     property var formOverrides: ({})   // per-field custom editors, from Lua

@@ -408,6 +408,13 @@ Item {
             width: 820; height: 580
             title: panel ? panel.title : ""
             onClosing: { tabs._redock(panel); Qt.callLater(destroy) }
+
+            WindowSettings {
+                key: "floatTab/" + (panel ? panel.title : "unknown")
+                win: win
+                defaultWidth: 820; defaultHeight: 580
+            }
+
             header: ToolBar {
                 RowLayout {
                     anchors.fill: parent

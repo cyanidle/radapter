@@ -348,6 +348,13 @@ Item {
             onXChanged: host.updateDrag(win)
             onYChanged: host.updateDrag(win)
             Component.onCompleted: Qt.callLater(function () { win.tracking = true })
+
+            WindowSettings {
+                key: "floatDock/" + (panel ? panel.title : "unknown")
+                win: win
+                defaultWidth: 440; defaultHeight: 540
+            }
+
             Item { id: bodyItem; anchors.fill: parent }
         }
     }

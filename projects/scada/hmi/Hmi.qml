@@ -14,6 +14,8 @@ ApplicationWindow {
     height: 480
     title: "Radapter HMI"
 
+    WindowSettings { key: "hmi"; win: win; defaultWidth: 640; defaultHeight: 480 }
+
     // `visualization` is a global context property set from Lua; root holds the tree
     readonly property var viz: (typeof visualization !== "undefined" && visualization)
                                ? visualization : ({ root: { type: "Column", children: [] } })
