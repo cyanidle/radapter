@@ -4,7 +4,6 @@ function(set_target_warnings target_name LINK_TYPE WARNING_AS_ERROR)
     set(CLANG_WARNINGS -Wall                       # reasonable and standard
                        -Wextra                     # same
                        -Wno-shadow                    # warn if shadow decalration
-                       -Wno-gnu-zero-variadic-macro-arguments
                        -Wpedantic                  # warn on language extansions
                        -Wnon-virtual-dtor          # warn if a class with virtual functions has a non-virtual dtor
                        -Wold-style-cast            # warn for c-style cast
@@ -58,6 +57,7 @@ function(set_target_warnings target_name LINK_TYPE WARNING_AS_ERROR)
     set(TARGET_WARNINGS_CXX ${MSVC_WARNINGS})
   elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     set(TARGET_WARNINGS_CXX ${CLANG_WARNINGS})
+    list(APPEND TARGET_WARNINGS_CXX -Wno-gnu-zero-variadic-macro-arguments)
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(TARGET_WARNINGS_CXX ${GCC_WARNINGS})
   else()

@@ -1,6 +1,7 @@
 #pragma once
 #include "radapter/radapter.hpp"
 #include "radapter/function.hpp"
+#include <vector>
 
 namespace radapter {
 
@@ -18,7 +19,7 @@ public:
         Quality quality = Quality::CommFail;
         QPointer<Worker> source;
         QString field;
-        QVector<LuaFunction> subscribers;
+        std::vector<LuaFunction> subscribers;
     };
 
     LuaValue changedListeners;

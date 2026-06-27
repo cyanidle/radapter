@@ -247,11 +247,11 @@ protected:
 // entry points (StartGuiRecording/StopGuiRecording/ReplayGuiFile) below.
 // ---------------------------------------------------------------------------
 
-static QVector<QQuickWindow*> guiWindows() {
-    QVector<QQuickWindow*> out;
+static std::vector<QQuickWindow*> guiWindows() {
+    std::vector<QQuickWindow*> out;
     for (auto* w : QGuiApplication::topLevelWindows())
         if (auto* qw = qobject_cast<QQuickWindow*>(w))
-            out.append(qw);
+            out.push_back(qw);
     return out;
 }
 
@@ -350,8 +350,8 @@ public:
     // No config needed — the framework auto-generates a name (like TestWorker).
     QML_Tester(WorkerArguments, Instance* inst) : Worker(inst, "qml_test") {
         auto wins = allWindows();
-        if (!wins.isEmpty())
-            curWindow = wins.first();
+        if (!wins.empty())
+            curWindow = wins.front();
     }
 
     void OnMsg(QVariant const&) override {} // no-op
@@ -360,8 +360,8 @@ private:
     QQuickWindow* checkWindow(const char* op = "this operation") {
         if (!curWindow) {
             auto wins = allWindows();
-            if (!wins.isEmpty())
-                curWindow = wins.first();
+            if (!wins.empty())
+                curWindow = wins.front();
         }
         if (!curWindow) {
             // give a specific hint when there are Item-rooted (non-window) QML workers
@@ -379,7 +379,7 @@ private:
         return win->mapToGlobal(QPoint(int(x), int(y)));
     }
 
-    static QVector<QQuickWindow*> allWindows() { return guiWindows(); }
+    static std::vector<QQuickWindow*> allWindows() { return guiWindows(); }
 
     static QQuickItem* findRecursive(QQuickItem* parent, QString const& name) {
         if (!parent) return nullptr;
@@ -391,9 +391,9 @@ private:
         return nullptr;
     }
 
-    static void findAllRecursive(QQuickItem* parent, QString const& name, QVector<QQuickItem*>& out) {
+    static void findAllRecursive(QQuickItem* parent, QString const& name, std::vector<QQuickItem*>& out) {
         if (!parent) return;
-        if (parent->objectName() == name) out.append(parent);
+        if (parent->objectName() == name) out.push_back(parent);
         for (auto* child : parent->childItems())
             findAllRecursive(child, name, out);
     }
@@ -418,8 +418,8 @@ private:
         return nullptr;
     }
 
-    QVector<QQuickItem*> findItems(QString const& name) {
-        QVector<QQuickItem*> out;
+    std::vector<QQuickItem*> findItems(QString const& name) {
+        std::vector<QQuickItem*> out;
         for (auto* win : allWindows())
             findAllRecursive(win->contentItem(), name, out);
         for (auto& p : _Inst->_GetPrivate()->guiItems)
@@ -602,9 +602,9 @@ public:
 
     void setWindowIndex(int idx) {
         auto wins = allWindows();
-        if (idx < 0 || idx >= wins.size())
+        if (idx < 0 || static_cast<size_t>(idx) >= wins.size())
             Raise("QML_Tester.set_window: index {} out of range ({} windows)", idx, wins.size());
-        curWindow = wins[idx];
+        curWindow = wins[static_cast<size_t>(idx)];
         curItem = nullptr;
     }
 
@@ -644,7 +644,7 @@ public:
 
     QVariantList find_all(QString name) {
         auto items = findItems(name);
-        QVariantList vl; vl.reserve(items.size());
+        QVariantList vl; vl.reserve(static_cast<int>(items.size()));
         for (auto* it : items)
             vl.append(it->objectName());
         return vl;
@@ -719,9 +719,9 @@ RADAPTER_API void gui::ReplayFile(QString const& path, double speed) {
     if (!f.open(QIODevice::ReadOnly))
         Raise("--gui-replay: cannot open '{}'", path);
     auto wins = qml_test::guiWindows();
-    if (wins.isEmpty())
+    if (wins.empty())
         Raise("--gui-replay: no QML window to replay into");
-    qml_test::replayEventsOn(wins.first(), qml_test::parseEventsArray(f.readAll(), "--gui-replay"), speed);
+    qml_test::replayEventsOn(wins.front(), qml_test::parseEventsArray(f.readAll(), "--gui-replay"), speed);
 }
 
 namespace builtin::workers {

@@ -2,7 +2,6 @@
 #include "radapter/radapter.hpp"
 #include <QSet>
 #include <QPointer>
-#include <QVector>
 #include <vector>
 #include "builtin.hpp"
 #include "tags.hpp"
@@ -31,7 +30,7 @@ struct radapter::Instance::Impl {
     QPointer<qml_test::RecordFilter> guiRecordFilter;
     // non-window QQuickItem roots from QML{} workers with an Item-rooted QML file;
     // QML_Tester searches these when there is no QQuickWindow to search through
-    QVector<QPointer<QQuickItem>> guiItems;
+    std::vector<QPointer<QQuickItem>> guiItems;
 
 
     static int luaLog(lua_State* L);

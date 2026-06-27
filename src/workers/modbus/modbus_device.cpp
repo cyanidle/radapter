@@ -2,6 +2,10 @@
 #include <qmodbusrtuserialslave.h>
 #include <qmodbustcpserver.h>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
+
 radapter::modbus::MasterDevice::MasterDevice(RtuDevice config, QObject *parent) :
     MasterDevice(static_cast<Device&>(config), parent)
 {

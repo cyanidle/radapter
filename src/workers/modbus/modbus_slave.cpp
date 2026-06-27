@@ -1,6 +1,10 @@
 #include "modbus_device.hpp"
 #include <QModbusServer>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
+
 namespace radapter::modbus
 {
 

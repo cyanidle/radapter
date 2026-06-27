@@ -214,6 +214,10 @@ static int tags_get(lua_State* L) {
     return 1;
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
 static int tags_source(lua_State* L) {
     auto* reg = getRegistry(L);
     auto name = QString::fromUtf8(luaL_checkstring(L, 2));
@@ -230,6 +234,9 @@ static int tags_source(lua_State* L) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
     return 1;
 }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 TagRegistry* Instance::Tags() const {
     return d->tagRegistry.get();

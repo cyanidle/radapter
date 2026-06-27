@@ -125,8 +125,10 @@ target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
 
 if (MSVC)
     target_compile_options(radapter-sdk PRIVATE /Zc:__cplusplus)
-else()
+elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     target_compile_options(radapter-sdk PRIVATE -Wno-old-style-cast -Wno-nested-anon-types)
+else()
+    target_compile_options(radapter-sdk PRIVATE -Wno-old-style-cast -Wno-stringop-overflow)
 endif()
 
 target_link_libraries(radapter-sdk PRIVATE

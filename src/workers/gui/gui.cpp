@@ -206,7 +206,7 @@ public:
         root->setParent(this);
         // Item-rooted QML (no QQuickWindow) — register for QML_Tester searches
         if (auto* item = qobject_cast<QQuickItem*>(root))
-            inst->_GetPrivate()->guiItems.append(item);
+            inst->_GetPrivate()->guiItems.push_back(item);
     }
     ~QMLWorker() override {
         // tear the view (and its bindings) down first, so they don't re-evaluate
