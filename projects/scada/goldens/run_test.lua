@@ -49,6 +49,10 @@ if mode == "record" then
     local view = QML {
         url = "../Configurator.qml",
         properties = {
+            -- Disable QSettings persistence during golden tests: Qt.labs.settings'
+            -- file I/O during QML component construction interferes with the
+            -- QML_Tester event recording/replay, causing note mismatches.
+            persistUi = false,
             home = os.getenv("HOME") or "/",
             qt_version = app_info().qt_version or "5",
             github_url = "https://github.com/cyanidle/radapter",

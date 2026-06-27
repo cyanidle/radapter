@@ -45,6 +45,7 @@ local custom_forms = {}
 local view = QML {
     url = "./Configurator.qml",
     properties = {
+        persistUi = true,  -- enable window/tab geometry persistence via QSettings
         custom_forms = custom_forms,
         home = os.getenv("HOME") or "/",   -- starting dir for the file pickers
         qt_version = app_info().qt_version,

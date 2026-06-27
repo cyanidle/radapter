@@ -15,7 +15,10 @@ Item {
 
     property var appWindow: null
     property var panelList: []
-    property string settingsKey: "tabs/main"   // QSettings category for tab layout
+
+    // Disable when the Lua side sets the global context property persistUi to false
+    // (e.g. golden tests pass this to avoid QSettings I/O interfering with replay).
+    readonly property bool _persistActive: typeof persistUi === "undefined" || persistUi
     property bool _tabRestored: false
 
     // ── tab state persistence ───────────────────────────────────────────────
@@ -23,7 +26,7 @@ Item {
 
     Settings {
         id: tabCfg
-        category: tabs.settingsKey
+        category: "tabs/main"
         property string groupsJson: ""
         property string detachedJson: ""
     }
@@ -35,7 +38,7 @@ Item {
     }
 
     function _scheduleTabSave() {
-        if (!_tabRestored) return
+        if (!_tabRestored || !_persistActive) return
         _tabSaveTimer.restart()
     }
 
@@ -49,7 +52,7 @@ Item {
     }
 
     function _restoreTabState() {
-        if (!tabCfg.groupsJson) return false
+        if (!_persistActive || !tabCfg.groupsJson) return false
         try {
             var savedGroups = JSON.parse(tabCfg.groupsJson)
             if (!savedGroups || !savedGroups.length) return false

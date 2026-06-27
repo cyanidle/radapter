@@ -23,6 +23,10 @@ Item {
     property int defaultHeight: 600
     property Window win: null           // required — set to the window id
 
+    // Disable when the Lua side sets the global context property persistUi to false
+    // (e.g. golden tests pass this to avoid QSettings I/O interfering with replay).
+    readonly property bool _active: typeof persistUi === "undefined" || persistUi
+
     // ── persisted via QSettings ─────────────────────────────────────────────
     Settings {
         id: s
@@ -39,14 +43,14 @@ Item {
     property bool _restored: false
 
     Component.onCompleted: {
-        if (!key || !win) return
+        if (!key || !win || !_active) return
         // For floating windows the creator sets x/y after createObject returns,
         // so defer geometry application to after those synchronous assignments.
         Qt.callLater(_init)
     }
 
     function _init() {
-        if (_restored) return
+        if (_restored || !_active) return
         _restored = true
         if (_hasSavedState()) {
             _applySaved()
@@ -145,7 +149,7 @@ Item {
 
     // ── save ────────────────────────────────────────────────────────────────
     function _installHooks() {
-        if (!win) return
+        if (!win || !_active) return
         win.onXChanged.connect(_scheduleSave)
         win.onYChanged.connect(_scheduleSave)
         win.onWidthChanged.connect(_scheduleSave)
@@ -167,7 +171,7 @@ Item {
 
     function _persistNow() {
         _saveTimer.stop()
-        if (!win) return
+        if (!_active || !win) return
 
         // Don't capture garbage coords during transitions
         var vis = win.visibility
