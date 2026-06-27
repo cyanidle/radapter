@@ -69,11 +69,9 @@ RowLayout {
         y: 40
         property var devValues: ({})
         readonly property string nameError: {
-            var n = nameField.text.trim()
             var _rev = ref.context ? ref.context.revision : 0
-            if (!n.length) return "Name is required"
-            if (ref.context && ref.context.has(n)) return "Name already in use"
-            return ""
+            return ref.context ? ref.context.nameError(nameField.text, "")
+                               : (nameField.text.trim().length ? "" : "Name is required")
         }
 
         // the standard button box may not exist yet when nameError first changes

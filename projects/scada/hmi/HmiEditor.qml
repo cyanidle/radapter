@@ -3,6 +3,7 @@ import QtQuick.Window 2.13
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
 import ".."   // DockHost / DockablePanel live one dir up in projects/scada/
+import "tree.js" as Tree
 // Node, Gauge, InfoDisplay are sibling .qml files (same-directory resolution).
 
 // Visualization (HMI) editor, embedded as a tab in the configurator. Edits a tree of
@@ -24,7 +25,7 @@ Item {
 
     // candidate "worker:field" tags, derived live from the authored config (re-evaluated
     // on every context edit via revision), sorted so they cluster by worker-name prefix.
-    property var candidateTags: context ? deriveTags(context.objects, context.revision) : []
+    property var candidateTags: (context && context.revision >= 0) ? context.candidateTags() : []
 
     property var viz: ({ root: { type: "Column", spacing: 8, children: [] } })
     property var selectedPath: null     // array of child indices; [] is the root
@@ -35,26 +36,6 @@ Item {
     readonly property var containerTypes: ["Row", "Column", "Grid"]
     readonly property var widgetTypes: ["Gauge", "InfoDisplay", "Chart", "Spacer", "Custom"]
 
-    // Tags follow the "<worker>:<field>" convention (see src/tags.cpp). Walk each
-    // Modbus object's register tables for the field names. Best-effort — the tag field
-    // is also free-text, so anything not discovered here can still be typed in.
-    function deriveTags(objects, _rev) {
-        var out = []
-        for (var name in (objects || ({}))) {
-            var o = objects[name]
-            if (!o || (o.type !== "ModbusMaster" && o.type !== "ModbusSlave")) continue
-            var regs = (o.config || ({})).registers || ({})
-            for (var group in regs) {
-                var g = regs[group]
-                if (g && typeof g === "object")
-                    for (var field in g) out.push(name + ":" + field)
-            }
-        }
-        out.sort()
-        return out
-    }
-
-    function isContainerType(t) { return containerTypes.indexOf(t) >= 0 }
     function clone(o) { return JSON.parse(JSON.stringify(o)) }
 
     // ---- tree navigation ----------------------------------------------------
@@ -63,11 +44,6 @@ Item {
         for (var i = 0; i < path.length; i++) n = n.children[path[i]]
         return n
     }
-    function pathEq(a, b) {
-        if (a === null || b === null) return false
-        return JSON.stringify(a) === JSON.stringify(b)
-    }
-
     // ---- load / commit ------------------------------------------------------
     function loadFromContext() {
         if (!context) return
@@ -106,9 +82,9 @@ Item {
         var chain = []
         var p = deepestPath.slice()
         while (true) { chain.push(p.slice()); if (p.length === 0) break; p = p.slice(0, -1) }
-        if (pathEq(deepestPath, _lastClickPath)) {
+        if (Tree.pathEq(deepestPath, _lastClickPath)) {
             var idx = 0
-            for (var i = 0; i < chain.length; i++) if (pathEq(chain[i], selectedPath)) { idx = i; break }
+            for (var i = 0; i < chain.length; i++) if (Tree.pathEq(chain[i], selectedPath)) { idx = i; break }
             selectNode(chain[(idx + 1) % chain.length])
         } else {
             selectNode(deepestPath)
@@ -150,7 +126,7 @@ Item {
     // ---- structural edits ---------------------------------------------------
     function makeNode(type) {
         if (type === "Grid")  return { type: type, spacing: 8, columns: 2, children: [] }
-        if (isContainerType(type)) return { type: type, spacing: 8, children: [] }
+        if (Tree.isContainer(type)) return { type: type, spacing: 8, children: [] }
         if (type === "Gauge") return { type: type, tag: "", min: 0, max: 100, label: type, units: "" }
         if (type === "Chart") return { type: type, tag: "", timeFrame: 3600, label: type, units: "" }
         if (type === "Spacer") return { type: type, fillWidth: true }
@@ -163,7 +139,7 @@ Item {
         var target = viz.root
         if (selectedPath && selectedPath.length >= 0) {
             var sel = nodeAt(selectedPath)
-            if (isContainerType(sel.type)) target = sel
+            if (Tree.isContainer(sel.type)) target = sel
             else if (selectedPath.length > 0) target = nodeAt(selectedPath.slice(0, -1))
         }
         if (!target.children) target.children = []
@@ -174,7 +150,7 @@ Item {
     // add a child of a specific container (the in-canvas "＋" button, by node path)
     function addChild(containerPath, type) {
         var target = nodeAt(containerPath)
-        if (!isContainerType(target.type)) return
+        if (!Tree.isContainer(target.type)) return
         if (!target.children) target.children = []
         target.children.push(makeNode(type))
         selectedPath = containerPath.concat([target.children.length - 1])
@@ -200,7 +176,7 @@ Item {
         var node = clone(clipboard)
         if (selectedPath && selectedPath.length > 0) {
             var sel = nodeAt(selectedPath)
-            if (isContainerType(sel.type)) {
+            if (Tree.isContainer(sel.type)) {
                 if (!sel.children) sel.children = []
                 sel.children.push(node)
                 selectedPath = selectedPath.concat([sel.children.length - 1])
@@ -242,7 +218,7 @@ Item {
         var node = nodeAt(fromPath)
         var fromParent = nodeAt(fromPath.slice(0, -1))
         var fromIdx = fromPath[fromPath.length - 1]
-        var sameParent = pathEq(fromPath.slice(0, -1), toParentPath)
+        var sameParent = Tree.pathEq(fromPath.slice(0, -1), toParentPath)
         var insertIdx = (sameParent && fromIdx < toIndex) ? toIndex - 1 : toIndex
         fromParent.children.splice(fromIdx, 1)
         var toParent = nodeAt(toParentPath)
@@ -258,7 +234,7 @@ Item {
         var toParentPath, toIndex
         if (zone === 0) {
             var t = nodeAt(targetPath)
-            if (isContainerType(t.type)) {
+            if (Tree.isContainer(t.type)) {
                 toParentPath = targetPath
                 toIndex = t.children ? t.children.length : 0
                 moveNode(fromPath, toParentPath, toIndex)
@@ -302,7 +278,7 @@ Item {
     function fieldsFor(node) {
         if (!node) return []
         var f = []
-        if (isContainerType(node.type)) {
+        if (Tree.isContainer(node.type)) {
             f.push({ key: "spacing", label: "Spacing", kind: "number" })
             if (node.type === "Grid") f.push({ key: "columns", label: "Columns", kind: "number" })
         } else if (node.type === "Spacer") {
@@ -435,7 +411,7 @@ Item {
                     width: treeList.width
                     height: 26
                     property var rowData: modelData
-                    readonly property bool selected: editor.pathEq(rowData.path, editor.selectedPath)
+                    readonly property bool selected: Tree.pathEq(rowData.path, editor.selectedPath)
 
                     Rectangle {
                         id: content
@@ -503,14 +479,14 @@ Item {
                             color: "transparent"
                             border.color: "#1565c0"; border.width: 2
                             visible: drop.active && drop.zone === 0
-                                     && editor.isContainerType(wrapper.rowData.type)
+                                     && Tree.isContainer(wrapper.rowData.type)
                         }
                         Rectangle {   // before/after insertion line
                             height: 2; color: "#1565c0"
                             anchors.left: parent.left; anchors.right: parent.right
                             y: drop.zone < 0 ? 0 : parent.height - 2
                             visible: drop.active &&
-                                     (drop.zone !== 0 || !editor.isContainerType(wrapper.rowData.type))
+                                     (drop.zone !== 0 || !Tree.isContainer(wrapper.rowData.type))
                         }
                     }
                 }

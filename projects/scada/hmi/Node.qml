@@ -1,6 +1,7 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
+import "tree.js" as Tree
 
 // Recursive renderer for one visualization node. A node is either a layout CONTAINER
 // (type Row/Column/Grid, with `children`) or a widget LEAF (type Gauge/InfoDisplay/…,
@@ -27,14 +28,6 @@ Loader {
     // in place of the design placeholder.
     property var liveValues: undefined
     property var liveQuality: undefined
-
-    function isContainer(t) { return t === "Row" || t === "Column" || t === "Grid" }
-    function pathEq(a, b) {
-        if (a === null || b === null) return false
-        if (a.length !== b.length) return false
-        for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
-        return true
-    }
 
     // layout hints — applied to this Loader as seen by its parent layout
     Layout.fillWidth: spec.fillWidth === true
@@ -64,7 +57,7 @@ Loader {
         if (mode === "run" && spec.tag && radapter.tags) radapter.tags.ensure(spec.tag)
     }
 
-    sourceComponent: isContainer(spec.type) ? containerComp : leafComp
+    sourceComponent: Tree.isContainer(spec.type) ? containerComp : leafComp
 
     // ---- container: a *Layout with a nested Node per child ------------------
     Component {
@@ -102,8 +95,7 @@ Loader {
                 id: childComp
                 Loader {
                     property var childSpec: node.spec.children[index]
-                    readonly property bool childIsContainer:
-                        childSpec.type === "Row" || childSpec.type === "Column" || childSpec.type === "Grid"
+                    readonly property bool childIsContainer: Tree.isContainer(childSpec.type)
                     width: childSpec.preferredWidth !== undefined ? childSpec.preferredWidth : implicitWidth
                     height: childSpec.preferredHeight !== undefined ? childSpec.preferredHeight : implicitHeight
                     // a nested container fills the available width in a Column/Grid so its own
@@ -252,8 +244,8 @@ Loader {
                 z: 2
                 anchors.fill: parent
                 color: "transparent"
-                border.color: node.pathEq(node.path, node.selectedPath) ? "#2196f3" : "#e8e8e8"
-                border.width: node.pathEq(node.path, node.selectedPath) ? 2 : 1
+                border.color: Tree.pathEq(node.path, node.selectedPath) ? "#2196f3" : "#e8e8e8"
+                border.width: Tree.pathEq(node.path, node.selectedPath) ? 2 : 1
                 visible: node.mode === "design"
             }
         }
@@ -289,7 +281,7 @@ Loader {
                 border.color: "#2196f3"
                 border.width: 2
                 radius: 3
-                visible: node.mode === "design" && node.pathEq(node.path, node.selectedPath)
+                visible: node.mode === "design" && Tree.pathEq(node.path, node.selectedPath)
             }
             MouseArea {
                 z: 1   // above the widget Loader (z 0), so clicks hit selection first

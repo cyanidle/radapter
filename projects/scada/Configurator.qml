@@ -121,7 +121,7 @@ ApplicationWindow {
                 root.liveValues = ({}); root.liveQuality = ({}); root.runnerLive = false
             } else if (root.runState === "running") {
                 root.runnerLive = true
-            } else if (root.runState === "stopped" || root.runState === "disconnected"
+            } else if (root.runState === "stopped"
                        || root.runState.indexOf("exited") === 0) {
                 root.runnerLive = false
             }
@@ -178,6 +178,19 @@ ApplicationWindow {
     function projectConfig() {
         return { objects: sharedContext.objects, pipes: sharedContext.pipes,
                  visualization: sharedContext.visualization }
+    }
+
+    // Run is enabled once at least one worker exists and every worker has its required
+    // fields set. Depends on revision (edits) and schemas (which arrive async) so it
+    // re-evaluates. Shared by the toolbar and the runner-panel Run buttons.
+    readonly property bool runReady:
+        sharedContext.revision >= 0
+        && sharedContext.schemas !== undefined
+        && Object.keys(sharedContext.objects).length > 0
+        && sharedContext.allComplete()
+    function startRun() {
+        radapter.note("runner:start_requested")
+        radapter.model.send({ run: root.projectConfig() })
     }
 
     function uniqueName(type) {
@@ -339,20 +352,11 @@ ApplicationWindow {
             Button {
                 objectName: "runBtn"
                 text: "▶ Run"
-                // depend on revision (objects/config edits) and schemas (arrive async)
-                // so it re-evaluates; disabled while any worker has a required field unset
-                enabled: sharedContext.revision >= 0
-                         && sharedContext.schemas !== undefined
-                         && Object.keys(sharedContext.objects).length > 0
-                         && sharedContext.allComplete()
+                enabled: root.runReady
                 ToolTip.visible: hovered && !enabled
                                  && Object.keys(sharedContext.objects).length > 0
                 ToolTip.text: "Some workers are missing required fields"
-                onClicked: {
-                    radapter.note("runner:start_requested")
-                    radapter.model.send({ run: root.projectConfig() })
-                    tabs.selectPanel(runnerPanel)
-                }
+                onClicked: { root.startRun(); tabs.selectPanel(runnerPanel) }
             }
             Item { Layout.fillWidth: true }
             Label {
@@ -532,15 +536,8 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
                 Button {
                     text: "▶ Run"
-                    enabled: sharedContext.revision >= 0
-                             && sharedContext.schemas !== undefined
-                             && Object.keys(sharedContext.objects).length > 0
-                             && sharedContext.allComplete()
-                    onClicked: {
-                        radapter.note("runner:start_requested")
-                        radapter.model.send({ run: root.projectConfig() })
-                        logModel.clear()
-                    }
+                    enabled: root.runReady
+                    onClicked: { root.startRun(); logModel.clear() }
                 }
                 Button { text: "Clear"; onClicked: logModel.clear() }
                 Button {

@@ -9,9 +9,6 @@ import QtQuick.Layouts 1.3
 // All editors sharing one `context` (a ConfigContext) see a single set of authored
 // objects: names are validated unique across them, and devices created via a RefField
 // land in the same store. The worker is registered into `context` live as it is edited.
-//
-// - currentWorker() -> { <name> = { type, config } } (just this worker; for preview)
-// - currentFragment() -> declare-compatible { objects = { ... } } from the whole context
 ColumnLayout {
     id: cfg
     spacing: 8
@@ -33,11 +30,9 @@ ColumnLayout {
     // "" when the name is valid; otherwise the reason. Reactive via nameField.text,
     // context.revision and registeredName.
     readonly property string nameError: {
-        var n = nameField.text.trim()
         var _rev = context ? context.revision : 0
-        if (!n.length) return "Name is required"
-        if (context && context.has(n) && n !== registeredName) return "Name already in use"
-        return ""
+        return context ? context.nameError(nameField.text, registeredName)
+                       : (nameField.text.trim().length ? "" : "Name is required")
     }
     readonly property bool nameOk: nameError.length === 0
 
@@ -84,18 +79,6 @@ ColumnLayout {
         formLoader.reload()
         changed()
         radapter.note("configurator:cleared")
-    }
-
-    function currentWorker() {
-        var e = {}
-        e[name() || "(unnamed)"] = { type: cfg.type, config: values }
-        return e
-    }
-    // the whole authored set (objects + pipes), ready for declare.build
-    function currentFragment() {
-        register()
-        return { objects: context ? context.objects : currentWorker(),
-                 pipes: context ? context.pipes : [] }
     }
 
     // reset the form when the user changes the configured type (but not while a

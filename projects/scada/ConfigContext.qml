@@ -30,6 +30,14 @@ QtObject {
     function nameAvailable(name, owned) {
         return name.length > 0 && (!has(name) || name === owned)
     }
+    // "" when usable, else the reason (for inline validation labels). `owned` is the name
+    // the asking editor already holds (excluded from the in-use check).
+    function nameError(name, owned) {
+        var n = (name || "").trim()
+        if (!n.length) return "Name is required"
+        if (has(n) && n !== owned) return "Name already in use"
+        return ""
+    }
 
     function put(name, type, config) { objects[name] = { type: type, config: config }; bump() }
 
@@ -79,6 +87,32 @@ QtObject {
         return out
     }
 
+    // ---- modbus tag derivation --------------------------------------------
+    // field names declared in a Modbus object's register tables (the leaves of
+    // config.registers.{holding,coils,…}); empty for non-Modbus objects.
+    function registerFieldNames(name) {
+        var o = objects[name], out = []
+        if (!o || (o.type !== "ModbusMaster" && o.type !== "ModbusSlave")) return out
+        var regs = (o.config || ({})).registers || ({})
+        for (var group in regs) {
+            var g = regs[group]
+            if (g && typeof g === "object")
+                for (var field in g) out.push(field)
+        }
+        return out
+    }
+    // every "<worker>:<field>" tag derivable from the authored config (see src/tags.cpp);
+    // the candidate list for HMI widgets / the sender. Sorted so they cluster by worker.
+    function candidateTags() {
+        var out = []
+        for (var name in objects) {
+            var fs = registerFieldNames(name)
+            for (var i = 0; i < fs.length; i++) out.push(name + ":" + fs[i])
+        }
+        out.sort()
+        return out
+    }
+
     // ---- completeness validation -------------------------------------------
     // a required field is a top-level leaf with no [optional]/[has_default]
     // annotation (mirrors SchemaForm.isRequired); name/category aren't authored
@@ -119,7 +153,11 @@ QtObject {
 
     // ---- pipes (graph edges) ----------------------------------------------
     // a pipe is { from, to } plus at most one declare directive field:
-    // wrap=<key> / unwrap=<key> / on=<field> (absent = a plain pipe)
+    // wrap=<key> / unwrap=<key> / on=<field> (absent = a plain pipe). The canonical
+    // directive ids, in their ComboBox order (index 0 is a plain pipe); the UIs supply
+    // their own labels but share this ordering so directive<->index stays consistent.
+    readonly property var pipeKinds: ["pipe", "wrap", "unwrap", "on"]
+    function dirIndex(dir) { var i = pipeKinds.indexOf(dir); return i < 0 ? 0 : i }
     function pipeDir(p) {
         if (p.wrap !== undefined)   return "wrap"
         if (p.unwrap !== undefined) return "unwrap"

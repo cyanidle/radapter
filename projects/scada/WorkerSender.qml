@@ -36,17 +36,12 @@ Item {
         }
 
         // 2) derive from the worker's config (Modbus registers, etc.)
-        var obj = context ? context.objects[workerName] : undefined
-        if (obj && (obj.type === "ModbusMaster" || obj.type === "ModbusSlave")) {
-            var regs = (obj.config || {}).registers || {}
-            for (var group in regs) {
-                var g = regs[group]
-                if (g && typeof g === "object")
-                    for (var fieldName in g)
-                        if (map[fieldName] === undefined)
-                            map[fieldName] = { field: fieldName, value: undefined,
-                                               quality: "comm_fail", source: "config" }
-            }
+        var names = context ? context.registerFieldNames(workerName) : []
+        for (var i = 0; i < names.length; i++) {
+            var fieldName = names[i]
+            if (map[fieldName] === undefined)
+                map[fieldName] = { field: fieldName, value: undefined,
+                                   quality: "comm_fail", source: "config" }
         }
 
         var out = []

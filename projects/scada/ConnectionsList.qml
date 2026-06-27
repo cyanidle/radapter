@@ -25,18 +25,13 @@ ColumnLayout {
         return out
     }
 
-    // the directive kinds, in the ComboBox order; index 0 is a plain pipe
-    readonly property var kinds: [
-        { kind: "pipe",   label: "plain"  },
-        { kind: "wrap",   label: "wrap"   },
-        { kind: "unwrap", label: "unwrap" },
-        { kind: "on",     label: "on"     }
-    ]
-    function dirToIndex(dir) {
-        if (dir === "wrap")   return 1
-        if (dir === "unwrap") return 2
-        if (dir === "on")     return 3
-        return 0
+    // labels for each canonical directive kind (ConfigContext.pipeKinds owns the ordering)
+    readonly property var kinds: {
+        var labels = ({ pipe: "plain", wrap: "wrap", unwrap: "unwrap", on: "on" })
+        var ks = context ? context.pipeKinds : ["pipe", "wrap", "unwrap", "on"]
+        var out = []
+        for (var i = 0; i < ks.length; i++) out.push({ kind: ks[i], label: labels[ks[i]] })
+        return out
     }
 
     Label {
@@ -68,7 +63,7 @@ ColumnLayout {
                 Layout.preferredWidth: 86
                 model: panel.kinds
                 textRole: "label"
-                Component.onCompleted: currentIndex = panel.dirToIndex(panel.context.pipeDir(p))
+                Component.onCompleted: currentIndex = panel.context.dirIndex(panel.context.pipeDir(p))
                 onActivated: {
                     var d = panel.kinds[currentIndex]
                     // plain commits immediately; keyed kinds wait for a key in keyField
