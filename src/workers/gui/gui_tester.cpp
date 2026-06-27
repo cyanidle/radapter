@@ -357,14 +357,21 @@ public:
     void OnMsg(QVariant const&) override {} // no-op
 
 private:
-    QQuickWindow* checkWindow() {
+    QQuickWindow* checkWindow(const char* op = "this operation") {
         if (!curWindow) {
             auto wins = allWindows();
             if (!wins.isEmpty())
                 curWindow = wins.first();
         }
-        if (!curWindow)
+        if (!curWindow) {
+            // give a specific hint when there are Item-rooted (non-window) QML workers
+            bool hasItems = false;
+            for (auto& p : _Inst->_GetPrivate()->guiItems)
+                if (p) { hasItems = true; break; }
+            if (hasItems)
+                Raise("QML_Tester: {} requires a QQuickWindow root, but the loaded QML has an Item root — wrap it in Window{{}} or ApplicationWindow{{}} to enable this", op);
             Raise("QML_Tester: no QML window — open one with QML{{...}} first");
+        }
         return curWindow.data();
     }
 
@@ -392,16 +399,31 @@ private:
     }
 
     QQuickItem* findItem(QString const& name) {
-        auto* win = checkWindow();
-        auto* item = findRecursive(win->contentItem(), name);
-        if (item) curItem = item;
-        return item;
+        // search all QQuickWindow content trees first, updating curWindow on match
+        for (auto* win : allWindows()) {
+            if (auto* found = findRecursive(win->contentItem(), name)) {
+                curWindow = win;
+                curItem = found;
+                return found;
+            }
+        }
+        // fall back to non-window Item roots (Item-rooted QML files)
+        for (auto& p : _Inst->_GetPrivate()->guiItems) {
+            if (!p) continue;
+            if (auto* found = findRecursive(p.data(), name)) {
+                curItem = found;
+                return found;
+            }
+        }
+        return nullptr;
     }
 
     QVector<QQuickItem*> findItems(QString const& name) {
         QVector<QQuickItem*> out;
-        auto* win = checkWindow();
-        findAllRecursive(win->contentItem(), name, out);
+        for (auto* win : allWindows())
+            findAllRecursive(win->contentItem(), name, out);
+        for (auto& p : _Inst->_GetPrivate()->guiItems)
+            if (p) findAllRecursive(p.data(), name, out);
         return out;
     }
 

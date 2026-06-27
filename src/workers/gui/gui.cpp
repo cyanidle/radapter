@@ -2,11 +2,13 @@
 #include <radapter/logs.hpp>
 #include <radapter/function.hpp>
 #include "builtin.hpp"
+#include "instance_impl.hpp"
 #include "tags.hpp"
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlPropertyMap>
+#include <QQuickItem>
 #include <QDir>
 #include <memory>
 #include <unordered_map>
@@ -202,10 +204,18 @@ public:
             Raise("Could not create qml view: {}", creator->errorString());
         }
         root->setParent(this);
+        // Item-rooted QML (no QQuickWindow) — register for QML_Tester searches
+        if (auto* item = qobject_cast<QQuickItem*>(root))
+            inst->_GetPrivate()->guiItems.append(item);
     }
     ~QMLWorker() override {
         // tear the view (and its bindings) down first, so they don't re-evaluate
         // against a half-destroyed `radapter`/model during teardown
+        if (auto* item = qobject_cast<QQuickItem*>(root)) {
+            auto& items = _Inst->_GetPrivate()->guiItems;
+            items.erase(std::remove_if(items.begin(), items.end(),
+                [item](auto const& p) { return p.data() == item || !p; }), items.end());
+        }
         delete root;
     }
 	void OnMsg(QVariant const& msg) override {
