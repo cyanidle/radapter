@@ -271,6 +271,7 @@ Loader {
                     item.value = Qt.binding(function () { return node.resolvedValue })
                     item.quality = Qt.binding(function () { return node.resolvedQuality })
                     if ("mode" in item) item.mode = Qt.binding(function () { return node.mode })
+                    if ("live" in item) item.live = Qt.binding(function () { return node.liveValues !== undefined })
                 }
             }
 

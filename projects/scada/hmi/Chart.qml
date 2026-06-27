@@ -17,6 +17,11 @@ Item {
     property var value: undefined
     property string quality: "good"
     property string mode: "design"    // set by Node.qml: "run" | "design"
+    property bool live: false         // set by Node.qml: true when observe-mode liveValues arrive
+
+    // true when the chart should collect incoming values (either real run mode, or design
+    // canvas with the runner streaming live data in observe mode)
+    readonly property bool _tracking: mode === "run" || live
 
     readonly property int timeFrame: spec.timeFrame !== undefined ? Number(spec.timeFrame) : 3600
     readonly property var yMinFixed: spec.yMin
@@ -40,12 +45,12 @@ Item {
     Timer {
         id: ticker
         interval: 1000; repeat: true
-        running: chart.mode === "run"
+        running: chart._tracking
         onTriggered: { chart._prune(); chart._scrollAxes(); chart._rescaleY() }
     }
 
     onValueChanged: {
-        if (chart.mode !== "run") return
+        if (!chart._tracking) return
         var v = Number(chart.value)
         if (isNaN(v)) return
         chart._lastValue = v
@@ -53,6 +58,7 @@ Item {
     }
 
     onModeChanged: chart._reload()
+    onLiveChanged: chart._reload()
     onSpecChanged: chart._reload()
     Component.onCompleted: chart._reload()
 
@@ -90,6 +96,7 @@ Item {
     }
 
     function _flush() {
+        if (!chart._tracking) return
         series.append(chart._now(), Number(chart._lastValue))
         chart._prune()
         chart._scrollAxes()
@@ -98,8 +105,10 @@ Item {
 
     // Rebuild the series from scratch (mode/spec change). Design mode seeds a sine curve.
     function _reload() {
+        flusher.stop()
+        chart._lastValue = undefined
         series.clear()
-        if (chart.mode === "design") {
+        if (!chart._tracking) {
             var now = chart._now()
             var n = 60
             for (var i = 0; i <= n; i++) {
