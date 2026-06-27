@@ -502,7 +502,7 @@ ApplicationWindow {
         Loader {
             id: hmiEditorLoader
             anchors.fill: parent
-            source: "hmi/HmiEditor.qml"
+            source: "../hmi/HmiEditor.qml"
             onLoaded: {
                 item.context = sharedContext
                 item.live = Qt.binding(function () { return root.runnerLive })

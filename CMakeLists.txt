@@ -217,7 +217,9 @@ if (NOT RADAPTER_SDK_ONLY)
         DEPENDS radapter
         COMMAND $<TARGET_FILE:radapter>
                 --gui-record ${CMAKE_CURRENT_SOURCE_DIR}/qml_record.json
-                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/configurator.lua
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/scada.lua
+                config
+                ui-no-persist
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         USES_TERMINAL
     )
@@ -233,7 +235,9 @@ if (NOT RADAPTER_SDK_ONLY)
             COMMAND
                 $<TARGET_FILE:radapter>
                 --gui-record ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/${golden_name}.json
-                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/configurator.lua
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/scada.lua
+                config
+                ui-no-persist
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             USES_TERMINAL
         )
@@ -241,7 +245,8 @@ if (NOT RADAPTER_SDK_ONLY)
             DEPENDS radapter
             COMMAND
                 $<TARGET_FILE:radapter>
-                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/goldens/run_test.lua
+                ${CMAKE_CURRENT_SOURCE_DIR}/projects/scada/scada.lua
+                test
                 ${golden_name}
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             USES_TERMINAL

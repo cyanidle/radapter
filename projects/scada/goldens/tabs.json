@@ -1,675 +1,884 @@
 [
     {
         "data": "app:loaded",
-        "t": 212,
+        "t": 133,
         "type": "note"
+    },
+    {
+        "t": 511,
+        "type": "mouseMove",
+        "x": 718,
+        "y": 400
+    },
+    {
+        "t": 751,
+        "type": "mouseMove",
+        "x": 697,
+        "y": 394
+    },
+    {
+        "t": 895,
+        "type": "mouseMove",
+        "x": 290,
+        "y": 114
+    },
+    {
+        "t": 1015,
+        "type": "mouseMove",
+        "x": 231,
+        "y": 76
+    },
+    {
+        "t": 1199,
+        "type": "mouseMove",
+        "x": 185,
+        "y": 51
+    },
+    {
+        "t": 1239,
+        "type": "mouseMove",
+        "x": 163,
+        "y": 40
+    },
+    {
+        "btn": "left",
+        "t": 1265,
+        "type": "mousePress",
+        "x": 163,
+        "y": 40
     },
     {
         "t": 1351,
         "type": "mouseMove",
-        "x": 22,
-        "y": 608
+        "x": 183,
+        "y": 47
     },
     {
-        "t": 1503,
+        "t": 1495,
         "type": "mouseMove",
-        "x": 194,
-        "y": 601
+        "x": 739,
+        "y": 259
     },
     {
-        "t": 1655,
+        "t": 1651,
         "type": "mouseMove",
-        "x": 421,
-        "y": 465
+        "x": 857,
+        "y": 313
     },
     {
-        "t": 1807,
+        "t": 1775,
         "type": "mouseMove",
-        "x": 477,
-        "y": 300
-    },
-    {
-        "t": 1959,
-        "type": "mouseMove",
-        "x": 371,
-        "y": 147
-    },
-    {
-        "t": 2110,
-        "type": "mouseMove",
-        "x": 271,
-        "y": 64
-    },
-    {
-        "t": 2143,
-        "type": "mouseMove",
-        "x": 257,
-        "y": 59
-    },
-    {
-        "t": 2335,
-        "type": "mouseMove",
-        "x": 259,
-        "y": 42
+        "x": 902,
+        "y": 318
     },
     {
         "btn": "left",
-        "t": 2367,
-        "type": "mousePress",
-        "x": 259,
-        "y": 42
+        "t": 1947,
+        "type": "mouseRelease",
+        "x": 902,
+        "y": 318
     },
     {
-        "t": 2406,
+        "data": "tabs:split|Visualization|right",
+        "t": 1949,
+        "type": "note"
+    },
+    {
+        "t": 2095,
         "type": "mouseMove",
-        "x": 262,
-        "y": 41
+        "x": 605,
+        "y": 194
+    },
+    {
+        "t": 2238,
+        "type": "mouseMove",
+        "x": 132,
+        "y": 66
+    },
+    {
+        "t": 2367,
+        "type": "mouseMove",
+        "x": 132,
+        "y": 50
+    },
+    {
+        "t": 2448,
+        "type": "mouseMove",
+        "x": 142,
+        "y": 45
+    },
+    {
+        "btn": "left",
+        "t": 2503,
+        "type": "mousePress",
+        "x": 142,
+        "y": 45
     },
     {
         "t": 2551,
         "type": "mouseMove",
-        "x": 685,
-        "y": 66
+        "x": 161,
+        "y": 58
     },
     {
-        "t": 2703,
+        "t": 2695,
         "type": "mouseMove",
-        "x": 773,
-        "y": 70
+        "x": 470,
+        "y": 213
     },
     {
-        "t": 2855,
+        "t": 2706,
         "type": "mouseMove",
-        "x": 802,
-        "y": 78
-    },
-    {
-        "t": 2895,
-        "type": "mouseMove",
-        "x": 805,
-        "y": 79
+        "x": 471,
+        "y": 214
     },
     {
         "btn": "left",
-        "t": 2987,
+        "t": 2931,
         "type": "mouseRelease",
-        "x": 805,
-        "y": 79
+        "x": 471,
+        "y": 214
     },
     {
         "data": "tabs:split|Runner|right",
-        "t": 2989,
+        "t": 2933,
         "type": "note"
     },
     {
-        "t": 3159,
+        "t": 3151,
         "type": "mouseMove",
-        "x": 412,
-        "y": 81
+        "x": 488,
+        "y": 174
     },
     {
-        "t": 3303,
+        "t": 3296,
         "type": "mouseMove",
-        "x": 165,
-        "y": 50
+        "x": 628,
+        "y": 147
     },
     {
-        "t": 3375,
+        "t": 3343,
         "type": "mouseMove",
-        "x": 122,
-        "y": 42
+        "x": 657,
+        "y": 155
     },
     {
-        "t": 3591,
+        "t": 3590,
         "type": "mouseMove",
-        "x": 142,
-        "y": 38
-    },
-    {
-        "btn": "left",
-        "t": 3598,
-        "type": "mousePress",
-        "x": 142,
-        "y": 38
-    },
-    {
-        "t": 3606,
-        "type": "mouseMove",
-        "x": 143,
-        "y": 38
-    },
-    {
-        "t": 3753,
-        "type": "mouseMove",
-        "x": 326,
-        "y": 117
-    },
-    {
-        "t": 3806,
-        "type": "mouseMove",
-        "x": 374,
-        "y": 134
-    },
-    {
-        "btn": "left",
-        "t": 3906,
-        "type": "mouseRelease",
-        "x": 374,
-        "y": 134
-    },
-    {
-        "data": "tabs:split|Visualization|right",
-        "t": 3908,
-        "type": "note"
-    },
-    {
-        "t": 4039,
-        "type": "mouseMove",
-        "x": 387,
-        "y": 156
-    },
-    {
-        "t": 4207,
-        "type": "mouseMove",
-        "x": 399,
-        "y": 121
-    },
-    {
-        "t": 4359,
-        "type": "mouseMove",
-        "x": 342,
-        "y": 38
-    },
-    {
-        "t": 4455,
-        "type": "mouseMove",
-        "x": 329,
-        "y": 36
-    },
-    {
-        "t": 4623,
-        "type": "mouseMove",
-        "x": 323,
-        "y": 34
-    },
-    {
-        "t": 4734,
-        "type": "mouseMove",
-        "x": 325,
-        "y": 36
-    },
-    {
-        "btn": "left",
-        "t": 4927,
-        "type": "mousePress",
-        "x": 325,
-        "y": 36
-    },
-    {
-        "t": 5102,
-        "type": "mouseMove",
-        "x": 199,
-        "y": 70
-    },
-    {
-        "t": 5254,
-        "type": "mouseMove",
-        "x": 378,
-        "y": 89
-    },
-    {
-        "t": 5407,
-        "type": "mouseMove",
-        "x": 162,
+        "x": 648,
         "y": 154
     },
     {
-        "t": 5559,
+        "t": 3726,
         "type": "mouseMove",
-        "x": 175,
-        "y": 150
+        "x": 643,
+        "y": 155
     },
     {
-        "t": 5702,
+        "t": 4040,
         "type": "mouseMove",
-        "x": 282,
-        "y": 146
-    },
-    {
-        "t": 5767,
-        "type": "mouseMove",
-        "x": 282,
-        "y": 150
+        "x": 646,
+        "y": 156
     },
     {
         "btn": "left",
-        "t": 5794,
-        "type": "mouseRelease",
-        "x": 282,
-        "y": 150
-    },
-    {
-        "t": 5854,
-        "type": "mouseMove",
-        "x": 303,
-        "y": 119
-    },
-    {
-        "t": 6008,
-        "type": "mouseMove",
-        "x": 334,
-        "y": 50
-    },
-    {
-        "t": 6104,
-        "type": "mouseMove",
-        "x": 329,
-        "y": 41
-    },
-    {
-        "t": 6167,
-        "type": "mouseMove",
-        "x": 327,
-        "y": 40
-    },
-    {
-        "btn": "left",
-        "t": 6174,
+        "t": 4247,
         "type": "mousePress",
-        "x": 327,
-        "y": 40
+        "x": 646,
+        "y": 156
     },
     {
-        "t": 6303,
+        "t": 4351,
         "type": "mouseMove",
-        "x": 197,
-        "y": 41
+        "x": 654,
+        "y": 156
     },
     {
-        "t": 6455,
+        "t": 4494,
         "type": "mouseMove",
-        "x": 182,
-        "y": 42
+        "x": 827,
+        "y": 187
     },
     {
-        "t": 6495,
+        "t": 4647,
         "type": "mouseMove",
-        "x": 179,
-        "y": 45
+        "x": 676,
+        "y": 202
+    },
+    {
+        "t": 4663,
+        "type": "mouseMove",
+        "x": 684,
+        "y": 200
     },
     {
         "btn": "left",
-        "t": 6563,
+        "t": 4739,
         "type": "mouseRelease",
-        "x": 179,
-        "y": 45
+        "x": 684,
+        "y": 200
     },
     {
-        "data": "tabs:drag_moved|Visualization|group0",
-        "t": 6568,
-        "type": "note"
-    },
-    {
-        "t": 6607,
+        "t": 4950,
         "type": "mouseMove",
-        "x": 186,
-        "y": 44
+        "x": 660,
+        "y": 194
     },
     {
-        "t": 6759,
+        "t": 5087,
         "type": "mouseMove",
-        "x": 483,
-        "y": 42
+        "x": 650,
+        "y": 194
     },
     {
-        "t": 6903,
+        "t": 5150,
         "type": "mouseMove",
-        "x": 544,
-        "y": 41
-    },
-    {
-        "t": 7055,
-        "type": "mouseMove",
-        "x": 547,
-        "y": 41
-    },
-    {
-        "t": 7143,
-        "type": "mouseMove",
-        "x": 534,
-        "y": 44
+        "x": 646,
+        "y": 194
     },
     {
         "btn": "left",
-        "t": 7191,
+        "t": 5375,
         "type": "mousePress",
-        "x": 534,
-        "y": 44
+        "x": 646,
+        "y": 194
     },
     {
-        "t": 7207,
+        "t": 5551,
         "type": "mouseMove",
-        "x": 532,
-        "y": 44
+        "x": 692,
+        "y": 194
     },
     {
-        "t": 7358,
+        "t": 5647,
         "type": "mouseMove",
-        "x": 290,
-        "y": 45
+        "x": 746,
+        "y": 191
     },
     {
-        "t": 7478,
+        "t": 5783,
         "type": "mouseMove",
-        "x": 246,
-        "y": 46
+        "x": 654,
+        "y": 191
     },
     {
         "btn": "left",
-        "t": 7635,
+        "t": 5786,
         "type": "mouseRelease",
-        "x": 246,
-        "y": 46
+        "x": 654,
+        "y": 191
     },
     {
-        "data": "tabs:drag_moved|Runner|group0",
-        "t": 7638,
-        "type": "note"
-    },
-    {
-        "t": 7807,
+        "t": 5847,
         "type": "mouseMove",
-        "x": 253,
-        "y": 59
+        "x": 494,
+        "y": 169
     },
     {
-        "t": 7959,
+        "t": 6000,
         "type": "mouseMove",
-        "x": 263,
-        "y": 55
+        "x": 317,
+        "y": 141
     },
     {
-        "t": 8015,
+        "t": 6096,
         "type": "mouseMove",
-        "x": 257,
-        "y": 45
+        "x": 326,
+        "y": 142
+    },
+    {
+        "t": 6207,
+        "type": "mouseMove",
+        "x": 322,
+        "y": 142
     },
     {
         "btn": "left",
-        "t": 8078,
+        "t": 6319,
         "type": "mousePress",
-        "x": 257,
-        "y": 45
+        "x": 322,
+        "y": 142
     },
     {
-        "t": 8094,
+        "t": 6603,
         "type": "mouseMove",
-        "x": 256,
-        "y": 42
+        "x": 302,
+        "y": 142
     },
     {
-        "t": 8251,
+        "t": 6743,
         "type": "mouseMove",
-        "x": 99,
-        "y": 42
+        "x": 222,
+        "y": 164
     },
     {
-        "btn": "left",
-        "t": 8603,
-        "type": "mouseRelease",
-        "x": 99,
-        "y": 42
-    },
-    {
-        "data": "tabs:reordered|Runner",
-        "t": 8606,
-        "type": "note"
-    },
-    {
-        "data": "tabs:drag_reordered|Runner",
-        "t": 8606,
-        "type": "note"
-    },
-    {
-        "t": 8703,
+        "t": 6911,
         "type": "mouseMove",
-        "x": 101,
-        "y": 45
+        "x": 305,
+        "y": 174
     },
     {
-        "t": 8823,
+        "t": 7047,
         "type": "mouseMove",
-        "x": 118,
-        "y": 45
-    },
-    {
-        "t": 8919,
-        "type": "mouseMove",
-        "x": 128,
-        "y": 41
-    },
-    {
-        "btn": "left",
-        "t": 8951,
-        "type": "mousePress",
-        "x": 128,
-        "y": 41
-    },
-    {
-        "t": 9006,
-        "type": "mouseMove",
-        "x": 125,
-        "y": 41
-    },
-    {
-        "t": 9159,
-        "type": "mouseMove",
-        "x": 48,
-        "y": 40
-    },
-    {
-        "t": 9271,
-        "type": "mouseMove",
-        "x": 35,
-        "y": 40
-    },
-    {
-        "t": 9374,
-        "type": "mouseMove",
-        "x": 30,
-        "y": 42
-    },
-    {
-        "t": 9488,
-        "type": "mouseMove",
-        "x": 29,
-        "y": 42
-    },
-    {
-        "btn": "left",
-        "t": 9555,
-        "type": "mouseRelease",
-        "x": 29,
-        "y": 42
-    },
-    {
-        "data": "tabs:reordered|Runner",
-        "t": 9558,
-        "type": "note"
-    },
-    {
-        "data": "tabs:drag_reordered|Runner",
-        "t": 9558,
-        "type": "note"
-    },
-    {
-        "t": 9759,
-        "type": "mouseMove",
-        "x": 50,
-        "y": 51
-    },
-    {
-        "t": 9895,
-        "type": "mouseMove",
-        "x": 82,
-        "y": 47
-    },
-    {
-        "t": 10055,
-        "type": "mouseMove",
-        "x": 109,
-        "y": 44
-    },
-    {
-        "t": 10111,
-        "type": "mouseMove",
-        "x": 115,
-        "y": 44
-    },
-    {
-        "btn": "left",
-        "t": 10118,
-        "type": "mousePress",
-        "x": 115,
-        "y": 44
-    },
-    {
-        "t": 10201,
-        "type": "mouseMove",
-        "x": 218,
-        "y": 66
-    },
-    {
-        "t": 10361,
-        "type": "mouseMove",
-        "x": 464,
-        "y": 185
-    },
-    {
-        "t": 10510,
-        "type": "mouseMove",
-        "x": 642,
-        "y": 250
-    },
-    {
-        "t": 10588,
-        "type": "mouseMove",
-        "x": 723,
-        "y": 258
-    },
-    {
-        "btn": "left",
-        "t": 10811,
-        "type": "mouseRelease",
-        "x": 723,
-        "y": 258
-    },
-    {
-        "data": "tabs:split|Configurator|right",
-        "t": 10814,
-        "type": "note"
-    },
-    {
-        "t": 10959,
-        "type": "mouseMove",
-        "x": 491,
+        "x": 349,
         "y": 192
     },
     {
-        "t": 11103,
+        "t": 7200,
         "type": "mouseMove",
-        "x": 254,
-        "y": 102
+        "x": 346,
+        "y": 218
     },
     {
-        "t": 11255,
+        "t": 7327,
         "type": "mouseMove",
-        "x": 189,
-        "y": 81
+        "x": 221,
+        "y": 198
     },
     {
-        "t": 11407,
+        "btn": "left",
+        "t": 7330,
+        "type": "mouseRelease",
+        "x": 221,
+        "y": 198
+    },
+    {
+        "t": 7351,
         "type": "mouseMove",
-        "x": 152,
+        "x": 241,
+        "y": 198
+    },
+    {
+        "t": 7487,
+        "type": "mouseMove",
+        "x": 634,
+        "y": 210
+    },
+    {
+        "t": 7648,
+        "type": "mouseMove",
+        "x": 569,
+        "y": 221
+    },
+    {
+        "t": 7736,
+        "type": "mouseMove",
+        "x": 538,
+        "y": 224
+    },
+    {
+        "t": 7944,
+        "type": "mouseMove",
+        "x": 546,
+        "y": 224
+    },
+    {
+        "t": 8096,
+        "type": "mouseMove",
+        "x": 546,
+        "y": 223
+    },
+    {
+        "btn": "left",
+        "t": 8191,
+        "type": "mousePress",
+        "x": 546,
+        "y": 223
+    },
+    {
+        "t": 8393,
+        "type": "mouseMove",
+        "x": 586,
+        "y": 219
+    },
+    {
+        "t": 8551,
+        "type": "mouseMove",
+        "x": 734,
+        "y": 221
+    },
+    {
+        "t": 8695,
+        "type": "mouseMove",
+        "x": 564,
+        "y": 242
+    },
+    {
+        "t": 8847,
+        "type": "mouseMove",
+        "x": 474,
+        "y": 224
+    },
+    {
+        "t": 8993,
+        "type": "mouseMove",
+        "x": 721,
+        "y": 250
+    },
+    {
+        "t": 9152,
+        "type": "mouseMove",
+        "x": 625,
+        "y": 251
+    },
+    {
+        "t": 9303,
+        "type": "mouseMove",
+        "x": 445,
+        "y": 266
+    },
+    {
+        "t": 9447,
+        "type": "mouseMove",
+        "x": 445,
+        "y": 243
+    },
+    {
+        "t": 9599,
+        "type": "mouseMove",
+        "x": 652,
+        "y": 224
+    },
+    {
+        "t": 9743,
+        "type": "mouseMove",
+        "x": 665,
+        "y": 254
+    },
+    {
+        "t": 9903,
+        "type": "mouseMove",
+        "x": 538,
+        "y": 274
+    },
+    {
+        "t": 10046,
+        "type": "mouseMove",
+        "x": 546,
+        "y": 258
+    },
+    {
+        "t": 10199,
+        "type": "mouseMove",
+        "x": 644,
+        "y": 245
+    },
+    {
+        "t": 10342,
+        "type": "mouseMove",
+        "x": 609,
+        "y": 283
+    },
+    {
+        "t": 10489,
+        "type": "mouseMove",
+        "x": 562,
+        "y": 268
+    },
+    {
+        "btn": "left",
+        "t": 10490,
+        "type": "mouseRelease",
+        "x": 562,
+        "y": 268
+    },
+    {
+        "t": 10502,
+        "type": "mouseMove",
+        "x": 564,
+        "y": 266
+    },
+    {
+        "t": 10648,
+        "type": "mouseMove",
+        "x": 644,
+        "y": 123
+    },
+    {
+        "t": 10792,
+        "type": "mouseMove",
+        "x": 654,
+        "y": 77
+    },
+    {
+        "t": 10912,
+        "type": "mouseMove",
+        "x": 644,
+        "y": 62
+    },
+    {
+        "t": 11072,
+        "type": "mouseMove",
+        "x": 634,
+        "y": 50
+    },
+    {
+        "t": 11120,
+        "type": "mouseMove",
+        "x": 634,
         "y": 49
     },
     {
-        "t": 11471,
-        "type": "mouseMove",
-        "x": 137,
-        "y": 34
-    },
-    {
         "btn": "left",
-        "t": 11503,
+        "t": 11120,
         "type": "mousePress",
-        "x": 137,
-        "y": 34
+        "x": 634,
+        "y": 49
     },
     {
-        "t": 11558,
+        "t": 11250,
         "type": "mouseMove",
-        "x": 142,
-        "y": 38
+        "x": 382,
+        "y": 44
     },
     {
-        "t": 11710,
+        "t": 11279,
         "type": "mouseMove",
-        "x": 293,
-        "y": 98
-    },
-    {
-        "t": 11843,
-        "type": "mouseMove",
-        "x": 326,
-        "y": 111
-    },
-    {
-        "t": 12006,
-        "type": "mouseMove",
-        "x": 342,
-        "y": 118
+        "x": 345,
+        "y": 44
     },
     {
         "btn": "left",
-        "t": 12091,
+        "t": 11499,
         "type": "mouseRelease",
-        "x": 342,
-        "y": 118
+        "x": 345,
+        "y": 44
     },
     {
-        "data": "tabs:split|Visualization|right",
-        "t": 12093,
+        "data": "tabs:drag_moved|Visualization|group1",
+        "t": 11504,
         "type": "note"
     },
     {
-        "t": 12159,
+        "t": 11696,
         "type": "mouseMove",
-        "x": 350,
-        "y": 127
+        "x": 226,
+        "y": 54
+    },
+    {
+        "t": 11847,
+        "type": "mouseMove",
+        "x": 406,
+        "y": 47
+    },
+    {
+        "t": 11992,
+        "type": "mouseMove",
+        "x": 593,
+        "y": 42
+    },
+    {
+        "t": 12151,
+        "type": "mouseMove",
+        "x": 598,
+        "y": 42
+    },
+    {
+        "t": 12247,
+        "type": "mouseMove",
+        "x": 618,
+        "y": 41
+    },
+    {
+        "btn": "left",
+        "t": 12263,
+        "type": "mousePress",
+        "x": 618,
+        "y": 41
     },
     {
         "t": 12303,
         "type": "mouseMove",
-        "x": 538,
-        "y": 160
+        "x": 615,
+        "y": 40
     },
     {
-        "t": 12455,
+        "t": 12451,
         "type": "mouseMove",
-        "x": 867,
+        "x": 234,
+        "y": 45
+    },
+    {
+        "t": 12464,
+        "type": "mouseMove",
+        "x": 227,
+        "y": 45
+    },
+    {
+        "btn": "left",
+        "t": 12571,
+        "type": "mouseRelease",
+        "x": 227,
+        "y": 45
+    },
+    {
+        "data": "tabs:drag_moved|Visualization|group0",
+        "t": 12575,
+        "type": "note"
+    },
+    {
+        "t": 12751,
+        "type": "mouseMove",
+        "x": 529,
         "y": 74
     },
     {
-        "t": 12607,
+        "t": 12896,
         "type": "mouseMove",
-        "x": 952,
-        "y": 14
+        "x": 622,
+        "y": 66
     },
     {
-        "t": 12687,
+        "t": 13024,
         "type": "mouseMove",
-        "x": 954,
-        "y": 2
+        "x": 522,
+        "y": 49
+    },
+    {
+        "btn": "left",
+        "t": 13119,
+        "type": "mousePress",
+        "x": 522,
+        "y": 49
+    },
+    {
+        "t": 13199,
+        "type": "mouseMove",
+        "x": 458,
+        "y": 50
+    },
+    {
+        "t": 13279,
+        "type": "mouseMove",
+        "x": 306,
+        "y": 50
+    },
+    {
+        "btn": "left",
+        "t": 13419,
+        "type": "mouseRelease",
+        "x": 306,
+        "y": 50
+    },
+    {
+        "data": "tabs:drag_moved|Runner|group0",
+        "t": 13422,
+        "type": "note"
+    },
+    {
+        "t": 13647,
+        "type": "mouseMove",
+        "x": 286,
+        "y": 68
+    },
+    {
+        "t": 13792,
+        "type": "mouseMove",
+        "x": 279,
+        "y": 49
+    },
+    {
+        "t": 13823,
+        "type": "mouseMove",
+        "x": 279,
+        "y": 47
+    },
+    {
+        "btn": "left",
+        "t": 13839,
+        "type": "mousePress",
+        "x": 279,
+        "y": 47
+    },
+    {
+        "t": 13951,
+        "type": "mouseMove",
+        "x": 202,
+        "y": 45
+    },
+    {
+        "t": 14095,
+        "type": "mouseMove",
+        "x": 168,
+        "y": 47
+    },
+    {
+        "t": 14223,
+        "type": "mouseMove",
+        "x": 153,
+        "y": 50
+    },
+    {
+        "t": 14327,
+        "type": "mouseMove",
+        "x": 149,
+        "y": 50
+    },
+    {
+        "btn": "left",
+        "t": 14395,
+        "type": "mouseRelease",
+        "x": 149,
+        "y": 50
+    },
+    {
+        "data": "tabs:reordered|Runner",
+        "t": 14398,
+        "type": "note"
+    },
+    {
+        "data": "tabs:drag_reordered|Runner",
+        "t": 14398,
+        "type": "note"
+    },
+    {
+        "t": 14407,
+        "type": "mouseMove",
+        "x": 146,
+        "y": 49
+    },
+    {
+        "t": 14696,
+        "type": "mouseMove",
+        "x": 214,
+        "y": 36
+    },
+    {
+        "t": 14823,
+        "type": "mouseMove",
+        "x": 234,
+        "y": 34
+    },
+    {
+        "t": 14864,
+        "type": "mouseMove",
+        "x": 234,
+        "y": 34
+    },
+    {
+        "btn": "left",
+        "t": 14903,
+        "type": "mousePress",
+        "x": 234,
+        "y": 34
+    },
+    {
+        "t": 14999,
+        "type": "mouseMove",
+        "x": 168,
+        "y": 38
+    },
+    {
+        "t": 15143,
+        "type": "mouseMove",
+        "x": 14,
+        "y": 40
+    },
+    {
+        "btn": "left",
+        "t": 15627,
+        "type": "mouseRelease",
+        "x": 14,
+        "y": 40
+    },
+    {
+        "data": "tabs:reordered|Visualization",
+        "t": 15630,
+        "type": "note"
+    },
+    {
+        "data": "tabs:drag_reordered|Visualization",
+        "t": 15630,
+        "type": "note"
+    },
+    {
+        "t": 15752,
+        "type": "mouseMove",
+        "x": 22,
+        "y": 41
+    },
+    {
+        "t": 15896,
+        "type": "mouseMove",
+        "x": 122,
+        "y": 44
+    },
+    {
+        "t": 16024,
+        "type": "mouseMove",
+        "x": 182,
+        "y": 38
+    },
+    {
+        "btn": "left",
+        "t": 16079,
+        "type": "mousePress",
+        "x": 182,
+        "y": 38
+    },
+    {
+        "t": 16202,
+        "type": "mouseMove",
+        "x": 131,
+        "y": 41
+    },
+    {
+        "t": 16351,
+        "type": "mouseMove",
+        "x": 58,
+        "y": 45
+    },
+    {
+        "t": 16431,
+        "type": "mouseMove",
+        "x": 40,
+        "y": 46
+    },
+    {
+        "btn": "left",
+        "t": 16635,
+        "type": "mouseRelease",
+        "x": 40,
+        "y": 46
+    },
+    {
+        "data": "tabs:reordered|Configurator",
+        "t": 16639,
+        "type": "note"
+    },
+    {
+        "data": "tabs:drag_reordered|Configurator",
+        "t": 16639,
+        "type": "note"
+    },
+    {
+        "t": 16800,
+        "type": "mouseMove",
+        "x": 52,
+        "y": 46
+    },
+    {
+        "t": 16952,
+        "type": "mouseMove",
+        "x": 503,
+        "y": 66
+    },
+    {
+        "t": 17072,
+        "type": "mouseMove",
+        "x": 836,
+        "y": 54
+    },
+    {
+        "t": 17248,
+        "type": "mouseMove",
+        "x": 897,
+        "y": 13
+    },
+    {
+        "t": 17360,
+        "type": "mouseMove",
+        "x": 912,
+        "y": 0
     }
 ]

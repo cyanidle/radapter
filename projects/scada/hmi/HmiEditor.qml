@@ -2,7 +2,7 @@ import QtQuick 2.7
 import QtQuick.Window 2.13
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import ".."   // DockHost / DockablePanel live one dir up in projects/scada/
+import "../configurator"   // DockHost / DockablePanel moved into configurator/
 import "tree.js" as Tree
 // Node, Gauge, InfoDisplay are sibling .qml files (same-directory resolution).
 

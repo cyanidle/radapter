@@ -96,7 +96,7 @@ smoke test is `tests/smoke.lua`** — run it after any engine change
 hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus slave/master
 loopback, services, worker naming). `tests/modbus_loopback.lua` is a deeper ModbusSlave <->
 ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pipe/get/set);
-`tests/local.lua` the local-IPC workers; `projects/scada/test.lua` the end-to-end runner;
+`tests/local.lua` the local-IPC workers; `projects/scada/scada.lua test` runs the golden test suite;
 `tests/tags.lua` the tag system (run with `--tags`).
 
 After making some changes **ALWAYS** check result somehow
@@ -117,7 +117,7 @@ screenshots directly from Lua — no QML-side hooks needed:
 ```bash
 QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
 local qt = QML_Tester()
-local view = QML { url = "projects/scada/Configurator.qml",
+local view = QML { url = "projects/scada/configurator/Configurator.qml",
     properties = { pickable_types = {}, initial_schemas = {} } }
 qt:wait(500)
 qt:screenshot("/tmp/radapter_smoke.png")
@@ -175,7 +175,7 @@ After making QML changes, verify them systematically — don't just eyeball the 
    ```bash
    QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
    local qt = QML_Tester()
-   QML { url = "projects/scada/Configurator.qml", properties = { ... } }
+   QML { url = "projects/scada/configurator/Configurator.qml", properties = { ... } }
    qt:wait(500)
    qt:screenshot("/tmp/before.png")
    shutdown()
@@ -232,27 +232,27 @@ serial port arg), `can.lua`/`cyphal.lua` (a CAN interface — see `examples/setu
 for a virtual one), `plugin.lua` (pass the plugins build dir), `ros.lua` (ROS2 plugin).
 `examples/demo/` is a small QML dashboard example and `examples/chat/` a headless server +
 QML client. **Projects (`projects/`)** are full apps built on radapter: `projects/scada/`
-is the schema-driven configurator (`--gui projects/scada/configurator.lua`).
+is the schema-driven configurator (`--gui projects/scada/scada.lua config`).
 
 ### UI state persistence
 
-`WindowSettings.qml` (in `projects/scada/`) persists an `ApplicationWindow`'s geometry,
+`WindowSettings.qml` (in `projects/scada/configurator/`) persists an `ApplicationWindow`'s geometry,
 maximized/fullscreen state, and screen assignment across sessions via `Qt.labs.settings`
 (QSettings). `DetachableTabs.qml` persists its tab-group layout and detached-panel state.
 Both are gated on the **global context property `persistUi`** — set from Lua in the `QML{}`
 call's `properties` table:
 
-- **Production** (`configurator.lua`): `persistUi = true` → saves to `~/.config/radapter/radapter.conf`
-- **Production, no persistence** (pass `ui-no-persist` as trailing arg to `configurator.lua`): `persistUi = false`
-- **Golden tests** (`goldens/run_test.lua`): `persistUi = false` → no QSettings I/O, so
+- **Production** (`scada.lua config`): `persistUi = true` → saves to `~/.config/radapter/radapter.conf`
+- **Production, no persistence** (pass `ui-no-persist` as trailing arg to `scada.lua config`): `persistUi = false`
+- **Golden tests** (`scada.lua test`): `persistUi = false` → no QSettings I/O, so
   `QML_Tester` event recording/replay is not disrupted
-- **Absent**: defaults to `true` (e.g. `runner.lua` opening the HMI window)
+- **Absent**: defaults to `true` (e.g. `scada.lua run` opening the HMI window)
 
 When **recording a new golden**, pass `ui-no-persist` so the recorded events
 don't include QSettings I/O side effects:
 ```bash
 build/bin/radapter --gui --gui-record projects/scada/goldens/new.json \
-    projects/scada/configurator.lua ui-no-persist
+    projects/scada/scada.lua config ui-no-persist
 ```
 
 To disable persistence when writing ad-hoc QML test snippets, pass `persistUi = false`:

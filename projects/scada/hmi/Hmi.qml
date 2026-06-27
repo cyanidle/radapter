@@ -1,6 +1,7 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
+import "../configurator"   // WindowSettings lives here
 // Node, Gauge, InfoDisplay are sibling .qml files (same-directory resolution).
 
 // Runtime HMI window. The runner opens this with the project's visualization tree passed

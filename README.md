@@ -192,7 +192,7 @@ capture screenshots, and record/replay sessions — all headless under
 ```bash
 QT_QPA_PLATFORM=offscreen build/bin/radapter --gui -e '
 local qt = QML_Tester()
-local view = QML { url = "projects/scada/Configurator.qml",
+local view = QML { url = "projects/scada/configurator/Configurator.qml",
     properties = { pickable_types = {}, initial_schemas = {} } }
 qt:wait(500)
 qt:screenshot("/tmp/configurator.png")

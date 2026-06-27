@@ -1,778 +1,2067 @@
 [
     {
         "data": "app:loaded",
-        "t": 207,
+        "t": 187,
         "type": "note"
     },
     {
-        "t": 749,
+        "t": 772,
         "type": "mouseMove",
-        "x": 589,
-        "y": 330
+        "x": 318,
+        "y": 503
     },
     {
-        "t": 909,
+        "t": 916,
         "type": "mouseMove",
-        "x": 578,
-        "y": 294
+        "x": 605,
+        "y": 188
     },
     {
-        "t": 1053,
+        "t": 1028,
         "type": "mouseMove",
-        "x": 582,
-        "y": 196
+        "x": 566,
+        "y": 159
     },
     {
-        "t": 1205,
+        "t": 1220,
         "type": "mouseMove",
-        "x": 606,
-        "y": 146
+        "x": 624,
+        "y": 117
     },
     {
-        "t": 1358,
+        "t": 1244,
         "type": "mouseMove",
-        "x": 615,
-        "y": 136
+        "x": 626,
+        "y": 117
     },
     {
-        "t": 1509,
+        "t": 1508,
         "type": "mouseMove",
-        "x": 901,
-        "y": 136
+        "x": 638,
+        "y": 123
     },
     {
-        "t": 1572,
+        "t": 1604,
         "type": "mouseMove",
-        "x": 922,
-        "y": 132
-    },
-    {
-        "t": 1764,
-        "type": "mouseMove",
-        "x": 933,
-        "y": 130
+        "x": 641,
+        "y": 126
     },
     {
         "btn": "left",
-        "t": 1812,
+        "t": 1659,
         "type": "mousePress",
-        "x": 933,
-        "y": 130
+        "x": 641,
+        "y": 126
     },
     {
-        "btn": "left",
-        "t": 1880,
-        "type": "mouseRelease",
-        "x": 933,
-        "y": 130
-    },
-    {
-        "data": "dock:minimized|Worker properties",
-        "t": 1881,
-        "type": "note"
-    },
-    {
-        "t": 2069,
+        "t": 1819,
         "type": "mouseMove",
-        "x": 930,
-        "y": 140
-    },
-    {
-        "t": 2260,
-        "type": "mouseMove",
-        "x": 928,
-        "y": 143
-    },
-    {
-        "t": 2404,
-        "type": "mouseMove",
-        "x": 860,
-        "y": 151
-    },
-    {
-        "t": 2556,
-        "type": "mouseMove",
-        "x": 860,
-        "y": 153
-    },
-    {
-        "t": 2700,
-        "type": "mouseMove",
-        "x": 933,
-        "y": 156
-    },
-    {
-        "btn": "left",
-        "t": 2828,
-        "type": "mousePress",
-        "x": 933,
-        "y": 156
-    },
-    {
-        "btn": "left",
-        "t": 2888,
-        "type": "mouseRelease",
-        "x": 933,
-        "y": 156
-    },
-    {
-        "data": "dock:restored|Connections",
-        "t": 2889,
-        "type": "note"
-    },
-    {
-        "t": 3004,
-        "type": "mouseMove",
-        "x": 935,
-        "y": 160
-    },
-    {
-        "t": 3197,
-        "type": "mouseMove",
-        "x": 935,
-        "y": 158
-    },
-    {
-        "btn": "left",
-        "t": 3212,
-        "type": "mousePress",
-        "x": 935,
-        "y": 158
-    },
-    {
-        "btn": "left",
-        "t": 3288,
-        "type": "mouseRelease",
-        "x": 935,
-        "y": 158
-    },
-    {
-        "data": "dock:minimized|Connections",
-        "t": 3289,
-        "type": "note"
-    },
-    {
-        "t": 3453,
-        "type": "mouseMove",
-        "x": 931,
-        "y": 166
-    },
-    {
-        "t": 3564,
-        "type": "mouseMove",
-        "x": 931,
-        "y": 182
-    },
-    {
-        "btn": "left",
-        "t": 3644,
-        "type": "mousePress",
-        "x": 931,
-        "y": 182
-    },
-    {
-        "btn": "left",
-        "t": 3712,
-        "type": "mouseRelease",
-        "x": 931,
-        "y": 182
-    },
-    {
-        "data": "dock:restored|Preview (objects + pipes)",
-        "t": 3712,
-        "type": "note"
-    },
-    {
-        "t": 3748,
-        "type": "mouseMove",
-        "x": 933,
-        "y": 183
-    },
-    {
-        "t": 3820,
-        "type": "mouseMove",
-        "x": 934,
-        "y": 185
-    },
-    {
-        "btn": "left",
-        "t": 3948,
-        "type": "mousePress",
-        "x": 934,
-        "y": 185
-    },
-    {
-        "btn": "left",
-        "t": 4016,
-        "type": "mouseRelease",
-        "x": 934,
-        "y": 185
-    },
-    {
-        "data": "dock:minimized|Preview (objects + pipes)",
-        "t": 4017,
-        "type": "note"
-    },
-    {
-        "t": 4060,
-        "type": "mouseMove",
-        "x": 935,
+        "x": 377,
         "y": 187
     },
     {
-        "t": 4180,
+        "t": 1964,
         "type": "mouseMove",
-        "x": 931,
-        "y": 201
+        "x": 108,
+        "y": 251
     },
     {
-        "t": 4271,
-        "type": "mouseMove",
-        "x": 931,
-        "y": 205
-    },
-    {
-        "btn": "left",
-        "t": 4298,
-        "type": "mousePress",
-        "x": 931,
-        "y": 205
-    },
-    {
-        "btn": "left",
-        "t": 4360,
-        "type": "mouseRelease",
-        "x": 931,
-        "y": 205
-    },
-    {
-        "data": "dock:restored|Send to worker",
-        "t": 4360,
-        "type": "note"
-    },
-    {
-        "t": 4500,
-        "type": "mouseMove",
-        "x": 930,
-        "y": 209
-    },
-    {
-        "btn": "left",
-        "t": 4620,
-        "type": "mousePress",
-        "x": 930,
-        "y": 209
-    },
-    {
-        "btn": "left",
-        "t": 4688,
-        "type": "mouseRelease",
-        "x": 930,
-        "y": 209
-    },
-    {
-        "data": "dock:minimized|Send to worker",
-        "t": 4689,
-        "type": "note"
-    },
-    {
-        "t": 4805,
-        "type": "mouseMove",
-        "x": 845,
-        "y": 214
-    },
-    {
-        "t": 4876,
-        "type": "mouseMove",
-        "x": 830,
-        "y": 214
-    },
-    {
-        "btn": "left",
-        "t": 4956,
-        "type": "mousePress",
-        "x": 830,
-        "y": 214
-    },
-    {
-        "t": 5100,
-        "type": "mouseMove",
-        "x": 611,
-        "y": 290
-    },
-    {
-        "t": 5260,
-        "type": "mouseMove",
-        "x": 165,
-        "y": 296
-    },
-    {
-        "t": 5404,
-        "type": "mouseMove",
-        "x": 133,
-        "y": 298
-    },
-    {
-        "t": 5553,
-        "type": "mouseMove",
-        "x": 94,
-        "y": 304
-    },
-    {
-        "t": 5708,
+        "t": 2115,
         "type": "mouseMove",
         "x": 90,
-        "y": 304
+        "y": 253
     },
     {
-        "t": 5748,
+        "t": 2178,
         "type": "mouseMove",
         "x": 78,
-        "y": 302
+        "y": 255
     },
     {
         "btn": "left",
-        "t": 5889,
+        "t": 2339,
         "type": "mouseRelease",
         "x": 78,
-        "y": 302
+        "y": 255
     },
     {
-        "data": "dock:docked|Send to worker|left",
-        "t": 5889,
+        "data": "dock:docked|Worker properties|left",
+        "t": 2339,
         "type": "note"
     },
     {
-        "t": 6004,
+        "t": 2419,
         "type": "mouseMove",
-        "x": 363,
-        "y": 274
+        "x": 106,
+        "y": 247
     },
     {
-        "t": 6157,
+        "t": 2572,
         "type": "mouseMove",
-        "x": 682,
-        "y": 179
+        "x": 584,
+        "y": 174
     },
     {
-        "t": 6236,
+        "t": 2707,
         "type": "mouseMove",
-        "x": 694,
-        "y": 162
+        "x": 660,
+        "y": 142
+    },
+    {
+        "t": 2860,
+        "type": "mouseMove",
+        "x": 663,
+        "y": 141
+    },
+    {
+        "t": 3020,
+        "type": "mouseMove",
+        "x": 663,
+        "y": 136
     },
     {
         "btn": "left",
-        "t": 6388,
+        "t": 3044,
         "type": "mousePress",
-        "x": 694,
-        "y": 162
+        "x": 663,
+        "y": 136
     },
     {
-        "t": 6460,
+        "t": 3091,
         "type": "mouseMove",
-        "x": 614,
-        "y": 186
-    },
-    {
-        "t": 6608,
-        "type": "mouseMove",
-        "x": 167,
-        "y": 278
-    },
-    {
-        "t": 6652,
-        "type": "mouseMove",
-        "x": 146,
-        "y": 285
+        "x": 665,
+        "y": 132
     },
     {
         "btn": "left",
-        "t": 6776,
+        "t": 3091,
         "type": "mouseRelease",
-        "x": 146,
-        "y": 285
+        "x": 665,
+        "y": 132
     },
     {
-        "data": "dock:docked|Connections|left",
-        "t": 6776,
+        "data": "dock:docked|Connections|right",
+        "t": 3092,
         "type": "note"
     },
     {
-        "t": 6909,
+        "t": 3099,
         "type": "mouseMove",
-        "x": 427,
-        "y": 218
-    },
-    {
-        "t": 7060,
-        "type": "mouseMove",
-        "x": 585,
-        "y": 164
-    },
-    {
-        "t": 7205,
-        "type": "mouseMove",
-        "x": 626,
+        "x": 665,
         "y": 130
     },
     {
-        "t": 7229,
+        "btn": "left",
+        "t": 3111,
+        "type": "mousePress",
+        "x": 665,
+        "y": 130
+    },
+    {
+        "t": 3171,
         "type": "mouseMove",
-        "x": 627,
-        "y": 123
+        "x": 662,
+        "y": 130
+    },
+    {
+        "t": 3315,
+        "type": "mouseMove",
+        "x": 317,
+        "y": 273
+    },
+    {
+        "t": 3467,
+        "type": "mouseMove",
+        "x": 182,
+        "y": 314
+    },
+    {
+        "t": 3571,
+        "type": "mouseMove",
+        "x": 168,
+        "y": 319
     },
     {
         "btn": "left",
-        "t": 7324,
+        "t": 3647,
+        "type": "mouseRelease",
+        "x": 168,
+        "y": 319
+    },
+    {
+        "data": "dock:docked|Connections|left",
+        "t": 3647,
+        "type": "note"
+    },
+    {
+        "t": 3772,
+        "type": "mouseMove",
+        "x": 420,
+        "y": 266
+    },
+    {
+        "t": 3916,
+        "type": "mouseMove",
+        "x": 596,
+        "y": 156
+    },
+    {
+        "t": 4052,
+        "type": "mouseMove",
+        "x": 622,
+        "y": 140
+    },
+    {
+        "t": 4156,
+        "type": "mouseMove",
+        "x": 626,
+        "y": 137
+    },
+    {
+        "btn": "left",
+        "t": 4227,
         "type": "mousePress",
-        "x": 627,
-        "y": 123
+        "x": 626,
+        "y": 137
     },
     {
-        "t": 7356,
+        "t": 4371,
         "type": "mouseMove",
-        "x": 627,
-        "y": 124
+        "x": 535,
+        "y": 266
     },
     {
-        "t": 7502,
+        "t": 4515,
         "type": "mouseMove",
-        "x": 449,
-        "y": 352
+        "x": 422,
+        "y": 605
     },
     {
-        "t": 7652,
+        "t": 4661,
         "type": "mouseMove",
-        "x": 320,
-        "y": 518
+        "x": 314,
+        "y": 803
     },
     {
-        "t": 7809,
+        "t": 4821,
         "type": "mouseMove",
-        "x": 322,
-        "y": 544
+        "x": 277,
+        "y": 827
+    },
+    {
+        "t": 4875,
+        "type": "mouseMove",
+        "x": 273,
+        "y": 830
+    },
+    {
+        "t": 5115,
+        "type": "mouseMove",
+        "x": 277,
+        "y": 836
+    },
+    {
+        "t": 5262,
+        "type": "mouseMove",
+        "x": 330,
+        "y": 853
+    },
+    {
+        "t": 5411,
+        "type": "mouseMove",
+        "x": 358,
+        "y": 855
+    },
+    {
+        "t": 5540,
+        "type": "mouseMove",
+        "x": 359,
+        "y": 855
+    },
+    {
+        "btn": "left",
+        "t": 5599,
+        "type": "mouseRelease",
+        "x": 359,
+        "y": 855
+    },
+    {
+        "data": "dock:docked|Preview (objects + pipes)|bottom",
+        "t": 5600,
+        "type": "note"
+    },
+    {
+        "t": 5715,
+        "type": "mouseMove",
+        "x": 392,
+        "y": 822
+    },
+    {
+        "t": 5868,
+        "type": "mouseMove",
+        "x": 599,
+        "y": 469
+    },
+    {
+        "t": 6020,
+        "type": "mouseMove",
+        "x": 597,
+        "y": 292
+    },
+    {
+        "t": 6172,
+        "type": "mouseMove",
+        "x": 593,
+        "y": 207
+    },
+    {
+        "t": 6316,
+        "type": "mouseMove",
+        "x": 593,
+        "y": 158
+    },
+    {
+        "t": 6436,
+        "type": "mouseMove",
+        "x": 616,
+        "y": 130
+    },
+    {
+        "btn": "left",
+        "t": 6531,
+        "type": "mousePress",
+        "x": 616,
+        "y": 130
+    },
+    {
+        "t": 6619,
+        "type": "mouseMove",
+        "x": 618,
+        "y": 155
+    },
+    {
+        "t": 6771,
+        "type": "mouseMove",
+        "x": 673,
+        "y": 560
+    },
+    {
+        "t": 6917,
+        "type": "mouseMove",
+        "x": 682,
+        "y": 806
+    },
+    {
+        "t": 7067,
+        "type": "mouseMove",
+        "x": 678,
+        "y": 880
+    },
+    {
+        "t": 7219,
+        "type": "mouseMove",
+        "x": 673,
+        "y": 893
+    },
+    {
+        "t": 7251,
+        "type": "mouseMove",
+        "x": 671,
+        "y": 894
+    },
+    {
+        "btn": "left",
+        "t": 7560,
+        "type": "mouseRelease",
+        "x": 671,
+        "y": 894
+    },
+    {
+        "data": "dock:docked|Send to worker|bottom",
+        "t": 7561,
+        "type": "note"
+    },
+    {
+        "t": 7587,
+        "type": "mouseMove",
+        "x": 666,
+        "y": 891
+    },
+    {
+        "t": 7820,
+        "type": "mouseMove",
+        "x": 654,
+        "y": 894
     },
     {
         "t": 7956,
         "type": "mouseMove",
-        "x": 346,
-        "y": 665
+        "x": 644,
+        "y": 894
     },
     {
-        "t": 8108,
+        "t": 8116,
         "type": "mouseMove",
-        "x": 350,
+        "x": 543,
+        "y": 878
+    },
+    {
+        "t": 8260,
+        "type": "mouseMove",
+        "x": 526,
+        "y": 874
+    },
+    {
+        "t": 8420,
+        "type": "mouseMove",
+        "x": 695,
+        "y": 883
+    },
+    {
+        "t": 8564,
+        "type": "mouseMove",
+        "x": 861,
+        "y": 859
+    },
+    {
+        "t": 8715,
+        "type": "mouseMove",
+        "x": 898,
+        "y": 874
+    },
+    {
+        "t": 8826,
+        "type": "mouseMove",
+        "x": 930,
+        "y": 876
+    },
+    {
+        "btn": "left",
+        "t": 8933,
+        "type": "mousePress",
+        "x": 930,
+        "y": 876
+    },
+    {
+        "btn": "left",
+        "t": 8991,
+        "type": "mouseRelease",
+        "x": 930,
+        "y": 876
+    },
+    {
+        "data": "dock:restored|Send to worker",
+        "t": 8992,
+        "type": "note"
+    },
+    {
+        "t": 9315,
+        "type": "mouseMove",
+        "x": 791,
+        "y": 846
+    },
+    {
+        "t": 9468,
+        "type": "mouseMove",
+        "x": 483,
+        "y": 731
+    },
+    {
+        "t": 9620,
+        "type": "mouseMove",
+        "x": 189,
+        "y": 682
+    },
+    {
+        "t": 9764,
+        "type": "mouseMove",
+        "x": 155,
+        "y": 669
+    },
+    {
+        "t": 9907,
+        "type": "mouseMove",
+        "x": 125,
+        "y": 666
+    },
+    {
+        "t": 9947,
+        "type": "mouseMove",
+        "x": 122,
+        "y": 669
+    },
+    {
+        "btn": "left",
+        "t": 10003,
+        "type": "mousePress",
+        "x": 122,
+        "y": 669
+    },
+    {
+        "btn": "left",
+        "t": 10079,
+        "type": "mouseRelease",
+        "x": 122,
+        "y": 669
+    },
+    {
+        "data": "dock:restored|Preview (objects + pipes)",
+        "t": 10081,
+        "type": "note"
+    },
+    {
+        "t": 10214,
+        "type": "mouseMove",
+        "x": 127,
+        "y": 684
+    },
+    {
+        "t": 10364,
+        "type": "mouseMove",
+        "x": 230,
+        "y": 727
+    },
+    {
+        "t": 10499,
+        "type": "mouseMove",
+        "x": 458,
+        "y": 703
+    },
+    {
+        "t": 10668,
+        "type": "mouseMove",
+        "x": 464,
+        "y": 684
+    },
+    {
+        "t": 10802,
+        "type": "mouseMove",
+        "x": 462,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 10815,
+        "type": "mousePress",
+        "x": 462,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 10895,
+        "type": "mouseRelease",
+        "x": 462,
+        "y": 666
+    },
+    {
+        "data": "dock:minimized|Preview (objects + pipes)",
+        "t": 10896,
+        "type": "note"
+    },
+    {
+        "t": 11083,
+        "type": "mouseMove",
+        "x": 464,
+        "y": 666
+    },
+    {
+        "t": 11268,
+        "type": "mouseMove",
+        "x": 471,
+        "y": 671
+    },
+    {
+        "t": 11420,
+        "type": "mouseMove",
+        "x": 711,
+        "y": 693
+    },
+    {
+        "t": 11564,
+        "type": "mouseMove",
+        "x": 902,
+        "y": 682
+    },
+    {
+        "t": 11707,
+        "type": "mouseMove",
+        "x": 918,
+        "y": 669
+    },
+    {
+        "t": 11779,
+        "type": "mouseMove",
+        "x": 923,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 11819,
+        "type": "mousePress",
+        "x": 923,
+        "y": 666
+    },
+    {
+        "btn": "left",
+        "t": 11895,
+        "type": "mouseRelease",
+        "x": 923,
+        "y": 666
+    },
+    {
+        "data": "dock:minimized|Send to worker",
+        "t": 11896,
+        "type": "note"
+    },
+    {
+        "t": 12003,
+        "type": "mouseMove",
+        "x": 927,
+        "y": 669
+    },
+    {
+        "t": 12171,
+        "type": "mouseMove",
+        "x": 910,
+        "y": 697
+    },
+    {
+        "t": 12316,
+        "type": "mouseMove",
+        "x": 765,
+        "y": 802
+    },
+    {
+        "t": 12411,
+        "type": "mouseMove",
+        "x": 945,
+        "y": 872
+    },
+    {
+        "t": 12766,
+        "type": "mouseMove",
+        "x": 959,
+        "y": 880
+    },
+    {
+        "t": 12884,
+        "type": "mouseMove",
+        "x": 932,
+        "y": 881
+    },
+    {
+        "t": 12924,
+        "type": "mouseMove",
+        "x": 931,
+        "y": 881
+    },
+    {
+        "btn": "left",
+        "t": 12964,
+        "type": "mousePress",
+        "x": 931,
+        "y": 881
+    },
+    {
+        "btn": "left",
+        "t": 13039,
+        "type": "mouseRelease",
+        "x": 931,
+        "y": 881
+    },
+    {
+        "data": "dock:restored|Send to worker",
+        "t": 13040,
+        "type": "note"
+    },
+    {
+        "t": 13219,
+        "type": "mouseMove",
+        "x": 804,
+        "y": 882
+    },
+    {
+        "t": 13372,
+        "type": "mouseMove",
+        "x": 532,
+        "y": 810
+    },
+    {
+        "t": 13516,
+        "type": "mouseMove",
+        "x": 790,
+        "y": 733
+    },
+    {
+        "t": 13660,
+        "type": "mouseMove",
+        "x": 898,
+        "y": 701
+    },
+    {
+        "t": 13813,
+        "type": "mouseMove",
+        "x": 906,
+        "y": 688
+    },
+    {
+        "t": 13939,
+        "type": "mouseMove",
+        "x": 919,
+        "y": 674
+    },
+    {
+        "t": 14059,
+        "type": "mouseMove",
+        "x": 931,
+        "y": 669
+    },
+    {
+        "btn": "left",
+        "t": 14099,
+        "type": "mousePress",
+        "x": 931,
+        "y": 669
+    },
+    {
+        "btn": "left",
+        "t": 14159,
+        "type": "mouseRelease",
+        "x": 931,
+        "y": 669
+    },
+    {
+        "data": "dock:minimized|Send to worker",
+        "t": 14160,
+        "type": "note"
+    },
+    {
+        "t": 14259,
+        "type": "mouseMove",
+        "x": 918,
+        "y": 678
+    },
+    {
+        "t": 14420,
+        "type": "mouseMove",
+        "x": 622,
+        "y": 794
+    },
+    {
+        "t": 14564,
+        "type": "mouseMove",
+        "x": 622,
+        "y": 838
+    },
+    {
+        "t": 14708,
+        "type": "mouseMove",
+        "x": 887,
+        "y": 855
+    },
+    {
+        "t": 14869,
+        "type": "mouseMove",
+        "x": 898,
+        "y": 854
+    },
+    {
+        "t": 15020,
+        "type": "mouseMove",
+        "x": 917,
+        "y": 864
+    },
+    {
+        "t": 15171,
+        "type": "mouseMove",
+        "x": 930,
+        "y": 872
+    },
+    {
+        "t": 15203,
+        "type": "mouseMove",
+        "x": 931,
+        "y": 872
+    },
+    {
+        "btn": "left",
+        "t": 15211,
+        "type": "mousePress",
+        "x": 931,
+        "y": 872
+    },
+    {
+        "btn": "left",
+        "t": 15287,
+        "type": "mouseRelease",
+        "x": 931,
+        "y": 872
+    },
+    {
+        "data": "dock:restored|Send to worker",
+        "t": 15289,
+        "type": "note"
+    },
+    {
+        "t": 15474,
+        "type": "mouseMove",
+        "x": 814,
+        "y": 846
+    },
+    {
+        "t": 15620,
+        "type": "mouseMove",
+        "x": 185,
+        "y": 659
+    },
+    {
+        "t": 15756,
+        "type": "mouseMove",
+        "x": 177,
+        "y": 667
+    },
+    {
+        "t": 15916,
+        "type": "mouseMove",
+        "x": 158,
+        "y": 674
+    },
+    {
+        "t": 16060,
+        "type": "mouseMove",
+        "x": 138,
+        "y": 672
+    },
+    {
+        "t": 16102,
+        "type": "mouseMove",
+        "x": 134,
+        "y": 672
+    },
+    {
+        "btn": "left",
+        "t": 16131,
+        "type": "mousePress",
+        "x": 134,
+        "y": 672
+    },
+    {
+        "btn": "left",
+        "t": 16222,
+        "type": "mouseRelease",
+        "x": 134,
+        "y": 672
+    },
+    {
+        "data": "dock:restored|Preview (objects + pipes)",
+        "t": 16223,
+        "type": "note"
+    },
+    {
+        "t": 16668,
+        "type": "mouseMove",
+        "x": 330,
+        "y": 676
+    },
+    {
+        "t": 16812,
+        "type": "mouseMove",
+        "x": 438,
+        "y": 678
+    },
+    {
+        "t": 16971,
+        "type": "mouseMove",
+        "x": 454,
+        "y": 672
+    },
+    {
+        "t": 17091,
+        "type": "mouseMove",
+        "x": 462,
+        "y": 669
+    },
+    {
+        "t": 17204,
+        "type": "mouseMove",
+        "x": 464,
+        "y": 667
+    },
+    {
+        "t": 17500,
+        "type": "mouseMove",
+        "x": 462,
+        "y": 667
+    },
+    {
+        "t": 17580,
+        "type": "mouseMove",
+        "x": 462,
+        "y": 667
+    },
+    {
+        "btn": "left",
+        "t": 17964,
+        "type": "mousePress",
+        "x": 462,
+        "y": 667
+    },
+    {
+        "t": 18020,
+        "type": "mouseMove",
+        "x": 460,
+        "y": 667
+    },
+    {
+        "btn": "left",
+        "t": 18023,
+        "type": "mouseRelease",
+        "x": 460,
+        "y": 667
+    },
+    {
+        "data": "dock:minimized|Preview (objects + pipes)",
+        "t": 18024,
+        "type": "note"
+    },
+    {
+        "t": 18171,
+        "type": "mouseMove",
+        "x": 498,
         "y": 675
     },
     {
-        "t": 8252,
+        "t": 18316,
         "type": "mouseMove",
-        "x": 353,
-        "y": 768
+        "x": 786,
+        "y": 690
     },
     {
-        "t": 8372,
+        "t": 18468,
         "type": "mouseMove",
-        "x": 354,
-        "y": 786
+        "x": 852,
+        "y": 686
     },
     {
-        "t": 8556,
+        "t": 18620,
         "type": "mouseMove",
-        "x": 357,
-        "y": 804
+        "x": 874,
+        "y": 680
     },
     {
-        "t": 8708,
+        "t": 18764,
         "type": "mouseMove",
-        "x": 359,
-        "y": 821
+        "x": 886,
+        "y": 676
     },
     {
-        "t": 8756,
+        "t": 18891,
         "type": "mouseMove",
-        "x": 361,
-        "y": 826
+        "x": 931,
+        "y": 665
+    },
+    {
+        "t": 18945,
+        "type": "mouseMove",
+        "x": 932,
+        "y": 665
     },
     {
         "btn": "left",
-        "t": 8904,
-        "type": "mouseRelease",
-        "x": 361,
-        "y": 826
+        "t": 19003,
+        "type": "mousePress",
+        "x": 932,
+        "y": 665
     },
     {
-        "data": "dock:docked|Worker properties|bottom",
-        "t": 8905,
+        "t": 19043,
+        "type": "mouseMove",
+        "x": 934,
+        "y": 665
+    },
+    {
+        "btn": "left",
+        "t": 19052,
+        "type": "mouseRelease",
+        "x": 934,
+        "y": 665
+    },
+    {
+        "data": "dock:minimized|Send to worker",
+        "t": 19053,
         "type": "note"
     },
     {
-        "t": 9005,
+        "t": 19364,
         "type": "mouseMove",
-        "x": 331,
-        "y": 753
+        "x": 880,
+        "y": 712
     },
     {
-        "t": 9157,
+        "t": 19516,
         "type": "mouseMove",
-        "x": 120,
-        "y": 277
+        "x": 442,
+        "y": 761
     },
     {
-        "t": 9309,
+        "t": 19668,
         "type": "mouseMove",
-        "x": 101,
-        "y": 174
+        "x": 278,
+        "y": 762
     },
     {
-        "t": 9413,
+        "t": 19820,
         "type": "mouseMove",
-        "x": 97,
-        "y": 143
+        "x": 238,
+        "y": 785
     },
     {
-        "t": 9549,
+        "t": 19964,
         "type": "mouseMove",
-        "x": 98,
-        "y": 143
+        "x": 417,
+        "y": 718
     },
     {
-        "t": 9709,
+        "t": 20116,
         "type": "mouseMove",
-        "x": 105,
-        "y": 156
+        "x": 446,
+        "y": 670
     },
     {
-        "btn": "left",
-        "t": 9740,
-        "type": "mousePress",
-        "x": 105,
-        "y": 156
+        "t": 20188,
+        "type": "mouseMove",
+        "x": 447,
+        "y": 670
     },
     {
-        "t": 9908,
+        "delta": -120,
+        "t": 20211,
+        "type": "wheel",
+        "x": 447.20000000000005,
+        "y": 669.6
+    },
+    {
+        "t": 20228,
+        "type": "mouseMove",
+        "x": 450,
+        "y": 672
+    },
+    {
+        "delta": -120,
+        "t": 20235,
+        "type": "wheel",
+        "x": 449.6,
+        "y": 672
+    },
+    {
+        "t": 20260,
         "type": "mouseMove",
         "x": 451,
-        "y": 211
+        "y": 680
     },
     {
-        "t": 9998,
-        "type": "mouseMove",
-        "x": 730,
-        "y": 258
+        "delta": -120,
+        "t": 20268,
+        "type": "wheel",
+        "x": 452,
+        "y": 684
     },
     {
-        "t": 10125,
+        "t": 20420,
         "type": "mouseMove",
-        "x": 733,
-        "y": 258
+        "x": 471,
+        "y": 835
+    },
+    {
+        "t": 20563,
+        "type": "mouseMove",
+        "x": 464,
+        "y": 870
+    },
+    {
+        "t": 20627,
+        "type": "mouseMove",
+        "x": 460,
+        "y": 874
+    },
+    {
+        "t": 20868,
+        "type": "mouseMove",
+        "x": 488,
+        "y": 767
+    },
+    {
+        "t": 21019,
+        "type": "mouseMove",
+        "x": 533,
+        "y": 529
+    },
+    {
+        "t": 21164,
+        "type": "mouseMove",
+        "x": 778,
+        "y": 143
+    },
+    {
+        "t": 21317,
+        "type": "mouseMove",
+        "x": 850,
+        "y": 49
+    },
+    {
+        "t": 21468,
+        "type": "mouseMove",
+        "x": 904,
+        "y": 6
+    },
+    {
+        "t": 21492,
+        "type": "mouseMove",
+        "x": 910,
+        "y": 0
+    },
+    {
+        "t": 21852,
+        "type": "mouseMove",
+        "x": 913,
+        "y": 8
+    },
+    {
+        "t": 22068,
+        "type": "mouseMove",
+        "x": 912,
+        "y": 15
+    },
+    {
+        "t": 22220,
+        "type": "mouseMove",
+        "x": 908,
+        "y": 50
+    },
+    {
+        "t": 22364,
+        "type": "mouseMove",
+        "x": 882,
+        "y": 89
+    },
+    {
+        "t": 22516,
+        "type": "mouseMove",
+        "x": 406,
+        "y": 134
+    },
+    {
+        "t": 22616,
+        "type": "mouseMove",
+        "x": 214,
+        "y": 134
+    },
+    {
+        "t": 22739,
+        "type": "mouseMove",
+        "x": 206,
+        "y": 132
     },
     {
         "btn": "left",
-        "t": 10128,
+        "t": 22819,
+        "type": "mousePress",
+        "x": 206,
+        "y": 132
+    },
+    {
+        "t": 22963,
+        "type": "mouseMove",
+        "x": 643,
+        "y": 179
+    },
+    {
+        "t": 23124,
+        "type": "mouseMove",
+        "x": 893,
+        "y": 182
+    },
+    {
+        "t": 23235,
+        "type": "mouseMove",
+        "x": 919,
+        "y": 187
+    },
+    {
+        "btn": "left",
+        "t": 23351,
         "type": "mouseRelease",
-        "x": 733,
-        "y": 258
+        "x": 919,
+        "y": 187
     },
     {
         "data": "dock:docked|Connections|right",
-        "t": 10128,
+        "t": 23351,
         "type": "note"
     },
     {
-        "t": 10205,
+        "t": 23564,
         "type": "mouseMove",
-        "x": 707,
-        "y": 251
+        "x": 917,
+        "y": 202
     },
     {
-        "t": 10357,
+        "t": 23715,
         "type": "mouseMove",
-        "x": 244,
-        "y": 174
+        "x": 930,
+        "y": 141
     },
     {
-        "t": 10509,
+        "t": 23831,
         "type": "mouseMove",
-        "x": 176,
-        "y": 160
-    },
-    {
-        "t": 10637,
-        "type": "mouseMove",
-        "x": 160,
-        "y": 130
+        "x": 929,
+        "y": 115
     },
     {
         "btn": "left",
-        "t": 10732,
+        "t": 23899,
         "type": "mousePress",
-        "x": 160,
-        "y": 130
-    },
-    {
-        "t": 10804,
-        "type": "mouseMove",
-        "x": 203,
-        "y": 142
-    },
-    {
-        "t": 10960,
-        "type": "mouseMove",
-        "x": 814,
-        "y": 262
-    },
-    {
-        "t": 10964,
-        "type": "mouseMove",
-        "x": 820,
-        "y": 266
+        "x": 929,
+        "y": 115
     },
     {
         "btn": "left",
-        "t": 11072,
+        "t": 23991,
         "type": "mouseRelease",
+        "x": 929,
+        "y": 115
+    },
+    {
+        "data": "dock:restored|Connections",
+        "t": 23991,
+        "type": "note"
+    },
+    {
+        "t": 24165,
+        "type": "mouseMove",
+        "x": 931,
+        "y": 118
+    },
+    {
+        "t": 24285,
+        "type": "mouseMove",
+        "x": 934,
+        "y": 126
+    },
+    {
+        "btn": "left",
+        "t": 24475,
+        "type": "mousePress",
+        "x": 934,
+        "y": 126
+    },
+    {
+        "btn": "left",
+        "t": 24575,
+        "type": "mouseRelease",
+        "x": 934,
+        "y": 126
+    },
+    {
+        "data": "dock:minimized|Connections",
+        "t": 24576,
+        "type": "note"
+    },
+    {
+        "t": 24619,
+        "type": "mouseMove",
+        "x": 921,
+        "y": 127
+    },
+    {
+        "t": 24766,
+        "type": "mouseMove",
+        "x": 214,
+        "y": 137
+    },
+    {
+        "t": 24915,
+        "type": "mouseMove",
+        "x": 187,
+        "y": 134
+    },
+    {
+        "t": 24995,
+        "type": "mouseMove",
+        "x": 172,
+        "y": 134
+    },
+    {
+        "btn": "left",
+        "t": 25027,
+        "type": "mousePress",
+        "x": 172,
+        "y": 134
+    },
+    {
+        "t": 25067,
+        "type": "mouseMove",
+        "x": 174,
+        "y": 134
+    },
+    {
+        "t": 25220,
+        "type": "mouseMove",
+        "x": 733,
+        "y": 215
+    },
+    {
+        "t": 25331,
+        "type": "mouseMove",
+        "x": 743,
+        "y": 217
+    },
+    {
+        "t": 25404,
+        "type": "mouseMove",
+        "x": 744,
+        "y": 217
+    },
+    {
+        "btn": "left",
+        "t": 25407,
+        "type": "mouseRelease",
+        "x": 744,
+        "y": 217
+    },
+    {
+        "data": "dock:docked|Worker properties|right",
+        "t": 25407,
+        "type": "note"
+    },
+    {
+        "t": 25516,
+        "type": "mouseMove",
+        "x": 886,
+        "y": 198
+    },
+    {
+        "t": 25668,
+        "type": "mouseMove",
+        "x": 929,
+        "y": 178
+    },
+    {
+        "t": 25820,
+        "type": "mouseMove",
+        "x": 935,
+        "y": 162
+    },
+    {
+        "btn": "left",
+        "t": 25900,
+        "type": "mousePress",
+        "x": 935,
+        "y": 162
+    },
+    {
+        "btn": "left",
+        "t": 25983,
+        "type": "mouseRelease",
+        "x": 935,
+        "y": 162
+    },
+    {
+        "data": "dock:minimized|Worker properties",
+        "t": 25983,
+        "type": "note"
+    },
+    {
+        "btn": "left",
+        "t": 26300,
+        "type": "mousePress",
+        "x": 935,
+        "y": 162
+    },
+    {
+        "btn": "left",
+        "t": 26360,
+        "type": "mouseRelease",
+        "x": 935,
+        "y": 162
+    },
+    {
+        "data": "dock:restored|Worker properties",
+        "t": 26360,
+        "type": "note"
+    },
+    {
+        "t": 26420,
+        "type": "mouseMove",
+        "x": 932,
+        "y": 162
+    },
+    {
+        "t": 26568,
+        "type": "mouseMove",
+        "x": 821,
+        "y": 159
+    },
+    {
+        "t": 26595,
+        "type": "mouseMove",
         "x": 820,
-        "y": 266
+        "y": 158
+    },
+    {
+        "t": 26852,
+        "type": "mouseMove",
+        "x": 904,
+        "y": 155
+    },
+    {
+        "t": 27004,
+        "type": "mouseMove",
+        "x": 868,
+        "y": 162
+    },
+    {
+        "t": 27164,
+        "type": "mouseMove",
+        "x": 914,
+        "y": 162
+    },
+    {
+        "t": 27276,
+        "type": "mouseMove",
+        "x": 938,
+        "y": 159
+    },
+    {
+        "btn": "left",
+        "t": 27342,
+        "type": "mousePress",
+        "x": 938,
+        "y": 159
+    },
+    {
+        "btn": "left",
+        "t": 27399,
+        "type": "mouseRelease",
+        "x": 938,
+        "y": 159
+    },
+    {
+        "data": "dock:minimized|Worker properties",
+        "t": 27399,
+        "type": "note"
+    },
+    {
+        "t": 27468,
+        "type": "mouseMove",
+        "x": 936,
+        "y": 164
+    },
+    {
+        "t": 27611,
+        "type": "mouseMove",
+        "x": 720,
+        "y": 725
+    },
+    {
+        "t": 27764,
+        "type": "mouseMove",
+        "x": 624,
+        "y": 842
+    },
+    {
+        "t": 27917,
+        "type": "mouseMove",
+        "x": 586,
+        "y": 853
+    },
+    {
+        "t": 28068,
+        "type": "mouseMove",
+        "x": 582,
+        "y": 885
+    },
+    {
+        "t": 28181,
+        "type": "mouseMove",
+        "x": 578,
+        "y": 881
+    },
+    {
+        "btn": "left",
+        "t": 28260,
+        "type": "mousePress",
+        "x": 578,
+        "y": 881
+    },
+    {
+        "t": 28371,
+        "type": "mouseMove",
+        "x": 625,
+        "y": 791
+    },
+    {
+        "t": 28517,
+        "type": "mouseMove",
+        "x": 763,
+        "y": 413
+    },
+    {
+        "t": 28643,
+        "type": "mouseMove",
+        "x": 767,
+        "y": 381
+    },
+    {
+        "btn": "left",
+        "t": 28647,
+        "type": "mouseRelease",
+        "x": 767,
+        "y": 381
     },
     {
         "data": "dock:docked|Send to worker|right",
-        "t": 11073,
+        "t": 28648,
         "type": "note"
     },
     {
-        "t": 11100,
+        "t": 28667,
         "type": "mouseMove",
-        "x": 822,
-        "y": 262
+        "x": 770,
+        "y": 375
     },
     {
-        "t": 11260,
+        "t": 28820,
+        "type": "mouseMove",
+        "x": 866,
+        "y": 268
+    },
+    {
+        "t": 28964,
+        "type": "mouseMove",
+        "x": 912,
+        "y": 198
+    },
+    {
+        "t": 29067,
+        "type": "mouseMove",
+        "x": 929,
+        "y": 182
+    },
+    {
+        "t": 29131,
         "type": "mouseMove",
         "x": 930,
-        "y": 192
-    },
-    {
-        "t": 11404,
-        "type": "mouseMove",
-        "x": 947,
-        "y": 170
-    },
-    {
-        "t": 11560,
-        "type": "mouseMove",
-        "x": 938,
-        "y": 175
-    },
-    {
-        "t": 11574,
-        "type": "mouseMove",
-        "x": 937,
-        "y": 182
-    },
-    {
-        "btn": "left",
-        "t": 11644,
-        "type": "mousePress",
-        "x": 937,
-        "y": 182
-    },
-    {
-        "t": 11721,
-        "type": "mouseMove",
-        "x": 937,
         "y": 181
     },
     {
         "btn": "left",
-        "t": 11721,
+        "t": 29158,
+        "type": "mousePress",
+        "x": 930,
+        "y": 181
+    },
+    {
+        "btn": "left",
+        "t": 29223,
         "type": "mouseRelease",
-        "x": 937,
+        "x": 930,
         "y": 181
     },
     {
         "data": "dock:restored|Send to worker",
-        "t": 11721,
+        "t": 29224,
         "type": "note"
     },
     {
-        "t": 11854,
+        "t": 29317,
         "type": "mouseMove",
-        "x": 933,
-        "y": 162
+        "x": 931,
+        "y": 182
     },
     {
         "btn": "left",
-        "t": 11894,
+        "t": 29420,
         "type": "mousePress",
-        "x": 933,
-        "y": 162
+        "x": 931,
+        "y": 182
     },
     {
         "btn": "left",
-        "t": 11974,
+        "t": 29471,
         "type": "mouseRelease",
-        "x": 933,
-        "y": 162
+        "x": 931,
+        "y": 182
     },
     {
-        "data": "dock:restored|Connections",
-        "t": 11974,
+        "data": "dock:minimized|Send to worker",
+        "t": 29472,
         "type": "note"
     },
     {
-        "t": 12001,
+        "t": 29492,
         "type": "mouseMove",
-        "x": 931,
-        "y": 160
-    },
-    {
-        "t": 12148,
-        "type": "mouseMove",
-        "x": 931,
-        "y": 134
-    },
-    {
-        "t": 12164,
-        "type": "mouseMove",
-        "x": 931,
-        "y": 134
+        "x": 932,
+        "y": 183
     },
     {
         "btn": "left",
-        "t": 12201,
+        "t": 29531,
         "type": "mousePress",
-        "x": 931,
-        "y": 134
+        "x": 932,
+        "y": 183
     },
     {
         "btn": "left",
-        "t": 12312,
+        "t": 29632,
         "type": "mouseRelease",
-        "x": 931,
-        "y": 134
+        "x": 932,
+        "y": 183
+    },
+    {
+        "data": "dock:restored|Send to worker",
+        "t": 29632,
+        "type": "note"
+    },
+    {
+        "t": 29796,
+        "type": "mouseMove",
+        "x": 930,
+        "y": 186
+    },
+    {
+        "btn": "left",
+        "t": 29916,
+        "type": "mousePress",
+        "x": 930,
+        "y": 186
+    },
+    {
+        "btn": "left",
+        "t": 29975,
+        "type": "mouseRelease",
+        "x": 930,
+        "y": 186
+    },
+    {
+        "data": "dock:minimized|Send to worker",
+        "t": 29976,
+        "type": "note"
+    },
+    {
+        "t": 30012,
+        "type": "mouseMove",
+        "x": 929,
+        "y": 187
+    },
+    {
+        "t": 30163,
+        "type": "mouseMove",
+        "x": 622,
+        "y": 447
+    },
+    {
+        "t": 30316,
+        "type": "mouseMove",
+        "x": 327,
+        "y": 806
+    },
+    {
+        "t": 30468,
+        "type": "mouseMove",
+        "x": 268,
+        "y": 829
+    },
+    {
+        "t": 30579,
+        "type": "mouseMove",
+        "x": 194,
+        "y": 882
+    },
+    {
+        "t": 30707,
+        "type": "mouseMove",
+        "x": 195,
+        "y": 882
+    },
+    {
+        "btn": "left",
+        "t": 30731,
+        "type": "mousePress",
+        "x": 195,
+        "y": 882
+    },
+    {
+        "t": 30772,
+        "type": "mouseMove",
+        "x": 199,
+        "y": 882
+    },
+    {
+        "t": 30920,
+        "type": "mouseMove",
+        "x": 654,
+        "y": 558
+    },
+    {
+        "t": 31067,
+        "type": "mouseMove",
+        "x": 793,
+        "y": 349
+    },
+    {
+        "t": 31123,
+        "type": "mouseMove",
+        "x": 818,
+        "y": 322
+    },
+    {
+        "btn": "left",
+        "t": 31215,
+        "type": "mouseRelease",
+        "x": 818,
+        "y": 322
+    },
+    {
+        "data": "dock:docked|Preview (objects + pipes)|right",
+        "t": 31216,
+        "type": "note"
+    },
+    {
+        "t": 31364,
+        "type": "mouseMove",
+        "x": 882,
+        "y": 250
+    },
+    {
+        "t": 31516,
+        "type": "mouseMove",
+        "x": 903,
+        "y": 224
+    },
+    {
+        "t": 31668,
+        "type": "mouseMove",
+        "x": 923,
+        "y": 211
+    },
+    {
+        "t": 31721,
+        "type": "mouseMove",
+        "x": 925,
+        "y": 211
+    },
+    {
+        "btn": "left",
+        "t": 31739,
+        "type": "mousePress",
+        "x": 925,
+        "y": 211
+    },
+    {
+        "btn": "left",
+        "t": 31788,
+        "type": "mouseRelease",
+        "x": 925,
+        "y": 211
     },
     {
         "data": "dock:restored|Preview (objects + pipes)",
-        "t": 12312,
+        "t": 31788,
         "type": "note"
     },
     {
-        "t": 12468,
+        "t": 31815,
         "type": "mouseMove",
-        "x": 943,
-        "y": 95
+        "x": 926,
+        "y": 211
     },
     {
-        "t": 12604,
-        "type": "mouseMove",
-        "x": 948,
-        "y": 23
+        "btn": "left",
+        "t": 31852,
+        "type": "mousePress",
+        "x": 926,
+        "y": 211
     },
     {
-        "t": 12741,
+        "btn": "left",
+        "t": 31928,
+        "type": "mouseRelease",
+        "x": 926,
+        "y": 211
+    },
+    {
+        "data": "dock:minimized|Preview (objects + pipes)",
+        "t": 31929,
+        "type": "note"
+    },
+    {
+        "btn": "left",
+        "t": 31963,
+        "type": "mousePress",
+        "x": 926,
+        "y": 211
+    },
+    {
+        "btn": "left",
+        "t": 32056,
+        "type": "mouseRelease",
+        "x": 926,
+        "y": 211
+    },
+    {
+        "data": "dock:restored|Preview (objects + pipes)",
+        "t": 32056,
+        "type": "note"
+    },
+    {
+        "t": 32268,
         "type": "mouseMove",
-        "x": 947,
+        "x": 858,
+        "y": 221
+    },
+    {
+        "t": 32420,
+        "type": "mouseMove",
+        "x": 846,
+        "y": 221
+    },
+    {
+        "t": 32565,
+        "type": "mouseMove",
+        "x": 910,
+        "y": 215
+    },
+    {
+        "t": 32696,
+        "type": "mouseMove",
+        "x": 931,
+        "y": 215
+    },
+    {
+        "t": 32859,
+        "type": "mouseMove",
+        "x": 934,
+        "y": 214
+    },
+    {
+        "t": 32949,
+        "type": "mouseMove",
+        "x": 925,
+        "y": 213
+    },
+    {
+        "btn": "left",
+        "t": 32988,
+        "type": "mousePress",
+        "x": 925,
+        "y": 213
+    },
+    {
+        "t": 33028,
+        "type": "mouseMove",
+        "x": 923,
+        "y": 213
+    },
+    {
+        "btn": "left",
+        "t": 33031,
+        "type": "mouseRelease",
+        "x": 923,
+        "y": 213
+    },
+    {
+        "data": "dock:minimized|Preview (objects + pipes)",
+        "t": 33032,
+        "type": "note"
+    },
+    {
+        "t": 33165,
+        "type": "mouseMove",
+        "x": 922,
+        "y": 213
+    },
+    {
+        "t": 33310,
+        "type": "mouseMove",
+        "x": 842,
+        "y": 217
+    },
+    {
+        "t": 33339,
+        "type": "mouseMove",
+        "x": 826,
+        "y": 217
+    },
+    {
+        "btn": "left",
+        "t": 33379,
+        "type": "mousePress",
+        "x": 826,
+        "y": 217
+    },
+    {
+        "t": 33467,
+        "type": "mouseMove",
+        "x": 829,
+        "y": 205
+    },
+    {
+        "t": 33550,
+        "type": "mouseMove",
+        "x": 830,
+        "y": 174
+    },
+    {
+        "btn": "left",
+        "t": 33847,
+        "type": "mouseRelease",
+        "x": 830,
+        "y": 174
+    },
+    {
+        "data": "dock:docked|Preview (objects + pipes)|right",
+        "t": 33848,
+        "type": "note"
+    },
+    {
+        "t": 34068,
+        "type": "mouseMove",
+        "x": 816,
+        "y": 174
+    },
+    {
+        "t": 34220,
+        "type": "mouseMove",
+        "x": 801,
+        "y": 175
+    },
+    {
+        "t": 34236,
+        "type": "mouseMove",
+        "x": 798,
+        "y": 177
+    },
+    {
+        "btn": "left",
+        "t": 34300,
+        "type": "mousePress",
+        "x": 798,
+        "y": 177
+    },
+    {
+        "t": 34372,
+        "type": "mouseMove",
+        "x": 798,
+        "y": 173
+    },
+    {
+        "t": 34508,
+        "type": "mouseMove",
+        "x": 799,
+        "y": 156
+    },
+    {
+        "t": 34659,
+        "type": "mouseMove",
+        "x": 801,
+        "y": 151
+    },
+    {
+        "t": 34780,
+        "type": "mouseMove",
+        "x": 803,
+        "y": 143
+    },
+    {
+        "btn": "left",
+        "t": 34928,
+        "type": "mouseRelease",
+        "x": 803,
+        "y": 143
+    },
+    {
+        "data": "dock:docked|Preview (objects + pipes)|right",
+        "t": 34928,
+        "type": "note"
+    },
+    {
+        "t": 35117,
+        "type": "mouseMove",
+        "x": 801,
+        "y": 142
+    },
+    {
+        "t": 35229,
+        "type": "mouseMove",
+        "x": 793,
+        "y": 145
+    },
+    {
+        "btn": "left",
+        "t": 35340,
+        "type": "mousePress",
+        "x": 793,
+        "y": 145
+    },
+    {
+        "t": 35421,
+        "type": "mouseMove",
+        "x": 791,
+        "y": 143
+    },
+    {
+        "t": 35571,
+        "type": "mouseMove",
+        "x": 797,
+        "y": 127
+    },
+    {
+        "t": 35716,
+        "type": "mouseMove",
+        "x": 799,
+        "y": 121
+    },
+    {
+        "t": 35844,
+        "type": "mouseMove",
+        "x": 799,
+        "y": 118
+    },
+    {
+        "t": 35973,
+        "type": "mouseMove",
+        "x": 801,
+        "y": 117
+    },
+    {
+        "btn": "left",
+        "t": 36016,
+        "type": "mouseRelease",
+        "x": 801,
+        "y": 117
+    },
+    {
+        "data": "dock:docked|Preview (objects + pipes)|right",
+        "t": 36016,
+        "type": "note"
+    },
+    {
+        "t": 36164,
+        "type": "mouseMove",
+        "x": 865,
+        "y": 47
+    },
+    {
+        "t": 36316,
+        "type": "mouseMove",
+        "x": 898,
+        "y": 4
+    },
+    {
+        "t": 36332,
+        "type": "mouseMove",
+        "x": 908,
         "y": 0
     }
 ]
