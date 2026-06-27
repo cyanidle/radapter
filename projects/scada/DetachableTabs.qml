@@ -2,6 +2,7 @@ import QtQuick 2.13
 import QtQuick.Window 2.13
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
+import Qt.labs.settings 1.0
 
 // VSCode-style tab groups. Each group is a column (tab bar + content) inside a
 // single horizontal SplitView, which handles resize handles between columns natively.
@@ -14,6 +15,80 @@ Item {
 
     property var appWindow: null
     property var panelList: []
+    property string settingsKey: "tabs/main"   // QSettings category for tab layout
+    property bool _tabRestored: false
+
+    // ── tab state persistence ───────────────────────────────────────────────
+    onGroupsChanged: _scheduleTabSave()
+
+    Settings {
+        id: tabCfg
+        category: tabs.settingsKey
+        property string groupsJson: ""
+        property string detachedJson: ""
+    }
+
+    Timer {
+        id: _tabSaveTimer
+        interval: 300
+        onTriggered: _persistTabState()
+    }
+
+    function _scheduleTabSave() {
+        if (!_tabRestored) return
+        _tabSaveTimer.restart()
+    }
+
+    function _persistTabState() {
+        _tabSaveTimer.stop()
+        tabCfg.groupsJson = JSON.stringify(groups)
+        var det = []
+        for (var i = 0; i < panelList.length; i++)
+            if (panelList[i].detached) det.push(i)
+        tabCfg.detachedJson = JSON.stringify(det)
+    }
+
+    function _restoreTabState() {
+        if (!tabCfg.groupsJson) return false
+        try {
+            var savedGroups = JSON.parse(tabCfg.groupsJson)
+            if (!savedGroups || !savedGroups.length) return false
+            var savedDetached = JSON.parse(tabCfg.detachedJson) || []
+
+            // Validate: panel count must match
+            var total = 0
+            for (var g = 0; g < savedGroups.length; g++)
+                total += savedGroups[g].tabs ? savedGroups[g].tabs.length : 0
+            total += savedDetached.length
+            if (total !== panelList.length) return false
+
+            // Validate: all indices in range
+            for (var g2 = 0; g2 < savedGroups.length; g2++) {
+                var tlist = savedGroups[g2].tabs
+                if (!tlist) return false
+                for (var t = 0; t < tlist.length; t++)
+                    if (tlist[t] < 0 || tlist[t] >= panelList.length) return false
+                if (savedGroups[g2].active < 0 || savedGroups[g2].active >= panelList.length)
+                    savedGroups[g2].active = tlist.length > 0 ? tlist[0] : -1
+            }
+            for (var d = 0; d < savedDetached.length; d++)
+                if (savedDetached[d] < 0 || savedDetached[d] >= panelList.length) return false
+
+            groups = savedGroups
+            groups = groups  // force notification
+            relayout()
+
+            // Re-detach panels that were detached (WindowSettings handles geometry)
+            for (var d2 = 0; d2 < savedDetached.length; d2++) {
+                var idx = savedDetached[d2]
+                if (!panelList[idx].detached && panelList[idx].detachable)
+                    _detachAt(idx, 100, 100)
+            }
+            return true
+        } catch (e) {
+            return false
+        }
+    }
 
     // ── group model ──────────────────────────────────────────────────────
     property var groups: [{tabs: [], active: -1}]
@@ -73,7 +148,11 @@ Item {
         for (var j = 0; j < arr.length; j++)
             if (!arr[j].detached) idxs.push(j)
         groups = [{tabs: idxs, active: idxs.length > 0 ? idxs[0] : -1}]
-        relayout()
+
+        if (!_restoreTabState())
+            relayout()
+        _tabRestored = true
+        _scheduleTabSave()   // persist the initial (or restored) state
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
@@ -242,7 +321,9 @@ Item {
         radapter.note("tabs:closed|" + p.title)
         if (p.detached) {
             if (p._win) { var w = p._win; p._win = null; w.close() }
-            p.detached = false; return
+            p.detached = false
+            _scheduleTabSave()
+            return
         }
         var g = groupOf(panelIdx)
         if (g < 0) return
