@@ -674,18 +674,9 @@ Item {
     }
 
     // drag ghost
-    Rectangle {
+    DragGhost {
         visible: tabs.dragging
-        z: 10000
-        width: Math.min(ghostLabel.implicitWidth + 20, 220)
-        height: 28; radius: 4
-        color: "#e3f2fd"; border.color: "#2196f3"; border.width: 1; opacity: 0.92
-        x: tabs.dragCurX - width / 2; y: tabs.dragCurY - height / 2
-        Label {
-            id: ghostLabel
-            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
-            verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
-            text: dragTitle(); font.bold: true
-        }
+        label: dragTitle()
+        cx: tabs.dragCurX; cy: tabs.dragCurY
     }
 }

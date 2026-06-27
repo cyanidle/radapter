@@ -325,24 +325,11 @@ Item {
     }
 
     // a small ghost that follows the cursor while a panel header is being dragged
-    Rectangle {
+    DragGhost {
         visible: host.draggingPanel !== null
-        z: 9999
-        width: 150; height: 28
-        radius: 3
-        color: "#e3f2fd"
-        border.color: "#2196f3"; border.width: 1
-        opacity: 0.92
-        x: host.ghostX - width / 2
-        y: host.ghostY - height / 2
-        Label {
-            anchors.fill: parent
-            anchors.leftMargin: 8; anchors.rightMargin: 8
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-            text: host.draggingPanel ? host.draggingPanel.title : ""
-            font.bold: true
-        }
+        label: host.draggingPanel ? host.draggingPanel.title : ""
+        cx: host.ghostX; cy: host.ghostY
+        fixedWidth: 150
     }
 
     Component {
