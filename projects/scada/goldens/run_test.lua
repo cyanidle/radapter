@@ -52,6 +52,7 @@ if mode == "record" then
             -- Disable QSettings persistence during golden tests: Qt.labs.settings'
             -- file I/O during QML component construction interferes with the
             -- QML_Tester event recording/replay, causing note mismatches.
+            -- (When launching via configurator.lua use the "ui-no-persist" arg.)
             persistUi = false,
             home = os.getenv("HOME") or "/",
             qt_version = app_info().qt_version or "5",

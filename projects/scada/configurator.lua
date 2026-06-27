@@ -10,6 +10,8 @@
 --
 -- Run (needs a Qt GUI):
 --   build/bin/radapter --gui projects/scada/configurator.lua
+-- To disable UI persistence (e.g. when recording golden tests):
+--   build/bin/radapter --gui projects/scada/configurator.lua ui-no-persist
 
 -- worker families this configurator offers (devices included so Modbus masters
 -- can reference / create one)
@@ -42,10 +44,17 @@ end
 -- so none are needed here; pass extra ones via custom_forms if desired.
 local custom_forms = {}
 
+-- UI persistence is on by default; pass "ui-no-persist" as a trailing argument
+-- to disable (golden tests set persistUi=false directly in QML properties).
+local persist_ui = true
+for _, a in ipairs(args) do
+    if a == "ui-no-persist" then persist_ui = false; break end
+end
+
 local view = QML {
     url = "./Configurator.qml",
     properties = {
-        persistUi = true,  -- enable window/tab geometry persistence via QSettings
+        persistUi = persist_ui,  -- enable window/tab geometry persistence via QSettings
         custom_forms = custom_forms,
         home = os.getenv("HOME") or "/",   -- starting dir for the file pickers
         qt_version = app_info().qt_version,

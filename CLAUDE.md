@@ -243,9 +243,17 @@ Both are gated on the **global context property `persistUi`** — set from Lua i
 call's `properties` table:
 
 - **Production** (`configurator.lua`): `persistUi = true` → saves to `~/.config/radapter/radapter.conf`
+- **Production, no persistence** (pass `ui-no-persist` as trailing arg to `configurator.lua`): `persistUi = false`
 - **Golden tests** (`goldens/run_test.lua`): `persistUi = false` → no QSettings I/O, so
   `QML_Tester` event recording/replay is not disrupted
 - **Absent**: defaults to `true` (e.g. `runner.lua` opening the HMI window)
+
+When **recording a new golden**, pass `ui-no-persist` so the recorded events
+don't include QSettings I/O side effects:
+```bash
+build/bin/radapter --gui --gui-record projects/scada/goldens/new.json \
+    projects/scada/configurator.lua ui-no-persist
+```
 
 To disable persistence when writing ad-hoc QML test snippets, pass `persistUi = false`:
 ```lua
