@@ -157,14 +157,15 @@ function M.save_to(params)
     end
 end
 
+-- Read a declarative config table (the { objects, pipes, visualization } shape) from a
+-- file or Redis hash, WITHOUT building it — for editors that want the config itself.
 ---@param params RadLoadParams
----@return table<string, Worker>
-function M.load_from(params)
+---@return RadConfig
+function M.read(params)
     assert(type(params) == "table", "params table expected")
-    local config
 
     if params.path then
-        config = json_decode(read_file(params.path))
+        return json_decode(read_file(params.path))
     elseif params.key then
         local cache = redis_conn(params)
         local ok, res = pcall(function()
@@ -186,12 +187,16 @@ function M.load_from(params)
         end)
         cache:destroy()
         if not ok then error(res) end
-        config = res
+        return res
     else
-        error("load_from: provide 'path' (file) or 'key' (redis)")
+        error("read: provide 'path' (file) or 'key' (redis)")
     end
+end
 
-    return M.build(config)
+---@param params RadLoadParams
+---@return table<string, Worker>
+function M.load_from(params)
+    return M.build(M.read(params))
 end
 
 return M

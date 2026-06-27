@@ -173,9 +173,10 @@ end)
 
 -- ── File save/load (triggered by QML menubar actions) ────────────────────
 --
--- QML sends { save_file = path } or { open_file = path } through the view
--- worker. We use Lua's standard io library to read/write project JSON.
--- We keep the current project state in a local variable so we can save it.
+-- QML sends { save_file = path } or { open_file = path } through the view worker. We
+-- persist project JSON via the declare module (the same format declare.build consumes),
+-- and keep the current project state in a local so we can save it.
+local declare = require "declare"   -- sibling module (resolved via the script's dir)
 
 local current_config = default_config   -- the live authoring state
 
@@ -184,36 +185,25 @@ pipe(view, function(msg)
         local path = msg.save_file
         -- the save message carries the GUI's live config; keep our copy in sync
         if msg.config then current_config = msg.config end
-        local data = json_encode(current_config)
-        local f, err = io.open(path, "w")
-        if f then
-            f:write(data)
-            f:close()
+        local ok, err = pcall(declare.save_to, { path = path, config = current_config })
+        if ok then
             view { save_ok = path }
             log.info("Saved project to {}", path)
         else
-            view { save_err = path, save_msg = err }
+            view { save_err = path, save_msg = tostring(err) }
             log.error("Failed to save {}: {}", path, err)
         end
     elseif msg.open_file then
         local path = msg.open_file
-        local f, err = io.open(path, "r")
-        if f then
-            local data = f:read("*a")
-            f:close()
-            local ok, cfg = pcall(json_decode, data)
-            if ok then
-                current_config = cfg
-                view { config = cfg }
-                view { open_ok = path }
-                log.info("Loaded project from {}", path)
-            else
-                view { open_err = path, open_msg = "Invalid JSON: " .. tostring(cfg) }
-                log.error("Failed to parse {}: {}", path, cfg)
-            end
+        local ok, cfg = pcall(declare.read, { path = path })
+        if ok then
+            current_config = cfg
+            view { config = cfg }
+            view { open_ok = path }
+            log.info("Loaded project from {}", path)
         else
-            view { open_err = path, open_msg = err }
-            log.error("Failed to open {}: {}", path, err)
+            view { open_err = path, open_msg = tostring(cfg) }
+            log.error("Failed to open {}: {}", path, cfg)
         end
     elseif msg.config then
         -- QML pushes the live config alongside other actions; keep our copy for saves
