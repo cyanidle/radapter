@@ -31,18 +31,21 @@ Item {
         border.color: "#cfd8dc"; border.width: 1
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
+    // The header is anchored to the top so it stays put for any panel height — a minimized
+    // bottom panel becomes a full-height narrow strip whose header must still sit at the top
+    // (a ColumnLayout would center the lone header when the body is hidden).
+    Rectangle {
+        id: headerBar
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: panel.headerH
 
         // The header is a drag handle: drag it onto a host edge to dock/reorder there, into
         // the host's middle to leave it where it is, or out of the host to float it.
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: panel.headerH
-            color: dragHandle.drag.active ? "#cfd8dc" : "#eceff1"
-            border.color: "#cfd8dc"; border.width: 1
-            RowLayout {
+        color: dragHandle.drag.active ? "#cfd8dc" : "#eceff1"
+        border.color: "#cfd8dc"; border.width: 1
+        RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 8
                 anchors.rightMargin: 2
@@ -80,15 +83,16 @@ Item {
                 }
                 onReleased: panel.host.endPanelDrag()
             }
-            Item { id: dragProxy }   // off-layout, just to satisfy drag.target
-        }
-        Item {
-            id: body
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            visible: !panel.minimized
-            clip: true
-        }
+        Item { id: dragProxy }   // off-layout, just to satisfy drag.target
+    }
+    Item {
+        id: body
+        anchors.top: headerBar.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: !panel.minimized
+        clip: true
     }
     // content goes below the header
     default property alias content: body.data

@@ -85,14 +85,29 @@ Item {
         }
         var nExp = list.length - nMin
         if (horizontal) {
-            var eachW = list.length > 0 ? Math.max(slot.width / list.length, 150) : 0
+            // bottom dock stacks panels along x. A minimized panel collapses to a narrow
+            // header strip and the expanded ones share the freed width (mirror of the
+            // vertical accordion below, which collapses height instead). When every panel
+            // is minimized the slot itself collapses to a header strip (bottomCollapsed),
+            // so split the full width evenly to show all titles.
+            var collapsedW = 130
             var x = 0
-            for (var a = 0; a < list.length; a++) {
-                var pa = list[a]
-                pa.x = x; pa.width = eachW
-                pa.y = 0
-                pa.height = pa.minimized ? headerH : slot.height
-                x += eachW
+            if (nExp === 0) {
+                var evenW = list.length > 0 ? slot.width / list.length : 0
+                for (var a = 0; a < list.length; a++) {
+                    var pa = list[a]
+                    pa.x = x; pa.width = evenW; pa.y = 0; pa.height = slot.height
+                    x += evenW
+                }
+            } else {
+                var freeW = Math.max(0, slot.width - nMin * collapsedW)
+                var eachW = Math.max(freeW / nExp, 150)
+                for (var c = 0; c < list.length; c++) {
+                    var pc = list[c]
+                    pc.x = x; pc.y = 0; pc.height = slot.height
+                    pc.width = pc.minimized ? collapsedW : eachW
+                    x += pc.width
+                }
             }
         } else {
             var freeH = Math.max(0, slot.height - nMin * headerH)
