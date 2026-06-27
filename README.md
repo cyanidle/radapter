@@ -277,6 +277,13 @@ qt:wait(500)                              -- block and process events for N ms
 qt:process_events()                       -- single non-blocking pass through the event loop
 ```
 
+### Window and tab state persistence
+
+The SCADA configurator saves window geometry, maximized/fullscreen state, screen
+assignment, and tab layout across sessions via QSettings. This is gated on the global
+context property `persistUi` (default `true`). Golden tests set `persistUi = false` to
+prevent QSettings I/O from interfering with `QML_Tester` event replay.
+
 ## Special thanks
 
 - smokie-l for inspiration

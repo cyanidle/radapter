@@ -234,6 +234,24 @@ for a virtual one), `plugin.lua` (pass the plugins build dir), `ros.lua` (ROS2 p
 QML client. **Projects (`projects/`)** are full apps built on radapter: `projects/scada/`
 is the schema-driven configurator (`--gui projects/scada/configurator.lua`).
 
+### UI state persistence
+
+`WindowSettings.qml` (in `projects/scada/`) persists an `ApplicationWindow`'s geometry,
+maximized/fullscreen state, and screen assignment across sessions via `Qt.labs.settings`
+(QSettings). `DetachableTabs.qml` persists its tab-group layout and detached-panel state.
+Both are gated on the **global context property `persistUi`** — set from Lua in the `QML{}`
+call's `properties` table:
+
+- **Production** (`configurator.lua`): `persistUi = true` → saves to `~/.config/radapter/radapter.conf`
+- **Golden tests** (`goldens/run_test.lua`): `persistUi = false` → no QSettings I/O, so
+  `QML_Tester` event recording/replay is not disrupted
+- **Absent**: defaults to `true` (e.g. `runner.lua` opening the HMI window)
+
+To disable persistence when writing ad-hoc QML test snippets, pass `persistUi = false`:
+```lua
+QML { url = "...", properties = { persistUi = false, ... } }
+```
+
 ## Architecture
 
 ### Layers
