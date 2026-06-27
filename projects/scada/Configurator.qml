@@ -119,7 +119,7 @@ ApplicationWindow {
             // a fresh run clears the overlay; a finished/lost run stops marking it live
             if (root.runState === "starting") {
                 root.liveValues = ({}); root.liveQuality = ({}); root.runnerLive = false
-            } else if (root.runState === "ConnectedState") {
+            } else if (root.runState === "running") {
                 root.runnerLive = true
             } else if (root.runState === "stopped" || root.runState === "disconnected"
                        || root.runState.indexOf("exited") === 0) {

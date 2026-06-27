@@ -1,16 +1,15 @@
--- SCADA config runner. Spawned by the configurator (see configurator.lua) as:
---   radapter projects/scada/runner.lua <server-socket-name> <token>
+-- SCADA config runner. Spawned by the configurator (see configurator.lua) as a child
+-- Process in binary mode; the two talk over the child's stdin/stdout (msgpack+SLIP):
+--   radapter [--tags] projects/scada/runner.lua
 --
--- Connects back to the configurator's single LocalServer, announces its token,
--- receives a declarative { objects, pipes } config, builds it, and streams every
--- log line back to the configurator over the same socket.
+-- Receives a declarative { objects, pipes } config, builds it, and streams every log
+-- line (and, in observe mode, live tag values) back to the configurator over stdout.
 --
--- Wire format (over the local socket):
+-- Wire format (binary msgpack objects over stdio):
 --   configurator -> runner : { config = { objects, pipes }, observe = bool }  -- build it
 --                            { send_to = name, msg = {...} }   -- send a message to a worker
 --                            { shutdown = true }                -- stop the runner
---   runner -> configurator : { hello = token }                 -- on connect (correlation)
---                            { log = { level, msg, category, timestamp } }
+--   runner -> configurator : { log = { level, msg, category, timestamp } }
 --                            { tag = { name, value, quality, ts } }  -- observe mode
 
 local declare = require "declare"   -- sibling module (resolved via the script's dir)
@@ -18,20 +17,17 @@ local declare = require "declare"   -- sibling module (resolved via the script's
 -- this script's directory, to locate the sibling hmi/ QML for the visualization window
 local here = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"
 
-local SERVER = assert(args[1], "runner: server socket name required (argument 1)")
-local TOKEN  = assert(args[2], "runner: token required (argument 2)")
-
-local client = LocalClient { socket = SERVER }
+local link = STDIO { framing = "slip", protocol = "msgpack" }
 
 -- forward every log line to the configurator. The engine suppresses logs emitted
 -- *inside* this handler, so sending here cannot recurse.
 log.set_handler(function(entry)
-    client { log = entry }
+    link { log = entry }
 end)
 
 local built = nil
 
-pipe(client, function(msg)
+pipe(link, function(msg)
     if msg.shutdown then
         log.info("runner: shutdown requested by configurator")
         shutdown()
@@ -46,13 +42,13 @@ pipe(client, function(msg)
 
         -- handle the project's operator visualization. In observe mode (launched by the
         -- configurator, which has its own visualization editor) we stream live tag values
-        -- back over the socket so they render there. Standalone, we open our own HMI window
+        -- back over stdout so they render there. Standalone, we open our own HMI window
         -- bound to radapter.tags (needs --gui --tags).
         local viz = msg.config.visualization
         if viz and viz.root and viz.root.children and #viz.root.children > 0 then
             if msg.observe then
                 if tags then
-                    pipe(tags.changed, function(ev) client { tag = ev } end)
+                    pipe(tags.changed, function(ev) link { tag = ev } end)
                     log.info("runner: streaming live tags to the configurator")
                 else
                     log.warn("runner: observe requested but --tags not enabled")
@@ -74,18 +70,14 @@ pipe(client, function(msg)
     end
 end)
 
--- Self-terminate when the configurator goes away. LocalClient reconnects on drop, so
--- without this a runner whose configurator was killed (not shut down gracefully) would
--- live forever and reconnect to the next configurator that reuses the socket name.
-local was_connected = false
-pipe(client.events, function(ev)
-    if ev.state == "ConnectedState" then
-        was_connected = true
-        client { hello = TOKEN }
-    elseif ev.state == "UnconnectedState" and was_connected then
-        log.info("runner: configurator disconnected; shutting down")
+-- Self-terminate when the configurator goes away. The parent dying closes our stdin,
+-- which the STDIO worker reports as a 'closed' event — without this an orphaned runner
+-- would linger.
+pipe(link.events, function(ev)
+    if ev.closed then
+        log.info("runner: stdin closed; shutting down")
         shutdown()
     end
 end)
 
-log.info("runner: connecting to {} (token {})", SERVER, TOKEN)
+log.info("runner: ready, waiting for config")

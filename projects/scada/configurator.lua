@@ -91,31 +91,23 @@ view {
 
 -- ── Run: launch the authored config in a separate headless adapter ───────────
 --
--- We stand up ONE local-IPC server. Pressing "Run" (the GUI sends { run = config })
--- spawns a headless `runner.lua`, passing it the server's socket name and a fresh
--- token. The runner connects back, announces its token ({hello=token}); we match it
--- to the pending config, send the config to that client, and stream its logs back to
--- the GUI's log window. "Stop" (or a re-run) shuts the previous runner down.
-
--- unique per configurator process, so a stray runner from a previous (crashed) session
--- can't reconnect to this one's server by reusing a fixed socket name
-local SERVER = "radapter-scada-" .. tostring(app_info().pid)
--- per_client: address each runner individually (send its config, read its hello/logs)
-local server = LocalServer { socket = SERVER, per_client = true }
+-- Pressing "Run" (the GUI sends { run = config }) spawns a headless `runner.lua` as a
+-- child Process in binary mode; we talk to it over the child's stdin/stdout
+-- (msgpack+SLIP). Once the child is up we push it the config and stream its logs (and,
+-- for a project with a visualization, its live tag values) back into the GUI's log/overlay.
+-- "Stop" (or a re-run) shuts the previous runner down; the child also self-terminates if
+-- this configurator dies, since that closes its stdin.
 
 -- this script's directory, to locate the sibling runner.lua for spawning
 local here = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"
 local RUNNER = here .. "runner.lua"
 
-local pending = {}      -- token -> config awaiting its runner's hello
-local active = nil      -- { proc, token, client } for the current run
+local active = nil      -- { proc, config, observe } for the current run
 
 local function stop_runner()
     if not active then return end
-    if active.client then
-        server { [active.client] = { shutdown = true } }   -- ask it to quit gracefully
-    end
-    if active.proc then active.proc:destroy() end          -- terminate the child too
+    active.proc { shutdown = true }   -- ask it to quit gracefully
+    active.proc:destroy()             -- and terminate the child
     active = nil
 end
 
@@ -128,9 +120,7 @@ end
 local function start_runner(config)
     stop_runner()
 
-    local token = tostring(next_id())
     local observe = has_visualization(config)
-    pending[token] = { config = config, observe = observe }
     -- when the project carries a visualization we run the adapter with --tags and have it
     -- stream live tag values back here (observe mode), so the configurator's visualization
     -- editor shows the running state instead of the runner popping its own HMI window
@@ -139,62 +129,45 @@ local function start_runner(config)
         arguments[#arguments + 1] = "--tags"
     end
     arguments[#arguments + 1] = RUNNER
-    arguments[#arguments + 1] = SERVER
-    arguments[#arguments + 1] = token
     -- app_info().executable is *this* radapter binary (Qt's applicationFilePath)
     local proc = Process {
         program = app_info().executable,
         arguments = arguments,
+        binary = { framing = "slip", protocol = "msgpack" },
     }
-    active = { proc = proc, token = token, client = nil }
+    active = { proc = proc, config = config, observe = observe }
     view { run_state = "starting" }
 
-    pipe(proc.events, function(ev)
-        if ev.finished then
-            local how = ev.signal and "signal" or ("code " .. tostring(ev.exit_code))
-            view { run_state = "exited(" .. how .. ")" }
-        elseif ev.stderr and active and not active.client then
-            -- boot diagnostics, until the socket takes over as the log source
-            view { log = { level = "warn", category = "runner.boot", msg = tostring(ev.stderr) } }
-        end
-    end)
-end
-
-pipe(server.events, function(ev)
-    if ev.disconnected and active and active.client == ev.disconnected then
-        view { run_state = "disconnected" }
-    end
-end)
-
--- inbound from runners arrives as { ["<clientId>"] = message }
-pipe(server, function(wrapped)
-    for id, msg in pairs(wrapped) do
-        if msg.hello ~= nil then
-            local token = tostring(msg.hello)
-            if active and active.token == token then
-                active.client = id
-                view { run_state = "ConnectedState" }
-                local entry = pending[token]
-                pending[token] = nil
-                if entry then
-                    server { [id] = { config = entry.config, observe = entry.observe } }
-                end
-            end
-        elseif msg.log ~= nil then
+    -- runner -> configurator: log lines and (observe mode) live tag values
+    pipe(proc, function(msg)
+        if msg.log ~= nil then
             view { log = msg.log }
         elseif msg.tag ~= nil then
             view { tag = msg.tag }   -- live tag update for the visualization editor
         end
-    end
-end)
+    end)
+
+    pipe(proc.events, function(ev)
+        if ev.started then
+            view { run_state = "running" }
+            proc { config = active.config, observe = active.observe }
+        elseif ev.finished then
+            local how = ev.signal and "signal" or ("code " .. tostring(ev.exit_code))
+            view { run_state = "exited(" .. how .. ")" }
+        elseif ev.stderr then
+            -- engine boot diagnostics (the runner routes its own logs over stdout)
+            view { log = { level = "warn", category = "runner.boot", msg = tostring(ev.stderr) } }
+        end
+    end)
+end
 
 pipe(view, function(msg)
     if msg.run then
         start_runner(msg.run)
     elseif msg.stop then
         stop_runner()
-    elseif msg.send_to and active and active.client then
-        server { [active.client] = msg }
+    elseif msg.send_to and active then
+        active.proc { send_to = msg.send_to, msg = msg.msg }
     end
 end)
 

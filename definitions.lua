@@ -844,6 +844,8 @@ function Serial(params) end
 
 ---Reads/writes msgpack-framed messages over stdin/stdout (not stderr).
 ---The worker name is always "radapter.stdio".
+---Its `.events` channel emits `{ closed = true }` when stdin reaches EOF (e.g. a parent
+---process exited), so a child can self-terminate when its launcher goes away.
 ---@class StdioWorker : Worker
 
 ---@return StdioWorker

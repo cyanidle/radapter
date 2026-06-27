@@ -25,6 +25,8 @@ class StdioWorker final : public BinaryWorker
     QByteArray buffer;
 #ifdef Q_OS_UNIX
     QSocketNotifier* notifier;
+#else
+    QTimer* timer = nullptr;
 #endif
 
     void doRead() {
@@ -37,11 +39,16 @@ class StdioWorker final : public BinaryWorker
         if (n > 0) {
             buffer.append(buf, int(n));
             ReceiveBinary(buffer);
-#ifdef Q_OS_UNIX
         } else if (n == 0) {
+            // EOF: the writer (typically a parent process) closed our stdin. Announce it on
+            // the event channel so a child can self-terminate when its parent goes away.
             Info("stdin closed");
+#ifdef Q_OS_UNIX
             if (notifier) notifier->setEnabled(false);
+#else
+            if (timer) timer->stop();
 #endif
+            emit SendEventField("closed", true);
         } else if (n < 0) {
             Warn("stdin read error: {}", strerror(errno));
 #ifdef Q_OS_UNIX
@@ -66,7 +73,7 @@ public:
             doRead();
         });
 #else
-        auto* timer = new QTimer(this);
+        timer = new QTimer(this);
         timer->setInterval(50);
         connect(timer, &QTimer::timeout, this, [this] {
             doRead();
