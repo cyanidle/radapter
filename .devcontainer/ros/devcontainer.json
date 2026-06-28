@@ -1,6 +1,9 @@
 {
   "name": "ROS2 Plugin Development Environment",
-  "build": { "dockerfile": "../../plugins/ros/Dockerfile" },
+  "build": {
+    "dockerfile": "../../scripts/Dockerfile.ros",
+    "target": "dev"
+  },
   "remoteUser": "ubuntu",
   "customizations": {
     "vscode": {

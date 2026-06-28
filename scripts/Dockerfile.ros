@@ -1,0 +1,151 @@
+# syntax=docker/dockerfile:1
+# ROS2 radapter plugin — DevContainer + cross-compilation environment
+#
+# DevContainer (default):
+#   docker build -f scripts/Dockerfile.ros --target dev -t radapter-ros-dev .
+#
+# Quick native-compile and extract the plugin:
+#   docker build -f scripts/Dockerfile.ros --target native-pkg --output=out .
+#   ls out/radapter_ros_x86_64.so
+#
+# Quick cross-compile and extract the plugin:
+#   docker build -f scripts/Dockerfile.ros --target cross-pkg --output=out .
+#   ls out/radapter_ros_aarch64.so
+
+ARG TARGET_PLATFORM=arm64
+ARG TARGET_ARCH=aarch64
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: ros_sysroot — target-arch ROS2 + Qt6 dev stack
+# ═══════════════════════════════════════════════════════════════════════
+FROM --platform=${TARGET_PLATFORM} ros:jazzy AS ros_sysroot
+RUN apt-get update && apt-get install -y \
+        qt6-base-dev \
+        qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+        libqt6sql6-sqlite \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: dev — DevContainer + cross-build environment (default target)
+# ═══════════════════════════════════════════════════════════════════════
+FROM ros:jazzy AS dev
+ARG UID=1000
+ARG GID=1000
+ARG TARGET_PLATFORM=arm64
+
+# --- Target-arch sysroot for cross-compilation ---
+COPY --from=ros_sysroot /lib /sysroot/lib
+COPY --from=ros_sysroot /usr/lib /sysroot/usr/lib
+COPY --from=ros_sysroot /usr/bin /sysroot/usr/bin
+COPY --from=ros_sysroot /usr/include /sysroot/usr/include
+COPY --from=ros_sysroot /opt/ros /sysroot/opt/ros
+
+# --- User setup ---
+RUN if getent passwd ubuntu >/dev/null 2>&1; then \
+        usermod --uid ${UID} ubuntu && groupmod --gid ${GID} ubuntu; \
+    else \
+        groupadd -g ${GID} ubuntu && useradd -m -u ${UID} -g ${GID} -s /bin/bash ubuntu; \
+    fi
+
+# --- Sudo ---
+RUN apt-get -y update && apt-get install -y sudo && \
+    echo "ubuntu ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu && \
+    chmod 0440 /etc/sudoers.d/ubuntu
+
+# --- Dev tools + host Qt6 + cross-toolchain ---
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
+    colcon \
+    ccls \
+    python3-colcon-common-extensions \
+    python3-pip \
+    clang \
+    clang-format \
+    clang-tidy \
+    ros-jazzy-turtlesim \
+    ros-jazzy-rqt* \
+    ros-jazzy-example-interfaces ros-jazzy-demo-nodes-cpp \
+    git cmake ninja-build build-essential \
+    qt6-base-dev qt6-base-dev-tools \
+    qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+    libqt6sql6-sqlite \
+    curl libssl-dev \
+    gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Fix up sysroot: copy host Qt6 codegen tools into the sysroot ---
+# The cross-compiler needs moc/rcc/etc. reachable under the sysroot path.
+RUN case "${TARGET_PLATFORM}" in \
+    'arm64') \
+        qt6_root=/sysroot/usr/lib/aarch64-linux-gnu/qt6; \
+        mkdir -p $qt6_root/libexec $qt6_root/bin; \
+        cp -RLf /usr/lib/x86_64-linux-gnu/qt6/libexec/* $qt6_root/libexec/ 2>/dev/null || true; \
+        cp -RLf /usr/lib/x86_64-linux-gnu/qt6/bin/*     $qt6_root/bin/ 2>/dev/null || true; \
+        ;; \
+    *) ;; \
+    esac
+
+# --- fff + ros sourcing ---
+RUN curl -fsSL https://raw.githubusercontent.com/dmtrKovalenko/fff.nvim/main/install-mcp.sh | bash
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/ubuntu/.bashrc
+ENV SHELL=/bin/bash
+
+# --- Toolchain file for cross-compilation ---
+COPY plugins/ros/cmake/toolchain_arm64.cmake /opt/radapter/cmake/
+
+USER ubuntu
+WORKDIR /home/ubuntu
+CMD ["/bin/bash"]
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: cross-builder — inline cross-compile (CI / one-shot mode)
+# ═══════════════════════════════════════════════════════════════════════
+FROM dev AS cross-builder
+ARG TARGET_ARCH=aarch64
+USER root
+COPY . /src
+WORKDIR /src
+ENV CPM_SOURCE_CACHE=/cpm
+RUN --mount=type=cache,target=/cpm \
+    cmake \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D RADAPTER_GUI=OFF \
+        -D RADAPTER_ROS2=ON \
+        -D RADAPTER_STATIC=OFF \
+        -D CMAKE_INSTALL_PREFIX=/usr \
+        -D CMAKE_TOOLCHAIN_FILE=/opt/radapter/cmake/toolchain_arm64.cmake \
+        -G Ninja -B /build \
+    && cmake --build /build -j$(nproc) --target radapter_ros
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: cross-pkg — extract the cross-compiled plugin with arch suffix
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS cross-pkg
+ARG TARGET_ARCH=aarch64
+COPY --from=cross-builder /build/bin/libradapter_ros.so /radapter_ros_${TARGET_ARCH}.so
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: native-builder — native compile (CI / one-shot mode)
+# ═══════════════════════════════════════════════════════════════════════
+FROM dev AS native-builder
+USER root
+COPY . /src
+WORKDIR /src
+ENV CPM_SOURCE_CACHE=/cpm
+RUN --mount=type=cache,target=/cpm \
+    cmake \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D RADAPTER_GUI=OFF \
+        -D RADAPTER_ROS2=ON \
+        -D RADAPTER_STATIC=OFF \
+        -D CMAKE_INSTALL_PREFIX=/usr \
+        -G Ninja -B /build \
+    && cmake --build /build -j$(nproc) --target radapter_ros
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: native-pkg — extract the native-compiled plugin with arch suffix
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS native-pkg
+COPY --from=native-builder /build/bin/libradapter_ros.so /radapter_ros_x86_64.so
