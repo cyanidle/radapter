@@ -377,7 +377,7 @@ local function configurator_gui(autostart_runner)
 
     -- ── Run: launch the authored config in a separate headless adapter ───────
 
-    local SELF = "scada.lua"
+    local SELF = SCRIPT_PATH or "scada.lua"
     local active = nil
 
     local function stop_runner()
@@ -577,7 +577,7 @@ local function mode_test()
 
     local proc = Process {
         program = app_info().executable,
-        arguments = { "--gui", "scada.lua", "test", "record", golden_name },
+        arguments = { "--gui", SCRIPT_PATH or "scada.lua", "test", "record", golden_name },
         binary = { framing = "slip", protocol = "msgpack" },
     }
 

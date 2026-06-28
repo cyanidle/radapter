@@ -355,6 +355,16 @@ workers = {}
 ---@type string[]
 args = {}
 
+---Absolute canonical path (realpath) of the currently executing script file.
+---Set when a script is run via EvalFile; nil for inline evals (`-e`).
+---@type string?
+SCRIPT_PATH = nil
+
+---Absolute canonical path (realpath) of the directory containing the currently
+---executing script. Nil for inline evals (`-e`).
+---@type string?
+SCRIPT_DIR = nil
+
 ---@class builtinTimer
 builtinTimer = {}
 function builtinTimer:Stop() end

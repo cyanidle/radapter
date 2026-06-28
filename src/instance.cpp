@@ -343,6 +343,8 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
 
 void Instance::EvalFile(fs::path path)
 {
+    path = fs::absolute(fs::weakly_canonical(path));
+
     auto L = d->L;
     auto was = std::move(d->currentFile);
     defer revert([&]{
@@ -362,8 +364,7 @@ void Instance::EvalFile(fs::path path)
     // let `require` find modules sitting next to the script (absolute, so it holds
     // regardless of cwd or when the require runs). Prepend once.
     {
-        auto absdir = fs::absolute(path).parent_path().u8string();
-        auto entry = fmt::format("{0}/?.lua;{0}/?/init.lua;", absdir);
+        auto entry = fmt::format("{0}/?.lua;{0}/?/init.lua;", dir.u8string());
         lua_getglobal(L, "package");
         lua_getfield(L, -1, "path");
         std::string cur = lua_tostring(L, -1) ? lua_tostring(L, -1) : "";
@@ -374,6 +375,10 @@ void Instance::EvalFile(fs::path path)
         }
         lua_pop(L, 1);
     }
+
+    RegisterGlobal("SCRIPT_PATH", QVariant(QString::fromStdString(path.u8string())));
+    RegisterGlobal("SCRIPT_DIR", QVariant(QString::fromStdString(dir.u8string())));
+
     lua_getglobal(L, "__eval_async");
     lua_insert(L, -2);
     lua_pushstring(L, path.string().c_str());
@@ -390,6 +395,9 @@ void Instance::EvalFile(fs::path path)
 
 void Instance::Eval(string_view code, string_view chunk)
 {
+    RegisterGlobal("SCRIPT_PATH", QVariant());
+    RegisterGlobal("SCRIPT_DIR", QVariant());
+
     auto L = d->L;
     auto load = luaL_loadbufferx(L, code.data(), code.size(), string{chunk}.c_str(), "t");
     if (load != LUA_OK) {
