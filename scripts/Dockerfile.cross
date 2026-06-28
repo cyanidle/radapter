@@ -1,0 +1,131 @@
+# syntax=docker/dockerfile:1
+# radapter cross-compilation — headless + GUI via --target
+#
+# Extract headless .deb (aarch64):
+#   docker build -f scripts/Dockerfile.cross --target headless-pkg --output=out .
+#   ls out/radapter-headless_*.deb
+#
+# Extract GUI .deb (aarch64):
+#   docker build -f scripts/Dockerfile.cross --target gui-pkg --output=out .
+#   ls out/radapter-gui_*.deb
+#
+# Build runner images:
+#   docker build -f scripts/Dockerfile.cross --target headless-runner -t radapter-headless:qt6-arm64 .
+#   docker build -f scripts/Dockerfile.cross --target gui-runner      -t radapter-gui:qt6-arm64 .
+
+ARG TARGET_PLATFORM=arm64
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: sysroot — target-arch Qt6 dev stack (superset of both variants)
+# ═══════════════════════════════════════════════════════════════════════
+FROM --platform=${TARGET_PLATFORM} debian:bookworm-slim AS sysroot
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt install -y \
+        qt6-base-dev \
+        qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+        qt6-declarative-dev qt6-charts-dev \
+        libgl1-mesa-dev libxkbcommon-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: builder — host Qt6 + cross-toolchain + sysroot
+# ═══════════════════════════════════════════════════════════════════════
+FROM debian:bookworm-slim AS builder
+ARG TARGET_PLATFORM
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt install -y \
+        git cmake ninja-build build-essential file \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+        qt6-base-dev qt6-base-dev-tools \
+        qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+        qt6-declarative-dev qt6-declarative-dev-tools \
+        qt6-charts-dev \
+        libqt6sql6-sqlite \
+        libgl1-mesa-dev libxkbcommon-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=sysroot /lib /sysroot/lib
+COPY --from=sysroot /usr/lib /sysroot/usr/lib
+COPY --from=sysroot /usr/bin /sysroot/usr/bin
+COPY --from=sysroot /usr/include /sysroot/usr/include
+
+# Qt6 tool fixup: copy host codegen tools into the sysroot
+RUN case "${TARGET_PLATFORM}" in \
+    'arm64') \
+        mkdir -p /sysroot/usr/lib/qt6/libexec; \
+        cp -RLf /usr/lib/qt6/libexec/* /sysroot/usr/lib/qt6/libexec/; \
+        mkdir -p /sysroot/usr/lib/qt6/bin; \
+        cp -RLf /usr/lib/qt6/bin/* /sysroot/usr/lib/qt6/bin/ 2>/dev/null || true; \
+        ;; \
+    *) ;; \
+    esac
+
+COPY scripts/cmake/toolchain_arm64.cmake /opt/radapter/cmake/
+COPY . /src
+WORKDIR /src
+ENV CPM_SOURCE_CACHE=/cpm
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: headless-builder
+# ═══════════════════════════════════════════════════════════════════════
+FROM builder AS headless-builder
+RUN --mount=type=cache,target=/cpm \
+    cmake \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_TOOLCHAIN_FILE=/opt/radapter/cmake/toolchain_arm64.cmake \
+        -D RADAPTER_GUI=OFF \
+        -D RADAPTER_STATIC=OFF \
+        -D CMAKE_INSTALL_PREFIX=/usr \
+        -G Ninja -B /build \
+    && cmake --build /build -j$(nproc)
+WORKDIR /build
+RUN cpack -G DEB
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: gui-builder
+# ═══════════════════════════════════════════════════════════════════════
+FROM builder AS gui-builder
+RUN --mount=type=cache,target=/cpm \
+    cmake \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_TOOLCHAIN_FILE=/opt/radapter/cmake/toolchain_arm64.cmake \
+        -D RADAPTER_GUI=ON \
+        -D RADAPTER_STATIC=OFF \
+        -D CMAKE_INSTALL_PREFIX=/usr \
+        -G Ninja -B /build \
+    && cmake --build /build -j$(nproc)
+WORKDIR /build
+RUN cpack -G DEB
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: headless-pkg
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS headless-pkg
+COPY --from=headless-builder /build/radapter-headless_*.deb /
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: gui-pkg
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS gui-pkg
+COPY --from=gui-builder /build/radapter-gui_*.deb /
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: headless-runner
+# ═══════════════════════════════════════════════════════════════════════
+FROM --platform=${TARGET_PLATFORM} debian:bookworm-slim AS headless-runner
+COPY --from=sysroot /lib /lib
+COPY --from=sysroot /usr/lib /usr/lib
+COPY --from=headless-builder /build/bin/libradapter-sdk.so /
+COPY --from=headless-builder /build/bin/radapter /
+ENTRYPOINT [ "/radapter" ]
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: gui-runner
+# ═══════════════════════════════════════════════════════════════════════
+FROM --platform=${TARGET_PLATFORM} debian:bookworm-slim AS gui-runner
+COPY --from=sysroot /lib /lib
+COPY --from=sysroot /usr/lib /usr/lib
+COPY --from=gui-builder /build/bin/libradapter-sdk.so /
+COPY --from=gui-builder /build/bin/radapter /
+ENTRYPOINT [ "/radapter" ]
