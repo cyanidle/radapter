@@ -11,7 +11,7 @@
 #include <QSslCertificate>
 #include <QSslKey>
 #include <QJsonDocument>
-#include <QTextCodec>
+#include <QStringDecoder>
 #include <QTimer>
 
 namespace radapter::http {
@@ -74,13 +74,13 @@ static QByteArray encodeBody(QVariant const& body, QByteArray& contentType)
     if (!body.isValid() || body.isNull()) {
         return {};
     }
-    switch (body.type()) {
-    case QVariant::ByteArray:
+    switch (body.metaType().id()) {
+    case QMetaType::QByteArray:
         return body.toByteArray();
-    case QVariant::String:
+    case QMetaType::QString:
         return body.toString().toUtf8();
-    case QVariant::Map:
-    case QVariant::List: {
+    case QMetaType::QVariantMap:
+    case QMetaType::QVariantList: {
         if (contentType.isEmpty()) {
             contentType = "application/json";
         }
@@ -96,10 +96,9 @@ static QVariant decodeBody(QByteArray const& data, HttpResponseFormat format)
     if (format == raw) {
         return data;
     } else if (format == text) {
-        QTextCodec* utf8 = QTextCodec::codecForName("UTF-8");
-        QTextCodec::ConverterState state;
-        auto res = utf8->toUnicode(data.data(), int(data.size()), &state);
-        if (state.invalidChars == 0) {
+        QStringDecoder utf8("UTF-8");
+        QString res = utf8(data);
+        if (!utf8.hasError()) {
             return res;
         }
         return data;
@@ -238,7 +237,7 @@ public:
         if (hasBody && idx < args.size() && !args.at(idx).canConvert<LuaFunction>()) {
             body = args.at(idx++);
         }
-        if (idx < args.size() && args.at(idx).type() == QVariant::Map) {
+        if (idx < args.size() && args.at(idx).metaType().id() == QMetaType::QVariantMap) {
             opts = args.at(idx++).toMap();
         }
         if (idx < args.size()) {

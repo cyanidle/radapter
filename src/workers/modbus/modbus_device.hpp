@@ -8,7 +8,7 @@
 #include <QQueue>
 #include <QPointer>
 #include <QtEndian>
-#include <QModbusRtuSerialMaster>
+#include <QModbusRtuSerialClient>
 #include "modbus_units.hpp"
 
 class QModbusServer;

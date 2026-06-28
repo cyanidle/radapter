@@ -36,12 +36,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-find_package(Qt5 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
 if (RADAPTER_GUI)
     # Widgets: --gui runs on a QApplication (QtCharts' QML module needs it). The QtCharts
     # QML plugin loads at runtime from the system qml module — no C++ link required.
-    find_package(Qt5 REQUIRED COMPONENTS Gui Qml Quick Widgets)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick Widgets)
 endif()
 
 add_subdirectory(deps)
@@ -55,7 +55,7 @@ if (UNIX)
 elseif(WIN32)
     target_sources(qctrl PRIVATE deps/qctrlsignals/qctrlsignalhandler_win.cpp)
 endif()
-target_link_libraries(qctrl PRIVATE Qt5::Core)
+target_link_libraries(qctrl PRIVATE Qt6::Core)
 target_compile_definitions(qctrl PUBLIC Q_CTRL_SIGNALS_EXPORT=)
 
 get_build_identity(RADAPTER)
@@ -107,7 +107,7 @@ function(radapter_scripts)
 
     file(GENERATE OUTPUT ${scripts_qrc} CONTENT ${qrc_content})
 
-    qt5_add_resources(RADAPTER_QRC ${scripts_qrc}
+    qt_add_resources(RADAPTER_QRC ${scripts_qrc}
         OPTIONS --compress 9 --threshold 70
     )
     set(RADAPTER_QRC ${RADAPTER_QRC} PARENT_SCOPE)
@@ -122,6 +122,7 @@ if (RADAPTER_STATIC)
 else()
     add_library(radapter-sdk SHARED ${RADAPTER_ALL_SRC})
 endif()
+add_dependencies(radapter-sdk radapter-scripts)
 set_target_warnings(radapter-sdk PRIVATE OFF)
 target_compile_definitions(radapter-sdk PRIVATE RADAPTER_API=Q_DECL_EXPORT)
 target_compile_definitions(radapter-sdk INTERFACE RADAPTER_API=Q_DECL_IMPORT)
@@ -147,11 +148,11 @@ target_link_libraries(radapter-sdk PRIVATE
 add_library(radapter-qt INTERFACE)
 
 target_link_libraries(radapter-qt INTERFACE
-    Qt5::Core Qt5::SerialPort Qt5::SerialBus
-    Qt5::Sql Qt5::WebSockets Qt5::Network
+    Qt6::Core Qt6::SerialPort Qt6::SerialBus
+    Qt6::Sql Qt6::WebSockets Qt6::Network
 )
 if (RADAPTER_GUI)
-    target_link_libraries(radapter-qt INTERFACE Qt5::Gui Qt5::Qml Qt5::Quick Qt5::Widgets)
+    target_link_libraries(radapter-qt INTERFACE Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Widgets)
 endif()
 
 target_link_libraries(radapter-sdk PUBLIC 

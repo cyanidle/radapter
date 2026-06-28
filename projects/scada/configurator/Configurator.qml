@@ -1,7 +1,7 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import QtQuick.Dialogs 1.2 as Dialogs   // aliased so `Dialog` stays QtQuick.Controls' Dialog
+import QtQuick.Dialogs as Dialogs   // aliased so `Dialog` stays QtQuick.Controls' Dialog
 // configurator components (WorkerGraph, WorkerConfigurator, ConfigContext, …) are sibling
 // .qml files in this directory and resolve by name without an import.
 
@@ -45,25 +45,25 @@ ApplicationWindow {
     // a sensible starting directory for the pickers
     readonly property string homeDir: (typeof home !== "undefined" && home) ? home : "/"
 
-    // Both Open and Save use the native FileDialog (`selectExisting` switches it between
-    // pick-existing and name-a-new-file modes).
+    // Qt6 QtQuick.Dialogs FileDialog: fileMode replaces selectExisting,
+    // selectedFile replaces fileUrl, currentFolder replaces folder.
     Dialogs.FileDialog {
         id: openDialog
         title: "Open Project"
         nameFilters: ["JSON files (*.json)"]
-        selectExisting: true
-        folder: shortcuts.home
-        onAccepted: radapter.model.send({ open_file: root.urlToPath(fileUrl) })
+        fileMode: Dialogs.FileDialog.OpenFile
+        currentFolder: root.homeDir
+        onAccepted: radapter.model.send({ open_file: root.urlToPath(selectedFile) })
     }
 
     Dialogs.FileDialog {
         id: saveDialog
         title: "Save Project As"
         nameFilters: ["JSON files (*.json)"]
-        selectExisting: false
-        folder: shortcuts.home
+        fileMode: Dialogs.FileDialog.SaveFile
+        currentFolder: root.homeDir
         onAccepted: {
-            var path = root.urlToPath(fileUrl)
+            var path = root.urlToPath(selectedFile)
             if (path.indexOf(".json") === -1) path = path + ".json"
             root.projectPath = path
             radapter.model.send({ save_file: path, config: root.projectConfig() })
@@ -74,6 +74,7 @@ ApplicationWindow {
     Dialogs.MessageDialog {
         id: messageDialog
         title: "Radapter Configurator"
+        buttons: Dialogs.MessageDialog.Ok
     }
 
     // ── File operations (delegate to Lua for actual I/O) ─────────────────

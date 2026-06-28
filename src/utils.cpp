@@ -8,8 +8,8 @@ static void flatten(
     QVariant const& input,
     string& path)
 {
-    switch (input.type()) {
-    case QVariant::Map: {
+    switch (input.metaType().id()) {
+    case QMetaType::QVariantMap: {
         auto& m = *static_cast<const QVariantMap*>(input.constData());
         for (auto it = m.keyValueBegin(); it != m.keyValueEnd(); ++it) {
             auto part = it->first.toStdString() + ':';
@@ -19,7 +19,7 @@ static void flatten(
         }
         break;
     }
-    case QVariant::List: {
+    case QMetaType::QVariantList: {
         auto& l = *static_cast<const QVariantList*>(input.constData());
         unsigned idx = 0;
         for (auto& v: l) {
@@ -70,7 +70,7 @@ void radapter::Unflatten(QVariant &out, const FlatMap &flat)
             auto idx = tryInt(subkey);
             if (idx < 0 || idx > (std::numeric_limits<int>::max)()) {
                 auto q = QString::fromUtf8(subkey.data(), int(subkey.size()));
-                if (level->type() != QVariant::Map) {
+                if (level->metaType().id() != QMetaType::QVariantMap) {
                     *level = QVariantMap{};
                 }
                 QVariantMap& out = *static_cast<QVariantMap*>(level->data());
@@ -80,7 +80,7 @@ void radapter::Unflatten(QVariant &out, const FlatMap &flat)
                     level = &out[q];
                 }
             } else {
-                if (level->type() != QVariant::List) {
+                if (level->metaType().id() != QMetaType::QVariantList) {
                     *level = QVariantList{};
                 }
                 QVariantList& out = *static_cast<QVariantList*>(level->data());
@@ -101,15 +101,15 @@ size_t radapter::MergePatch(QVariant& out, QVariant const& _patch, QVariant *dif
     // if _patch is an alias to 'out&' or anything inside out (if not - its ok bc of COW)
     size_t result = 0;
     auto patch = _patch;
-    if (patch.type() == QVariant::Map) {
-        if (out.type() != QVariant::Map) {
+    if (patch.metaType().id() == QMetaType::QVariantMap) {
+        if (out.metaType().id() != QMetaType::QVariantMap) {
             out = QVariantMap{};
         }
         QVariantMap& outMap = *static_cast<QVariantMap*>(out.data());
         QVariantMap const& inMap = *static_cast<const QVariantMap*>(_patch.data());
         QVariantMap* diffMap = nullptr;
         if (diff) {
-            if (diff->type() != QVariant::Map) *diff = QVariantMap{};
+            if (diff->metaType().id() != QMetaType::QVariantMap) *diff = QVariantMap{};
             diffMap = static_cast<QVariantMap*>(diff->data());
         }
         for (auto it = inMap.constKeyValueBegin(); it != inMap.keyValueEnd(); ++it) {

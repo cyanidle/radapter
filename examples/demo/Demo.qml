@@ -2,7 +2,7 @@ import QtQuick 2.7
 import QtQuick.Controls 2.0
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.7
-import QtQuick.Dialogs 1.1
+import QtQuick.Dialogs
 import "."
 
 ApplicationWindow {
@@ -29,6 +29,7 @@ ApplicationWindow {
         id: broke
         title: "SKILL ISSUE"
         text: "YOU ARE BROKE!!!"
+        buttons: MessageDialog.Ok
         onAccepted: {
             radapter.shutdown()
         }

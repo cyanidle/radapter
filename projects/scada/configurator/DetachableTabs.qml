@@ -2,7 +2,7 @@ import QtQuick 2.13
 import QtQuick.Window 2.13
 import QtQuick.Controls 2.13
 import QtQuick.Layouts 1.3
-import Qt.labs.settings 1.0
+import QtCore
 
 // VSCode-style tab groups. Each group is a column (tab bar + content) inside a
 // single horizontal SplitView, which handles resize handles between columns natively.
@@ -569,17 +569,17 @@ Item {
                         anchors.fill: parent; z: -1
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         drag.target: tabDragDummy
-                        onPressed: {
+                        onPressed: function (mouse) {
                             if (mouse.button === Qt.RightButton) { ctxMenu.popup(); return }
                             tabs.beginDrag(panelIdx, barRow.groupIdx, mouse.x, mouse.y)
                         }
-                        onPositionChanged: {
+                        onPositionChanged: function (mouse) {
                             if (tabs.dragPanelIdx < 0) return
                             var g = mapToGlobal(mouse.x, mouse.y)
                             tabs.updateDrag(g.x, g.y)
                         }
                         onReleased: { if (tabs.dragPanelIdx >= 0) tabs.endDrag() }
-                        onClicked: {
+                        onClicked: function (mouse) {
                             if (mouse.button === Qt.RightButton) return
                             if (!panel) return
                             if (panel.detached) tabs._raise(panel)

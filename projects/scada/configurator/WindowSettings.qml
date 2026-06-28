@@ -1,6 +1,6 @@
 import QtQuick 2.13
 import QtQuick.Window 2.13
-import Qt.labs.settings 1.0
+import QtCore
 
 // Persists an ApplicationWindow's geometry and visibility state across sessions via
 // QSettings. Handles multi-screen changes gracefully: if the saved screen is gone the

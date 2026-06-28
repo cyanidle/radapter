@@ -29,7 +29,7 @@ void radapter::Parse(QVariant &out, const QVariant &conf, const TraceFrame &)
 
 void radapter::Parse(QVariantList &out, const QVariant &conf, const TraceFrame &frame)
 {
-    if (conf.type() == QVariant::Map && conf.toMap().empty()) {
+    if (conf.metaType().id() == QMetaType::QVariantMap && conf.toMap().empty()) {
         return;
     }
     CheckCanConvert<QVariantList>(conf, frame);
@@ -56,7 +56,7 @@ void radapter::Parse(QUuid &out, const QVariant &conf, const TraceFrame &frame) 
 void radapter::CheckCanConvert(int targetTypeId, const QVariant &from, const TraceFrame &frame)
 {
     if (!from.canConvert(targetTypeId)) {
-        Raise("{}: Could not convert to '{}' from '{}'", frame, QMetaType(targetTypeId).name().data(), TypeNameOf(from));
+        Raise("{}: Could not convert to '{}' from '{}'", frame, QMetaType(targetTypeId).name(), TypeNameOf(from));
     }
 }
 

@@ -379,7 +379,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
     const QVariant& val = it.value();
     if constexpr (describe::has_v<FieldIsBitArray, Member>) {
         size_t max_sz = std::size(field.bitpacked);
-        if (val.type() != QVariant::List) {
+        if (val.metaType().id() != QMetaType::QVariantList) {
             Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
@@ -406,7 +406,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
             *out++ = uint8_t(b);
         }
     } else if constexpr (describe::has_v<FieldIsBitmask, Member>) {
-        if (val.type() != QVariant::List) {
+        if (val.metaType().id() != QMetaType::QVariantList) {
             Raise("{}: {}: Expected a list of bits, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
@@ -423,7 +423,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         }
     } else if constexpr (describe::has_v<FieldIsDynString, Member>) {
         auto max_sz = std::size(field.elements) - 1;
-        if (val.type() != QVariant::String) {
+        if (val.metaType().id() != QMetaType::QString) {
             Raise("{}: {}: Expected a string, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto str = val.toString().toStdString();
@@ -434,7 +434,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
         field.count = str.size();
     } else if constexpr (describe::has_v<FieldIsDynArray, Member>) {
         auto max_sz = std::size(field.elements);
-        if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
+        if (val.metaType().id() != QMetaType::QVariantList && val.metaType().id() != QMetaType::QStringList) {
             Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
@@ -457,7 +457,7 @@ void field_from_variant(const QVariantMap& in, Member info, T& out, [[maybe_unus
             Raise("{}: {}: invalid enum value: {}. Valid: [{}]", describe::Get<T>::name, frame, str, fmt::join(describe::enum_names<E>(), ", "));
         field = res;
     } else if constexpr (std::rank_v<typename Member::type>) {
-        if (val.type() != QVariant::List && val.type() != QVariant::StringList) {
+        if (val.metaType().id() != QMetaType::QVariantList && val.metaType().id() != QMetaType::QStringList) {
             Raise("{}: {}: Expected a list, got: {}", describe::Get<T>::name, frame, TypeNameOf(val));
         }
         const auto list = val.toList();
@@ -483,7 +483,7 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
     else if constexpr (describe::has_v<TypeIsUnionBase, T>)
     {
         using UnionEnum = typename describe::extract_t<TypeIsUnionBase, T>::type;
-        if (in.type() != QVariant::Map) {
+        if (in.metaType().id() != QMetaType::QVariantMap) {
             Raise("{}: type {}: map expected", describe::Get<T>::name, frame);
         }
         auto* map = reinterpret_cast<const QVariantMap*>(in.constData());
@@ -509,7 +509,7 @@ void from_variant(QVariant const& in, T& out, [[maybe_unused]] const TraceFrame&
     }
     else
     {
-        if (in.type() != QVariant::Map) {
+        if (in.metaType().id() != QMetaType::QVariantMap) {
             Raise("{}: type {}: map expected", describe::Get<T>::name, frame);
         }
         auto* map = reinterpret_cast<const QVariantMap*>(in.constData());

@@ -151,7 +151,7 @@ public:
         assert(config.hash_key);
         client->Execute({"HGETALL", *config.hash_key})
             .ThenSync([this](QVariant resp){
-                if (resp.type() != QVariant::List) {
+                if (resp.metaType().id() != QMetaType::QVariantList) {
                     Error("error reading all keys: {}", resp.toString());
                     return;
                 }
@@ -324,7 +324,7 @@ public:
     void parseReply(QVariant resp) {
         if (!resp.isValid())
             return;
-        if (resp.type() != QVariant::List) {
+        if (resp.metaType().id() != QMetaType::QVariantList) {
             Error("error reading stream: non list received {}", resp.typeName() ? resp.typeName() : "<unk>");
             return;
         }

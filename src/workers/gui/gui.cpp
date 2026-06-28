@@ -30,7 +30,7 @@ RAD_DESCRIBE(QMLConfig) {
 static QMLConfig baseConfig(QVariantList const& args) {
     QMLConfig c;
     auto first = args.value(0);
-    if (first.type() != QVariant::String) {
+    if (first.metaType().id() != QMetaType::QString) {
         Parse(c, first);
         EnsureName(c, c.url);
     }
@@ -38,7 +38,7 @@ static QMLConfig baseConfig(QVariantList const& args) {
 }
 
 static QVariant unwrapQmlVar(QVariant const& var) {
-    if (var.type() >= QVariant::UserType) {
+    if (var.metaType().id() >= QMetaType::User) {
         return var.value<QJSValue>().toVariant();
     } else {
         return var;
@@ -102,7 +102,7 @@ signals:
     void received(QVariant const& msg);
 
 protected:
-    QVariant updateValue(QString const& key, QVariant const& input) override;
+    QVariant updateValue(const QString& key, const QVariant& input) override;
 
 private:
     QVariant wrapPath(QVariant payload) const;
@@ -185,7 +185,7 @@ public:
         auto ctx = new QQmlContext(engine, this);
         ctx->setContextProperty("radapter", proxy);
         auto first = args.value(0);
-        if (first.type() == QVariant::String) {
+        if (first.metaType().id() == QMetaType::QString) {
             creator = new QQmlComponent(engine);
             auto f = inst->CurrentFile();
             auto base = QUrl::fromLocalFile(f ? QString::fromStdString(f->u8string()) : QDir::currentPath());
@@ -236,7 +236,7 @@ QVariant GuiModel::wrapPath(QVariant payload) const {
     return payload;
 }
 
-QVariant GuiModel::updateValue(QString const& key, QVariant const& input) {
+QVariant GuiModel::updateValue(const QString& key, const QVariant& input) {
     QVariantMap leaf;
     leaf.insert(key, input);
     _worker->emitModelChange(wrapPath(leaf));
@@ -250,7 +250,7 @@ void GuiModel::send(QVariant const& msg) {
 void GuiModel::applyIncoming(QVariant const& msg) {
     auto map = msg.toMap();
     for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-        if (it.value().type() == QVariant::Map) {
+        if (it.value().metaType().id() == QMetaType::QVariantMap) {
             node(it.key())->applyIncoming(it.value());
         } else {
             QQmlPropertyMap::insert(it.key(), it.value());

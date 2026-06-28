@@ -1,5 +1,5 @@
 #include "modbus_device.hpp"
-#include <qmodbusrtuserialslave.h>
+#include <QModbusRtuSerialServer>
 #include <qmodbustcpserver.h>
 
 #ifdef __GNUC__
@@ -165,7 +165,7 @@ radapter::modbus::SlaveDevice::SlaveDevice(RtuDevice config, QObject *parent) :
     SlaveDevice(static_cast<Device&>(config), parent)
 {
     using Param = QModbusDevice::ConnectionParameter;
-    server = new QModbusRtuSerialSlave(this);
+    server = new QModbusRtuSerialServer(this);
     connectionString = config.port;
     server->setConnectionParameter(Param::SerialPortNameParameter, QString::fromStdString(config.port));
     server->setConnectionParameter(Param::SerialBaudRateParameter, config.baud.value);

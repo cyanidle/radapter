@@ -70,7 +70,7 @@ static QHash<QString, int> makeKeyMap() {
 static const QHash<QString, int> keyMap = makeKeyMap();
 
 static int parseKey(QVariant const& arg) {
-    if (arg.type() == QVariant::Int || arg.type() == QVariant::LongLong)
+    if (arg.metaType().id() == QMetaType::Int || arg.metaType().id() == QMetaType::LongLong)
         return arg.toInt();
     auto it = keyMap.find(arg.toString().toLower());
     if (it != keyMap.end()) return *it;
@@ -92,7 +92,7 @@ static const QHash<QString, Qt::KeyboardModifier> modMap = makeModMap();
 static Qt::KeyboardModifiers parseMods(QVariantList const& args, int startIdx) {
     Qt::KeyboardModifiers mods = Qt::NoModifier;
     for (int i = startIdx; i < args.size(); i++) {
-        if (args[i].type() != QVariant::String) continue;
+        if (args[i].metaType().id() != QMetaType::QString) continue;
         auto it = modMap.find(args[i].toString().toLower());
         if (it != modMap.end())
             mods |= *it;
@@ -189,8 +189,8 @@ protected:
             QVariantMap rec;
             rec["t"] = qint64(elapsed);
             rec["type"] = QStringLiteral("mouseMove");
-            rec["x"] = me->pos().x();
-            rec["y"] = me->pos().y();
+            rec["x"] = me->position().x();
+            rec["y"] = me->position().y();
             pendingMove = rec;
             return false;
         }
@@ -205,8 +205,8 @@ protected:
             rec["type"] = event->type() == QEvent::MouseButtonPress
                 ? QStringLiteral("mousePress")
                 : QStringLiteral("mouseRelease");
-            rec["x"] = me->pos().x();
-            rec["y"] = me->pos().y();
+            rec["x"] = me->position().x();
+            rec["y"] = me->position().y();
             rec["btn"] = btnToStr(me->button());
             events.append(rec);
             break;
@@ -627,7 +627,7 @@ public:
 
 public:
     void set_window(QVariant arg) {
-        if (arg.type() == QVariant::Int || arg.type() == QVariant::LongLong)
+        if (arg.metaType().id() == QMetaType::Int || arg.metaType().id() == QMetaType::LongLong)
             setWindowIndex(arg.toInt());
         else setWindowTitle(arg.toString());
     }

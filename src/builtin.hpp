@@ -15,8 +15,8 @@ template<>
 struct jv::Convert<QVariant>
 {
     static JsonView DoIntoJson(QVariant const& value, Arena& alloc) {
-        switch (value.type()) {
-        case QVariant::Map: {
+        switch (value.metaType().id()) {
+        case QMetaType::QVariantMap: {
             auto& map = *static_cast<const QVariantMap*>(value.constData());
             auto count = unsigned(map.size());
             auto res = MakeObjectOf(count, alloc);
@@ -28,7 +28,7 @@ struct jv::Convert<QVariant>
             }
             return JsonView(res, count);
         }
-        case QVariant::List: {
+        case QMetaType::QVariantList: {
             auto& list = *static_cast<const QVariantList*>(value.constData());
             auto count = unsigned(list.size());
             auto res = MakeArrayOf(count, alloc);
@@ -37,37 +37,37 @@ struct jv::Convert<QVariant>
             }
             return JsonView(res, count);
         }
-        case QVariant::Bool: {
+        case QMetaType::Bool: {
             return JsonView(*static_cast<const bool*>(value.constData()));
         }
-        case QVariant::Int: {
+        case QMetaType::Int: {
             return JsonView(*static_cast<const int*>(value.constData()));
         }
-        case QVariant::UInt: {
+        case QMetaType::UInt: {
             return JsonView(*static_cast<const unsigned int*>(value.constData()));
         }
-        case QVariant::ULongLong: {
+        case QMetaType::ULongLong: {
             return JsonView(*static_cast<const unsigned long long*>(value.constData()));
         }
-        case QVariant::LongLong: {
+        case QMetaType::LongLong: {
             return JsonView(*static_cast<const long long*>(value.constData()));
         }
-        case QVariant::Double: {
+        case QMetaType::Double: {
             return JsonView(*static_cast<const double*>(value.constData()));
         }
-        case QVariant::ByteArray: {
+        case QMetaType::QByteArray: {
             auto& arr = *static_cast<const QByteArray*>(value.constData());
             return JsonView::Binary(string_view(arr.data(), unsigned(arr.size())));
         }
-        case QVariant::Char: {
+        case QMetaType::QChar: {
             auto ch = *static_cast<const QChar*>(value.constData());
             return fromStr(QString(ch), alloc);
         }
-        case QVariant::String: {
+        case QMetaType::QString: {
             auto& str = *static_cast<const QString*>(value.constData());
             return fromStr(str, alloc);
         }
-        case QVariant::StringList: {
+        case QMetaType::QStringList: {
             auto& list = *static_cast<const QStringList*>(value.constData());
             auto count = unsigned(list.size());
             auto res = MakeArrayOf(count, alloc);

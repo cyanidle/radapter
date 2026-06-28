@@ -99,7 +99,7 @@ void TagRegistry::onWorkerMsg(Worker* w, QVariant const& msg) {
 }
 
 void TagRegistry::onWorkerEvent(Worker* w, QVariant const& msg) {
-    if (msg.type() != QVariant::Map) return;
+    if (msg.metaType().id() != QMetaType::QVariantMap) return;
     auto m = msg.toMap();
 
     bool disconnected = false;

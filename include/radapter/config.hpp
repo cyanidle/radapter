@@ -112,7 +112,7 @@ void Parse(T& out, QVariant const& conf, TraceFrame const& frame = {}) {
     constexpr auto desc = describe::Get<T>();
     TraceFrame clsroot = TraceFrame(desc.name, frame);
     TraceFrame const& current = frame.IsRoot() ? clsroot : frame;
-    if (conf.type() != conf.Map) {
+    if (conf.metaType().id() != QMetaType::QVariantMap) {
         Raise("{}: Cannot get {} from {}", current, desc.name, TypeNameOf(conf));
     }
     auto asMap = conf.toMap();
@@ -152,9 +152,9 @@ void Parse(OptionalPtr<T>& out, QVariant const& conf, TraceFrame const& frame = 
 
 template<typename T>
 void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
-    auto t = conf.type();
+    auto t = conf.metaType().id();
     if constexpr (string_like<T>) {
-        if (t == QVariant::StringList) {
+        if (t == QMetaType::QStringList) {
             auto l = conf.toStringList();
             out.resize(unsigned(l.size()));
             int idx = 0;
@@ -169,7 +169,7 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
             return;
         }
     }
-    if (t == QVariant::List) {
+    if (t == QMetaType::QVariantList) {
         auto l = conf.toList();
         out.resize(size_t(l.size()));
         int idx = 0;
@@ -179,7 +179,7 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
         }
         return;
     }
-    if (t == QVariant::Map && conf.toMap().empty()) {
+    if (t == QMetaType::QVariantMap && conf.toMap().empty()) {
         return;
     }
     Raise("{}: Non-array config passed ({})", frame, TypeNameOf(conf));
@@ -189,7 +189,7 @@ void Parse(vector<T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
 template<typename K, typename T>
 void Parse(map<K, T>& out, QVariant const& conf, TraceFrame const& frame = {}) {
     static_assert(string_like<K>);
-    if (conf.type() != conf.Map) {
+    if (conf.metaType().id() != QMetaType::QVariantMap) {
         Raise("{}: Cannot parse map from {}", frame, TypeNameOf(conf));
     }
     out.clear();

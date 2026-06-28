@@ -34,17 +34,17 @@ else()
     set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
-# Common Qt5 C++ runtime libs (both variants)
+# Common Qt6 C++ runtime libs (both variants)
 set(RADAPTER_DEB_COMMON_DEPS
-    "libqt5core5a, libqt5network5, libqt5serialport5, libqt5serialbus5, libqt5sql5, libqt5websockets5")
+    "libqt6core6, libqt6network6, libqt6serialport6, libqt6serialbus6, libqt6sql6, libqt6websockets6")
 
 # GUI C++ runtime libs
 set(RADAPTER_DEB_GUI_CPP_DEPS
-    "libqt5gui5, libqt5qml5, libqt5quick5, libqt5widgets5")
+    "libqt6gui6, libqt6qml6, libqt6quick6, libqt6widgets6")
 
 # QML module runtime deps (loaded dynamically — invisible to dpkg-shlibdeps)
 set(RADAPTER_DEB_GUI_QML_DEPS
-    "qml-module-qtquick2, qml-module-qtquick-controls2, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qtquick-dialogs, qml-module-qtcharts")
+    "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtquick-dialogs, qml6-module-qtcharts")
 
 if(RADAPTER_GUI)
     set(CPACK_PACKAGE_NAME "radapter-gui")

@@ -1,5 +1,5 @@
 import QtQuick 2.7
-import QtCharts 2.15
+import QtCharts
 
 // Time-series line chart built on QtCharts. Collects timestamped values on `value`
 // changes (run mode) into a LineSeries drawn against a scrolling DateTimeAxis and an

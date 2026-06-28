@@ -72,7 +72,7 @@ public:
             Info("started (pid {})", proc->processId());
             emit SendEventField("started", qlonglong(proc->processId()));
         });
-        connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+        connect(proc, &QProcess::finished, this,
                 [this](int code, QProcess::ExitStatus status){
             QVariantMap ev{ {"finished", true} };
             if (status == QProcess::CrashExit) {
@@ -115,9 +115,9 @@ public:
             Warn("stdin write ignored: process not running");
             return;
         }
-        if (msg.type() == QVariant::ByteArray) {
+        if (msg.metaType().id() == QMetaType::QByteArray) {
             proc->write(msg.toByteArray());
-        } else if (msg.type() == QVariant::String) {
+        } else if (msg.metaType().id() == QMetaType::QString) {
             proc->write(msg.toString().toUtf8());
         } else {
             Warn("only strings/bytes can be written to stdin");
@@ -131,7 +131,7 @@ public:
         if (a.isEmpty()) Raise("Signal(name_or_num): missing argument");
         auto& arg = a[0];
         int sig = 0;
-        if (arg.type() == QVariant::Int || arg.type() == QVariant::LongLong) {
+        if (arg.metaType().id() == QMetaType::Int || arg.metaType().id() == QMetaType::LongLong) {
             sig = arg.toInt();
         } else {
             auto name = arg.toString().toUpper().toLatin1();
@@ -187,7 +187,7 @@ public:
     QVariant Write(QVariantList const& a) {
         if (a.isEmpty()) Raise("Write(data): missing data argument");
         auto& v = a[0];
-        auto bytes = v.type() == QVariant::ByteArray ? v.toByteArray() : v.toString().toUtf8();
+        auto bytes = v.metaType().id() == QMetaType::QByteArray ? v.toByteArray() : v.toString().toUtf8();
         return qlonglong(proc->write(bytes));
     }
 

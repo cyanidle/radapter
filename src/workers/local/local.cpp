@@ -111,7 +111,7 @@ public:
 
     void OnMsg(QVariant const& msg) override {
         if (!msg.isValid()) return;
-        if (config.per_client.value && msg.type() == QVariant::Map) {
+        if (config.per_client.value && msg.metaType().id() == QMetaType::QVariantMap) {
             auto m = msg.toMap();
             bool targeted = false;
             for (auto it = m.begin(); it != m.end(); ++it) {

@@ -12,7 +12,7 @@
 #include "builtin.hpp"
 #include "glua/glua.hpp"
 #include <QPluginLoader>
-#include <QTextCodec>
+#include <QStringDecoder>
 
 using namespace radapter;
 using namespace glua;
@@ -380,9 +380,9 @@ static int wrapFunc(lua_State* L) {
 }
 
 void glua::Push(lua_State* L, QVariant const& val) {
-    auto t = val.type();
-    switch (int(t)) {
-    case QVariant::Type::Map: {
+    auto t = val.metaType().id();
+    switch (t) {
+    case QMetaType::QVariantMap: {
         lua_checkstack(L, 3); //key, val, table
         auto map = val.toMap();
         lua_createtable(L, 0, map.size());
@@ -393,7 +393,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
         }
         break;
     }
-    case QVariant::Type::List: {
+    case QMetaType::QVariantList: {
         lua_checkstack(L, 2); //val, table
         auto arr = val.toList();
         lua_createtable(L, arr.size(), 0);
@@ -404,31 +404,31 @@ void glua::Push(lua_State* L, QVariant const& val) {
         }
         break;
     }
-    case QVariant::Type::Bool: {
+    case QMetaType::Bool: {
         lua_pushboolean(L, val.toBool());
         break;
     }
-    case QVariant::Type::Char: {
+    case QMetaType::QChar: {
         pushQStr(L, QString(val.toChar()));
         break;
     }
-    case QVariant::Type(QMetaType::SChar):
-    case QVariant::Type(QMetaType::Short):
-    case QVariant::Type::Int: {
+    case QMetaType::SChar:
+    case QMetaType::Short:
+    case QMetaType::Int: {
         lua_pushinteger(L, val.toInt());
         break;
     }
-    case QVariant::Type(QMetaType::UChar):
-    case QVariant::Type(QMetaType::UShort):
-    case QVariant::Type::UInt: {
+    case QMetaType::UChar:
+    case QMetaType::UShort:
+    case QMetaType::UInt: {
         lua_pushinteger(L, val.toUInt());
         break;
     }
-    case QVariant::Type::LongLong: {
+    case QMetaType::LongLong: {
         lua_pushinteger(L, val.toLongLong());
         break;
     }
-    case QVariant::Type::ULongLong: {
+    case QMetaType::ULongLong: {
         auto v = val.toULongLong();
         if (v > size_t((std::numeric_limits<lua_Integer>::max)())) {
             lua_pushnumber(L, double(v));
@@ -437,24 +437,24 @@ void glua::Push(lua_State* L, QVariant const& val) {
         }
         break;
     }
-    case QVariant::Type(QMetaType::Float): {
+    case QMetaType::Float: {
         lua_pushnumber(L, double(val.toFloat()));
         break;
     }
-    case QVariant::Type::Double: {
+    case QMetaType::Double: {
         lua_pushnumber(L, val.toDouble());
         break;
     }
-    case QVariant::Type::String: {
+    case QMetaType::QString: {
         pushQStr(L, val.toString());
         break;
     }
-    case QVariant::Type::ByteArray: {
+    case QMetaType::QByteArray: {
         auto arr = val.toByteArray();
         lua_pushlstring(L, arr.data(), size_t(arr.size()));
         break;
     }
-    case QVariant::Type::StringList: {
+    case QMetaType::QStringList: {
         lua_checkstack(L, 1); //val
         auto arr = val.toStringList();
         lua_createtable(L, arr.size(), 0);
@@ -486,10 +486,9 @@ QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
     size_t len;
     auto s = luaL_tolstring(L, idx, &len);
     lua_pop(L, 1);
-    static QTextCodec* utf8 = QTextCodec::codecForName("UTF-8");
-    QTextCodec::ConverterState state;
-    auto res = utf8->toUnicode(s, static_cast<int>(len), &state);
-    if (state.invalidChars == 0) {
+    QStringDecoder utf8("UTF-8");
+    QString res = utf8(QByteArrayView(s, static_cast<qsizetype>(len)));
+    if (!utf8.hasError()) {
         return res;
     }
     return QByteArray(s, static_cast<int>(len));

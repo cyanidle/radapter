@@ -1,6 +1,7 @@
 ﻿#include "canframe.hpp"
 #include "cyphal_helpers.h"
 #include <QTimer>
+#include <QDateTime>
 #include <unordered_set>
 #include "json_view/alloc.hpp"
 
@@ -188,7 +189,7 @@ public:
         QTimer* hb = new QTimer(this);
         hb->callOnTimeout(this, &CyphalWorker::heartbeat);
         hb->start(config.heartbeat_period);
-        start = QTime::currentTime();
+        start = QDateTime::currentDateTime().time();
         connect(can, &ICanWorker::gotFrame, this, &CyphalWorker::on_frame);
         for (auto& [name, topic]: config.publish.value) {
             const CanardMessageDynamic* dyn = lookup_canard_type(topic.type);
@@ -361,7 +362,7 @@ public:
     }
 private:
     void heartbeat() {
-        auto now = QTime::currentTime();
+        auto now = QDateTime::currentDateTime().time();
         uavcan_node_Heartbeat_1_0 test_heartbeat = {};
         test_heartbeat.uptime = static_cast<uint32_t>(start.secsTo(now));
         test_heartbeat.health = {uavcan_node_Health_1_0_NOMINAL};
