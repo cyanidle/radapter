@@ -23,6 +23,7 @@ option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
 option(RADAPTER_GUI "Enable GUI capabilities" ON)
 option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
 option(RADAPTER_ROS2 "Develop ROS2 plugin" OFF)
+option(RADAPTER_PACKAGES "Enable packages" OFF)
 
 if (RADAPTER_JIT_STATIC)
     set(RADAPTER_JIT ON)
@@ -69,23 +70,25 @@ endif()
 
 file(GLOB_RECURSE RADAPTER_SCRIPTS CONFIGURE_DEPENDS src/scripts/*.lua)
 
-file(CONFIGURE OUTPUT ${CMAKE_BINARY_DIR}/_info/_embedded_scripts.h @ONLY CONTENT [[
-    constexpr std::string_view _embed_path = "@CMAKE_SOURCE_DIR@/src/scripts/";
-]])
-
 function(radapter_scripts)
     set(scripts_dir ${CMAKE_CURRENT_BINARY_DIR}/_scripts)
     set(scripts_qrc ${scripts_dir}/radapter.qrc)
-
+    set(prepared_scripts)
     set(qrc_content "<RCC>\n<qresource prefix=\"/scripts\">\n")
 
     foreach(file ${ARGN})
         get_filename_component(name ${file} NAME)
         message(STATUS "Embedding file => scripts/${name}")
+        set(out ${scripts_dir}/${name})
+        list(APPEND prepared_scripts ${out})
         if (RADAPTER_JIT OR CMAKE_CROSSCOMPILING) #no precompile for JIT or Cross
-            file(COPY ${file} DESTINATION ${scripts_dir})
+            add_custom_command(
+                OUTPUT ${out}
+                DEPENDS ${file}
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${file} ${out}
+                COMMENT "Copy => ${out}"
+            )
         else()
-            set(out ${scripts_dir}/${name})
             add_custom_command(
                 OUTPUT ${out}
                 DEPENDS radapter-luac ${file}
@@ -96,6 +99,8 @@ function(radapter_scripts)
         endif()
         string(APPEND qrc_content "<file>${name}</file>\n")
     endforeach()
+
+    add_custom_target(embedded_scripts DEPENDS ${prepared_scripts})
 
     string(APPEND qrc_content "</qresource>\n</RCC>\n")
 
@@ -122,6 +127,7 @@ target_compile_definitions(radapter-sdk INTERFACE RADAPTER_API=Q_DECL_IMPORT)
 target_include_directories(radapter-sdk PUBLIC include ${CMAKE_BINARY_DIR}/_info)
 target_include_directories(radapter-sdk PRIVATE src)
 target_link_system_libraries(radapter-sdk PRIVATE hiredis hiredis_ssl)
+add_dependencies(radapter-sdk embedded_scripts)
 
 if (MSVC)
     target_compile_options(radapter-sdk PRIVATE /Zc:__cplusplus)
@@ -255,4 +261,6 @@ if (NOT RADAPTER_SDK_ONLY)
     endforeach()
 endif()
 
-include(cmake/Packaging.cmake)
+if (RADAPTER_PACKAGES)
+    include(cmake/Packaging.cmake)
+endif()

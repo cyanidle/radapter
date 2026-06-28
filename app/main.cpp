@@ -91,11 +91,13 @@ public:
     AppState(const AppConfig* _config) : config(_config) {
         inst = new radapter::Instance(this);
 
+#ifdef RADAPTER_GUI
         if (auto* gapp = qobject_cast<QGuiApplication*>(qApp); gapp && config->shutdownOnLastClosed) {
             connect(gapp, &QGuiApplication::lastWindowClosed, inst, [inst=inst]{
                 inst->Shutdown();
             });
         }
+#endif
 
         QObject::connect(inst, &radapter::Instance::ShutdownDone, this, &QObject::deleteLater);
 
@@ -116,9 +118,11 @@ public:
             shutdown();
         });
 
-        if (radapter::GUI && qobject_cast<QGuiApplication*>(qApp)) {
+#ifdef RADAPTER_GUI
+        if (qobject_cast<QGuiApplication*>(qApp)) {
             inst->EnableGui();
         }
+#endif
 
         // --gui-record: start recording before user code runs (so windows created
         // during eval are captured) and save on any exit path.

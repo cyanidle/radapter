@@ -11,12 +11,13 @@ WORKDIR /src
 RUN cmake \
     -D CMAKE_BUILD_TYPE=RelWithDebInfo \
     -D RADAPTER_GUI=OFF \
-    -D RADAPTER_STATIC=ON \
+    -D RADAPTER_STATIC=OFF \
     -G Ninja -B /build
 RUN cmake --build /build -j$(nproc)
+RUN cmake --install /build --prefix /usr
 
 FROM debian:bullseye-slim AS runner
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib /usr/lib
-COPY --from=builder /build/bin/radapter /radapter
-ENTRYPOINT [ "/radapter" ]
+COPY --from=builder /usr/bin /usr/bin
+ENTRYPOINT [ "/bin/bash" ]

@@ -13,7 +13,6 @@
 #include "glua/glua.hpp"
 #include <QPluginLoader>
 #include <QTextCodec>
-#include "_embedded_scripts.h"
 
 using namespace radapter;
 using namespace glua;
