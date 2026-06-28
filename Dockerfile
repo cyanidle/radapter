@@ -28,4 +28,4 @@ COPY --from=builder /usr/lib /usr/lib
 COPY --from=builder /build/bin/libradapter-sdk.so /
 COPY --from=builder /build/bin/radapter /
 COPY --from=builder /build/radapter-headless_3.0_amd64.deb /
-ENTRYPOINT [ "/bin/bash" ]
+ENTRYPOINT [ "/radapter" ]
