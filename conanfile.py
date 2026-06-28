@@ -29,6 +29,7 @@ class Radapter(ConanFile):
 
     def requirements(self):
         self.requires("openssl/[~3]")
+        # TODO: add qtmqtt, qtgrpc, qtopcua
         # TODO: https://mirror.yandex.ru/mirrors/qt.io/official_releases/qt/
         qtopts = {
             "qtserialbus": True,
@@ -43,16 +44,16 @@ class Radapter(ConanFile):
                 "qtdeclarative": True,
                 "qtserialport": True,
                 "with_harfbuzz": True,
-                "qtquickcontrols2": True,
+                "qtshadertools": True,
                 "qttranslations": True,
                 "qttools": True,
                 "qtcharts": True,
+                "qtgraphs": True,
                 "with_gssapi": True,
             })
             if self.settings.os == "Linux":
                 qtopts.update({
                     "with_dbus": True,
-                    "with_glib": True,
                 })
         self.requires("qt/[~6]", options=qtopts)
         if self.options.jit != "off":
