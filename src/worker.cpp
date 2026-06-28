@@ -153,7 +153,7 @@ static int get_listeners(lua_State* L) {
     auto* ud = static_cast<WorkerImpl*>(luaL_checkudata(L, 1, cls));
     Push(L, ud->listeners);
     return 1;
-};
+}
 
 
 static int worker_destroy(lua_State* L) {

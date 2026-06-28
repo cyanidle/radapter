@@ -45,7 +45,8 @@ RUN set -eux; \
         -D CMAKE_SYSROOT=/sysroot \
         -D CMAKE_SYSTEM_NAME=Linux \
         -D RADAPTER_GUI=OFF \
-        -D RADAPTER_STATIC=ON \
+        -D RADAPTER_STATIC=OFF \
+        -D RADAPTER_PACKAGES=ON \
         -D CMAKE_FIND_ROOT_PATH=/sysroot \
         -D CMAKE_C_COMPILER=${tool_prefix}gcc \
         -D CMAKE_CXX_COMPILER=${tool_prefix}g++ \
@@ -60,5 +61,8 @@ FROM --platform=${TARGET_PLATFORM} debian:bullseye-slim AS runner
 ARG TARGET_PLATFORM
 COPY --from=sysroot /lib /lib
 COPY --from=sysroot /usr/lib /usr/lib
-COPY --from=builder /build/bin/radapter /radapter
+
+COPY --from=builder /build/bin/libradapter-sdk.so /
+COPY --from=builder /build/bin/radapter /
+COPY --from=builder /build/radapter-headless_3.0_amd64.deb /
 ENTRYPOINT [ "/radapter" ]

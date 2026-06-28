@@ -4,3 +4,4 @@ build/
 *.user
 Dockerfile*
 *.md
+!README.md

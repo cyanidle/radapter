@@ -6,6 +6,7 @@
 
 set(CPACK_PACKAGE_VENDOR        "cyanidle")
 set(CPACK_PACKAGE_CONTACT       "cyanidle")
+set(CPACK_PACKAGE_CONTACT       "lyosha.doronin@gmail.com")
 set(CPACK_PACKAGE_HOMEPAGE_URL  "https://github.com/cyanidle/radapter")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "NodeJS-style plumbing for industrial/embedded integration")
 set(CPACK_PACKAGE_DESCRIPTION   "Wire together Modbus, WebSocket, Redis, SQL, Serial, CAN, and QML
@@ -46,20 +47,19 @@ set(RADAPTER_DEB_GUI_QML_DEPS
     "qml-module-qtquick2, qml-module-qtquick-controls2, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qtquick-dialogs, qml-module-qtcharts")
 
 if(RADAPTER_GUI)
-    set(RADAPTER_PKG_NAME "radapter-gui")
+    set(CPACK_PACKAGE_NAME "radapter-gui")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
         "${RADAPTER_DEB_COMMON_DEPS}, ${RADAPTER_DEB_GUI_CPP_DEPS}, ${RADAPTER_DEB_GUI_QML_DEPS}")
     set(CPACK_DEBIAN_PACKAGE_CONFLICTS "radapter-headless")
 else()
-    set(RADAPTER_PKG_NAME "radapter-headless")
+    set(CPACK_PACKAGE_NAME "radapter-headless")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "${RADAPTER_DEB_COMMON_DEPS}")
     set(CPACK_DEBIAN_PACKAGE_CONFLICTS "radapter-gui")
 endif()
 
-set(CPACK_PACKAGE_NAME              "${RADAPTER_PKG_NAME}")
-set(CPACK_DEBIAN_PACKAGE_NAME       "${RADAPTER_PKG_NAME}")
+set(CPACK_DEBIAN_PACKAGE_NAME       "${CPACK_PACKAGE_NAME}")
 set(CPACK_PACKAGE_VERSION           "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_FILE_NAME         "${RADAPTER_PKG_NAME}-${PROJECT_VERSION}-Linux-${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+set(CPACK_PACKAGE_FILE_NAME         "${CPACK_PACKAGE_NAME}")
 
 # Install prefix for Debian packaging
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
