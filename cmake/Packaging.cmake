@@ -19,7 +19,9 @@ set(CPACK_RESOURCE_FILE_README   "${CMAKE_SOURCE_DIR}/README.md")
 
 set(CPACK_GENERATOR              "DEB")
 set(CPACK_DEBIAN_FILE_NAME       DEB-DEFAULT)
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# All runtime deps are declared manually below (RADAPTER_DEB_*).  shlibdeps is
+# useless here and breaks cross-builds where it can't resolve target-arch libs.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 

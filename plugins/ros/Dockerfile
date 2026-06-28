@@ -24,8 +24,8 @@ RUN apt-get update && apt-get upgrade -y && \
     ros-jazzy-rqt* \
     ros-jazzy-example-interfaces ros-jazzy-demo-nodes-cpp \
     git cmake ninja-build build-essential \
-    libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
-    libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
+    qt6-base-dev qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+    libqt6sql6-sqlite \
     curl libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
