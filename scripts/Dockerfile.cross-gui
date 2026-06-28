@@ -1,9 +1,13 @@
 # Cross-build radapter DEB packages — the recommended way to create distributions.
 #
-#   docker build -f scripts/Dockerfile.native-headless  -t radapter-headless:qt6
-#   docker build -f scripts/Dockerfile.native-gui       -t radapter-gui:qt6
-#   docker build -f scripts/Dockerfile.cross-headless   -t radapter-headless:qt6-arm64
-#   docker build -f scripts/Dockerfile.cross-gui        -t radapter-gui:qt6-arm64
+#   docker build -f scripts/Dockerfile.native-headless  -t radapter-headless:qt6 .
+#   docker build -f scripts/Dockerfile.native-gui       -t radapter-gui:qt6      .
+#   docker build -f scripts/Dockerfile.cross-headless   -t radapter-headless:qt6-arm64 .
+#   docker build -f scripts/Dockerfile.cross-gui        -t radapter-gui:qt6-arm64      .
+#
+# Extract the .deb directly without creating a container:
+#   docker build --target pkg --output=out -f scripts/Dockerfile.cross-gui .
+#   ls out/radapter-gui.deb
 #
 # The cross variants require qemu-user-static on the host for the --platform arm64 stage.
 # All four share the same builder-stage package list — Docker layer caching makes this free.
@@ -78,11 +82,13 @@ RUN --mount=type=cache,target=/cpm \
 WORKDIR /build
 RUN cpack -G DEB
 
+FROM scratch AS pkg
+COPY --from=builder /build/radapter-gui_*.deb /
+
 FROM --platform=${TARGET_PLATFORM} debian:bookworm-slim AS runner
 ARG TARGET_PLATFORM
 COPY --from=sysroot /lib /lib
 COPY --from=sysroot /usr/lib /usr/lib
 COPY --from=builder /build/bin/libradapter-sdk.so /
 COPY --from=builder /build/bin/radapter /
-COPY --from=builder /build/radapter-gui_*.deb /
 ENTRYPOINT [ "/radapter" ]
