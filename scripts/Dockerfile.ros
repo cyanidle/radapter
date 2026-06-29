@@ -87,8 +87,7 @@ RUN case "${TARGET_PLATFORM}" in \
     *) ;; \
     esac
 
-# --- fff + ros sourcing ---
-RUN curl -fsSL https://raw.githubusercontent.com/dmtrKovalenko/fff.nvim/main/install-mcp.sh | bash
+# --- ros sourcing ---
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/ubuntu/.bashrc
 ENV SHELL=/bin/bash
 
