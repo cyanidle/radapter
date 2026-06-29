@@ -79,10 +79,10 @@ RUN apt-get update && apt-get upgrade -y && \
 # The cross-compiler needs moc/rcc/etc. reachable under the sysroot path.
 RUN case "${TARGET_PLATFORM}" in \
     'arm64') \
-        qt6_root=/sysroot/usr/lib/aarch64-linux-gnu/qt6; \
+        qt6_root=/sysroot/usr/lib/qt6; \
         mkdir -p $qt6_root/libexec $qt6_root/bin; \
-        cp -RLf /usr/lib/x86_64-linux-gnu/qt6/libexec/* $qt6_root/libexec/ 2>/dev/null || true; \
-        cp -RLf /usr/lib/x86_64-linux-gnu/qt6/bin/*     $qt6_root/bin/ 2>/dev/null || true; \
+        cp -RLf /usr/lib/qt6/libexec/* $qt6_root/libexec/ 2>/dev/null || true; \
+        cp -RLf /usr/lib/qt6/bin/*     $qt6_root/bin/ 2>/dev/null || true; \
         ;; \
     *) ;; \
     esac
@@ -109,7 +109,7 @@ COPY . /src
 WORKDIR /src
 ENV CPM_SOURCE_CACHE=/cpm
 RUN --mount=type=cache,target=/cpm \
-    cmake \
+    bash -c "source /opt/ros/jazzy/setup.bash && cmake \
         -D CMAKE_BUILD_TYPE=Release \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_ROS2=ON \
@@ -117,14 +117,14 @@ RUN --mount=type=cache,target=/cpm \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -D CMAKE_TOOLCHAIN_FILE=/opt/radapter/cmake/toolchain_arm64.cmake \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc) --target radapter_ros
+    && cmake --build /build -j$(nproc) --target radapter_ros"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: cross-pkg — extract the cross-compiled plugin with arch suffix
 # ═══════════════════════════════════════════════════════════════════════
 FROM scratch AS cross-pkg
 ARG TARGET_ARCH=aarch64
-COPY --from=cross-builder /build/bin/libradapter_ros.so /radapter_ros_${TARGET_ARCH}.so
+COPY --from=cross-builder /build/bin/libradapter_ros.so /libradapter_ros_${TARGET_ARCH}.so
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: native-builder — native compile (CI / one-shot mode)
@@ -135,17 +135,18 @@ COPY . /src
 WORKDIR /src
 ENV CPM_SOURCE_CACHE=/cpm
 RUN --mount=type=cache,target=/cpm \
-    cmake \
+    bash -c "source /opt/ros/jazzy/setup.bash && cmake \
         -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_PREFIX_PATH=/opt/ros/jazzy \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_ROS2=ON \
         -D RADAPTER_STATIC=OFF \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc) --target radapter_ros
+    && cmake --build /build -j$(nproc) --target radapter_ros"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: native-pkg — extract the native-compiled plugin with arch suffix
 # ═══════════════════════════════════════════════════════════════════════
 FROM scratch AS native-pkg
-COPY --from=native-builder /build/bin/libradapter_ros.so /radapter_ros_x86_64.so
+COPY --from=native-builder /build/bin/libradapter_ros.so /libradapter_ros_amd64.so
