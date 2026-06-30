@@ -830,7 +830,7 @@ function Http(params) end
 ---@field dir string -- directory containing the binary
 ---@field name string -- application name
 ---@field pid integer -- this process's PID
----@field qt_version string -- runtime Qt version (e.g. "5.15.3")
+---@field qt_version string -- runtime Qt version (e.g. "6.5.3")
 
 ---Info about the running process, via Qt's QCoreApplication.
 ---@return AppInfo

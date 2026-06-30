@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 radapter ("Redis Adapter") is **NodeJS-style plumbing software for industrial/embedded
 integration**: it wires together a zoo of devices, protocols and databases and exposes them
-to simple, usable **Lua** scripts. The C++/Qt5 engine provides *workers* (Modbus,
+to simple, usable **Lua** scripts. The C++/Qt6 engine provides *workers* (Modbus,
 Websocket, Redis, SQL, Serial, CAN/Cyphal, GUI/QML); Lua scripts instantiate them, validate
 their config, and connect them into message **pipelines**.
 
@@ -44,9 +44,9 @@ build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 Set `CPM_SOURCE_CACHE` (e.g. `export CPM_SOURCE_CACHE="$HOME/.cache/CPM"`) to cache fetched
 packages across builds/clones.
 
-System deps (Ubuntu): `cmake ninja-build build-essential` plus Qt5 dev packages
-(`libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev`, the `libqt5sql5-*`
-drivers, `qtdeclarative5-dev libqt5quickcontrols2-5`). Full list in README.md.
+System deps (Ubuntu): `cmake ninja-build build-essential` plus Qt6 dev packages
+(`qt6-base-dev qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev`, the `libqt6sql6-*`
+drivers, `qt6-declarative-dev qml6-module-qtquick-controls`). Full list in README.md.
 
 ### DEB packaging
 

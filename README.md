@@ -75,9 +75,10 @@ local view = QML[[ Window { visible: true; ... } ]]
 
 ```bash
 sudo apt install cmake ninja-build build-essential \
-    libqt5websockets5-dev libqt5serialbus5-dev libqt5serialport5-dev \
-    libqt5sql5-mysql libqt5sql5-odbc libqt5sql5-psql libqt5sql5-sqlite \
-    qtdeclarative5-dev libqt5quickcontrols2-5
+    qt6-base-dev qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
+    qt6-declarative-dev \
+    libqt6sql6-mysql libqt6sql6-odbc libqt6sql6-psql libqt6sql6-sqlite \
+    qml6-module-qtquick-controls
 
 cmake -B build -G Ninja
 cmake --build build -j $(nproc)
@@ -136,7 +137,7 @@ build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 
 ## Architecture
 
-radapter is a C++/Qt5 engine with a public SDK (`include/radapter/`). Three ways to extend it:
+radapter is a C++/Qt6 engine with a public SDK (`include/radapter/`). Three ways to extend it:
 
 - **Lua scripts** — the normal path. Wire built-in workers, write transform functions, build pipelines.
 - **Native plugins** — compile a separate `.so` against `radapter-sdk` and load at runtime with `load_plugin("path/to/lib.so")`. See `plugins/test.cpp` for the reference pattern.
