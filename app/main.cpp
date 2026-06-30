@@ -3,6 +3,7 @@
 #include <QTimer>
 #include <QJsonDocument>
 #include <QFile>
+#include <QElapsedTimer>
 #include <efsw/efsw.hpp>
 #include <qctrlsignalhandler.h>
 #include "radapter/radapter.hpp"
