@@ -476,7 +476,9 @@ QMLWorker = {}
 function QMLWorker:dir() end
 
 ---@class QMLParams
----@field url string
+---@field url string local path, or an http(s) URL to fetch the QML over the network
+---(remote same-directory components need a `qmldir`). A relative url resolves against the
+---running script's URL when that script was itself loaded over HTTP.
 
 ---@return QMLWorker
 ---@param params QMLParams

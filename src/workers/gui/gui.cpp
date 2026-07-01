@@ -10,6 +10,9 @@
 #include <QQmlPropertyMap>
 #include <QQuickItem>
 #include <QDir>
+#include <QUrl>
+#include <QEventLoop>
+#include <QTimer>
 #include <memory>
 #include <unordered_map>
 
@@ -192,11 +195,33 @@ public:
             creator->setData(first.toByteArray(), base);
         } else {
             Parse(config, first);
-            creator = new QQmlComponent(engine, config.url);
+            // A relative url resolves against the running script's URL when that script was
+            // itself loaded over HTTP, mirroring how `require` resolves Lua modules.
+            QUrl qmlUrl(config.url);
+            auto const& scriptBase = inst->_GetPrivate()->scriptBaseUrl;
+            if (qmlUrl.isRelative() && !scriptBase.isEmpty()) {
+                qmlUrl = QUrl(scriptBase).resolved(qmlUrl);
+            }
+            if (qmlUrl.scheme() == "http" || qmlUrl.scheme() == "https") {
+                creator = new QQmlComponent(engine, qmlUrl);
+            } else {
+                creator = new QQmlComponent(engine, config.url);
+            }
         }
         if (config.properties) {
             for (auto it = config.properties->constBegin(); it != config.properties->constEnd(); ++it) {
                 ctx->setContextProperty(it.key(), it.value());
+            }
+        }
+        // Remote QML (http/https) loads asynchronously; block until the component resolves
+        // before creating it. Local files and inline data are already synchronous.
+        if (creator->isLoading()) {
+            QEventLoop loop;
+            QObject::connect(creator, &QQmlComponent::statusChanged, &loop, &QEventLoop::quit);
+            QTimer::singleShot(30000, &loop, &QEventLoop::quit);
+            loop.exec();
+            if (creator->isLoading()) {
+                Raise("Timed out loading remote QML: {}", config.url.toStdString());
             }
         }
         root = creator->create(ctx);
