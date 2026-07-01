@@ -3,6 +3,7 @@
 #include <QTimer>
 #include <QJsonDocument>
 #include <QFile>
+#include <QUrl>
 #include <QElapsedTimer>
 #include <efsw/efsw.hpp>
 #include <qctrlsignalhandler.h>
@@ -167,6 +168,12 @@ public:
 
         inst->RegisterGlobal("args", config->lua_args);
 
+        // --pre-script runs before any user script (and re-runs on every reload); local
+        // filesystem only, takes no args of its own.
+        if (auto ps = config->cli.present("pre-script")) {
+            inst->EvalFile(radapter::fs::u8path(*ps));
+        }
+
         for (auto& e: config->exprs) {
             inst->Eval(e);
         }
@@ -183,7 +190,12 @@ public:
         }
 
         if (auto f = config->cli.present("file")) {
-            inst->EvalFile(radapter::fs::u8path(*f));
+            auto scheme = QUrl(QString::fromStdString(*f)).scheme();
+            if (scheme == "http" || scheme == "https") {
+                inst->EvalHttp(QString::fromStdString(*f));
+            } else {
+                inst->EvalFile(radapter::fs::u8path(*f));
+            }
         }
 
         // --gui-replay: once the event loop is running and windows exist, replay the
@@ -211,6 +223,17 @@ public:
                     g_reloading = false;
             });
         }
+
+        // Lua reload() performs the same hot reload as -w, on demand and regardless of
+        // whether a watcher is configured. RequestReload already deferred us out of the
+        // Lua frame, but Shutdown still tears down this instance, so guard reentrancy.
+        QObject::connect(inst, &radapter::Instance::ReloadRequest, this, [this] {
+            if (g_reloading)
+                return;
+            g_reloading = true;
+            if (!reload())
+                g_reloading = false;
+        });
     }
 
     void shutdown() {
@@ -234,7 +257,8 @@ public:
                 reexec();   // on success the image is replaced and never returns
             try {
                 new AppState{config};
-                config->listener->elapsed.restart();
+                if (config->listener)
+                    config->listener->elapsed.restart();
                 std::cerr << "# Hot reload done." << std::endl;
             } catch (std::exception& e) {
                 std::cerr << "# Hot reload error: " << e.what() << std::endl;
@@ -320,6 +344,9 @@ int main (int argc, char **argv) try {
     cli.add_argument("--pre-reload")
         .help("Shell command to run before each hot reload (e.g. a rebuild); "
               "the reload is skipped if it exits non-zero");
+    cli.add_argument("--pre-script")
+        .help("Lua file (local filesystem) to run before the main script, on every "
+              "reload; takes no args of its own");
     cli.add_argument("--reload-exec", "-r")
         .flag()
         .help("On hot reload, re-exec the (rebuilt) binary instead of rebuilding "

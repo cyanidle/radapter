@@ -31,6 +31,11 @@ function on_shutdown(handler) end
 ---@param timeout number?
 function shutdown(timeout) end
 
+---Hot-reload the current instance, exactly as the `-w`/`--watch-dir` file watcher does
+---(re-runs any `--pre-script` and the main script). Deferred: the current call returns
+---first. A no-op when run without a host that acts on it.
+function reload() end
+
 ---@param key string
 ---@param sep string?
 ---@return fun(object: any): any

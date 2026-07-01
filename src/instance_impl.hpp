@@ -27,6 +27,9 @@ struct radapter::Instance::Impl {
     int luaLogHandler = LUA_NOREF;
     unsigned logCatLen = 12;
     optional<fs::path> currentFile;
+    // non-empty when the running script was loaded over HTTP; base URL that relative
+    // `require` paths resolve against.
+    QString scriptBaseUrl;
     QPointer<qml_test::RecordFilter> guiRecordFilter;
     // non-window QQuickItem roots from QML{} workers with an Item-rooted QML file;
     // QML_Tester searches these when there is no QQuickWindow to search through

@@ -164,7 +164,16 @@ public:
     optional<fs::path> CurrentFile();
 
     void EvalFile(fs::path path);
+    // Fetch a script over HTTP(S) and run it. While it runs, `require` also resolves
+    // modules by relative HTTP path against this script's URL (tried before the
+    // filesystem searchers).
+    void EvalHttp(QString const& url);
     void Eval(string_view code, string_view chunk = "<eval>");
+
+    // Ask the host to hot-reload (re-create this instance). A no-op unless the host
+    // (app/main.cpp) is wired to act on ReloadRequest. Deferred: the current Lua call
+    // returns first. Backs the Lua global `reload()`.
+    void RequestReload();
 
     lua_State* LuaState();
     static Instance* FromLua(lua_State* L);
@@ -178,6 +187,7 @@ signals:
     void ShutdownRequest();
     void WorkerCreated(Worker* worker);
     void ShutdownDone();
+    void ReloadRequest();
 private:
     QScopedPointer<Impl> d;
 };

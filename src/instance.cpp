@@ -4,6 +4,11 @@
 #include <QTimer>
 #include <qdatetime.h>
 #include <QDir>
+#include <QUrl>
+#include <QEventLoop>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 #include "fmt/compile.h"
 #include "glua/glua.hpp"
 #include "instance_impl.hpp"
@@ -19,6 +24,10 @@ static void* instKey = &_dummy;
 
 static void luaShutdown(lua_State* L, optional<unsigned> timeout) {
     Instance::FromLua(L)->Shutdown(timeout ? *timeout : 5000);
+}
+
+static void luaReload(lua_State* L) {
+    Instance::FromLua(L)->RequestReload();
 }
 
 int Instance::Impl::onShutdown(lua_State* L) {
@@ -158,6 +167,7 @@ Instance::Instance(QObject *parent) :
     lua_register(L, "json_encode", glua::protect<builtin::json_encode>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
+    lua_register(L, "reload", glua::Wrap<luaReload>);
     lua_register(L, "on_shutdown", glua::protect<Impl::onShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
     lua_register(L, "each", glua::protect<builtin::api::Each>);
@@ -357,6 +367,127 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
     d->schemas[name] = schemaGen;
 }
 
+// Blocking HTTP(S) GET, driven by a nested event loop. `require` is synchronous, so a
+// script loader has no other option; this only runs while resolving scripts/modules.
+static optional<QByteArray> httpGetSync(QUrl const& url, QString& err, int timeoutMs = 30000)
+{
+    static QNetworkAccessManager manager;
+    QNetworkRequest req(url);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = manager.get(req);
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(&timer, &QTimer::timeout, reply, &QNetworkReply::abort);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    timer.start(timeoutMs);
+    loop.exec();
+
+    optional<QByteArray> res;
+    if (reply->error() != QNetworkReply::NoError) {
+        err = reply->errorString();
+    } else {
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status >= 200 && status < 300) {
+            res = reply->readAll();
+        } else {
+            err = QString("HTTP %1").arg(status);
+        }
+    }
+    reply->deleteLater();
+    return res;
+}
+
+// package.searchers entry (installed only in HTTP mode): map a module name to a relative
+// path and fetch it against the running script's base URL. Returns the loaded chunk on a
+// hit, or an error string so `require` keeps trying the remaining searchers.
+static int httpSearcher(lua_State* L)
+{
+    auto* inst = Instance::FromLua(L);
+    QString base = inst->_GetPrivate()->scriptBaseUrl;
+    if (base.isEmpty()) {
+        lua_pushstring(L, "\n\tno http base url");
+        return 1;
+    }
+    QString rel = QString::fromUtf8(luaL_checkstring(L, 1));
+    rel.replace('.', '/');
+    rel += ".lua";
+    QUrl url = QUrl(base).resolved(QUrl(rel));
+
+    QString err;
+    auto body = httpGetSync(url, err);
+    if (!body) {
+        lua_pushfstring(L, "\n\tno http '%s' (%s)",
+                        url.toString().toUtf8().constData(), err.toUtf8().constData());
+        return 1;
+    }
+    auto chunk = ("@" + url.toString()).toUtf8();
+    if (luaL_loadbufferx(L, body->constData(), size_t(body->size()), chunk.constData(), "t") != LUA_OK) {
+        return lua_error(L);
+    }
+    lua_pushstring(L, url.toString().toUtf8().constData()); // loader arg (module "filename")
+    return 2;
+}
+
+// Insert httpSearcher into package.searchers (5.4) / package.loaders (LuaJIT) at index 2,
+// right after the preload searcher so preloaded modules (e.g. socket) still win, but
+// everything else is tried over HTTP before the filesystem searchers.
+static void installHttpSearcher(lua_State* L)
+{
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "searchers");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        lua_getfield(L, -1, "loaders");
+    }
+    if (!lua_istable(L, -1)) {
+        Raise("could not install http searcher: package.searchers missing");
+    }
+#ifdef RADAPTER_JIT
+    int len = int(lua_objlen(L, -1));
+#else
+    int len = int(lua_rawlen(L, -1));
+#endif
+    for (int i = len; i >= 2; --i) {
+        lua_rawgeti(L, -1, i);
+        lua_rawseti(L, -2, i + 1);
+    }
+    lua_pushcfunction(L, httpSearcher);
+    lua_rawseti(L, -2, 2);
+    lua_pop(L, 2);
+}
+
+void Instance::EvalHttp(QString const& url)
+{
+    QString err;
+    auto body = httpGetSync(QUrl(url), err);
+    if (!body) {
+        Raise("Could not fetch script {}: {}", url.toStdString(), err.toStdString());
+    }
+
+    auto L = d->L;
+    d->scriptBaseUrl = url;
+    installHttpSearcher(L);
+
+    QUrl dir = QUrl(url).resolved(QUrl("."));
+    RegisterGlobal("SCRIPT_PATH", QVariant(url));
+    RegisterGlobal("SCRIPT_DIR", QVariant(dir.toString()));
+
+    auto chunk = ("@" + url).toStdString();
+    auto load = luaL_loadbufferx(L, body->constData(), size_t(body->size()), chunk.c_str(), "t");
+    if (load != LUA_OK) {
+        Raise("Error loading {}: {}", url.toStdString(), builtin::help::toSV(L));
+    }
+    lua_getglobal(L, "__eval_async");
+    lua_insert(L, -2);
+    lua_pushstring(L, url.toUtf8().constData());
+    auto res = lua_pcall(L, 2, 0, 0);
+    if (res != LUA_OK) {
+        Raise("EvalHttp error:\n\t{}", builtin::help::toSV(L));
+    }
+}
+
 void Instance::EvalFile(fs::path path)
 {
     path = fs::absolute(fs::weakly_canonical(path));
@@ -428,6 +559,12 @@ void Instance::Eval(string_view code, string_view chunk)
         auto e = builtin::help::toSV(L);
         Raise("Eval error:\n\t{}", e);
     }
+}
+
+void Instance::RequestReload()
+{
+    // Defer so the calling Lua frame unwinds before the host tears this instance down.
+    QTimer::singleShot(0, this, [this]{ emit ReloadRequest(); });
 }
 
 void Instance::Shutdown(unsigned int timeout)
