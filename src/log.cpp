@@ -1,7 +1,7 @@
 #include "instance_impl.hpp"
 
 #ifdef RADAPTER_JIT
-#define luaL_tolstring lua_tolstring
+#define luaL_tolstring radapter::compat::luaL_tolstring
 #endif
 
 int radapter::Instance::Impl::luaLog(lua_State *L) {

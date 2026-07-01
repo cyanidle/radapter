@@ -45,7 +45,7 @@ void builtin::help::PrintStack(lua_State* L, string msg) {
 }
 
 #ifdef RADAPTER_JIT
-#define luaL_tolstring lua_tolstring
+#define luaL_tolstring radapter::compat::luaL_tolstring
 #endif
 
 

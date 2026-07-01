@@ -44,6 +44,31 @@ void radapter::compat::luaL_requiref (lua_State *L, const char *modname, lua_CFu
     lua_replace(L, -2);
 }
 
+const char* radapter::compat::luaL_tolstring(lua_State *L, int idx, size_t *len) {
+    idx = compat::lua_absindex(L, idx);
+    if (luaL_callmeta(L, idx, "__tostring")) {
+        if (!lua_isstring(L, -1))
+            luaL_error(L, "'__tostring' must return a string");
+    } else {
+        switch (lua_type(L, idx)) {
+        case LUA_TNUMBER:
+        case LUA_TSTRING:
+            lua_pushvalue(L, idx);
+            break;
+        case LUA_TBOOLEAN:
+            lua_pushstring(L, lua_toboolean(L, idx) ? "true" : "false");
+            break;
+        case LUA_TNIL:
+            lua_pushstring(L, "nil");
+            break;
+        default:
+            lua_pushfstring(L, "%s: %p", luaL_typename(L, idx), lua_topointer(L, idx));
+            break;
+        }
+    }
+    return lua_tolstring(L, -1, len);
+}
+
 static int do_prequiref(lua_State* L) {
     compat::luaL_requiref(L, lua_tostring(L, 1), lua_tocfunction(L, 2), int(lua_tointeger(L, 3)));
     return 1;

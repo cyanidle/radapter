@@ -29,6 +29,10 @@ int RADAPTER_API lua_absindex(lua_State *L, int i);
 int RADAPTER_API luaL_getsubtable(lua_State *L, int i, const char *name);
 void RADAPTER_API luaL_requiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
 void RADAPTER_API prequiref(lua_State *L, const char *modname, lua_CFunction openf, int glb);
+// Faithful Lua 5.2+ luaL_tolstring for LuaJIT/5.1 (which lacks it): honors __tostring,
+// formats primitives, and PUSHES the result (callers pop it) — unlike lua_tolstring,
+// which pushes nothing and ignores non-scalars.
+RADAPTER_API const char* luaL_tolstring(lua_State *L, int idx, size_t *len);
 }
 
 struct WorkerArguments;
