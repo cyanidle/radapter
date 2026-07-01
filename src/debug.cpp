@@ -1,16 +1,10 @@
 #include "radapter/radapter.hpp"
 #include "builtin.hpp"
-#include "glua/glua.hpp"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <qfileinfo.h>
 #include <qthread.h>
 #include <QAbstractEventDispatcher>
-
-extern "C" {
-int luaopen_socket_core(lua_State *L);
-}
-
 
 void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
 {
@@ -21,9 +15,6 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     defer restart([L]{
         lua_gc(L, LUA_GCRESTART, 0);
     });
-    radapter::compat::prequiref(L, "socket.core", luaopen_socket_core, 0);
-    lua_pop(L, 1);
-    LoadEmbeddedFile("socket");
     if (opts.vscode) {
         Warn("debugger", "Using vscode-compatible mobdebug");
         LoadEmbeddedFile("mobdebug.vscode", LoadEmbedNoPop);

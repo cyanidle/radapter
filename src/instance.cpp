@@ -51,6 +51,19 @@ void Instance::EnableGui() {
 
 extern "C" {
 int luaopen_lfs(lua_State *L);
+int luaopen_socket_core(lua_State *L);
+}
+
+static int load_embedded_module(lua_State* L);
+
+// Register a module loader in package.preload so require(name) works lazily,
+// without eagerly running the module at startup.
+static void set_preload(lua_State* L, const char* name, lua_CFunction openf) {
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "preload");
+    lua_pushcfunction(L, openf);
+    lua_setfield(L, -2, name);
+    lua_pop(L, 2);
 }
 
 static std::atomic<unsigned> _curr_id = 0;
@@ -165,6 +178,9 @@ Instance::Instance(QObject *parent) :
     lua_pop(L, 1);
     LoadEmbeddedFile("builtins");
     LoadEmbeddedFile("async");
+
+    set_preload(L, "socket.core", luaopen_socket_core);
+    set_preload(L, "socket", glua::protect<load_embedded_module>);
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
