@@ -77,67 +77,6 @@ function make_service(request, responce, timeout) end
 ---@field unwrap string?
 ---@field on string?
 
----A node in the operator visualization (HMI) tree. Either a layout container
----(type Row/Column/Grid, with `children`) or a widget leaf (type Gauge/InfoDisplay/
----Spacer/Custom, bound to a `tag`). See projects/scada/hmi/Node.qml.
----@class RadVizNode
----@field type string -- "Row"|"Column"|"Grid"|"Gauge"|"InfoDisplay"|"Spacer"|"Custom"
----@field children RadVizNode[]? -- container children
----@field tag string? -- "<worker>:<field>" tag the leaf binds to
----@field source string? -- Custom: path/URL of a .qml file to load
----@field spacing number? -- container child spacing
----@field columns number? -- Grid column count
----@field min number? -- Gauge range minimum
----@field max number? -- Gauge range maximum
----@field label string? -- widget caption
----@field units string? -- value units suffix
----@field color string? -- Gauge arc color
----@field fillWidth boolean? -- Layout.fillWidth hint
----@field fillHeight boolean? -- Layout.fillHeight hint
----@field preferredWidth number? -- Layout.preferredWidth hint
----@field preferredHeight number? -- Layout.preferredHeight hint
-
----@class RadVisualization
----@field root RadVizNode
-
----@class RadConfig
----@field objects table<string, RadObjectEntry>
----@field pipes RadPipe[]?
----@field visualization RadVisualization? -- operator HMI authored by the scada configurator
-
----@class RadSaveParams
----@field config RadConfig
----@field path string? -- write whole config as JSON to this file
----@field key string? -- write config as a Redis hash under this key (one field per object)
----@field host string?
----@field port number?
----@field db number?
-
----@class RadLoadParams
----@field path string? -- read config JSON from this file
----@field key string? -- read config from a Redis hash under this key
----@field host string?
----@field port number?
----@field db number?
-
----@class radapterDeclare
-local declare = {}
-
----Instantiate every object and wire the declared pipes.
----@param config RadConfig
----@return table<string, Worker>
-function declare.build(config) end
-
----Serialize a config to a file (`path`) and/or a Redis hash (`key`).
----The Redis path is async: call at script top level or inside `async(...)`.
----@param params RadSaveParams
-function declare.save_to(params) end
-
----Read a config (file `path` or Redis `key`) and build it.
----The Redis path is async: call at script top level or inside `async(...)`.
----@param params RadLoadParams
----@return table<string, Worker>
-function declare.load_from(params) end
 
 ---@enum (key) loggingLevel
 loggingLevel = {
@@ -709,10 +648,33 @@ function RedisCache(params) end
 ---@param params RedisStreamConfig
 function RedisStream(params) end
 
+---@class WebsocketServerParams : WorkerConfig
+---@field port integer -- TCP port to listen on
+---@field host string? -- bind address (default "0.0.0.0")
+---@field per_client boolean? -- route per connection ({id=msg}); else broadcast (default false)
+---@field origin string? -- Origin header value (default "radapter")
+---@field cert_file string? -- PEM certificate for wss://
+---@field key_file string? -- PEM private key for wss://
+---@field compression "zlib"? -- optional payload compression
+---@field protocol ("json"|"msgpack")? -- frame payload encoding (default "json")
+---@field compression_level integer? -- zlib level (default -1)
+
+---@class WebsocketClientParams : WorkerConfig
+---@field url string -- websocket server URL (ws:// or wss://)
+---@field reconnect_timeout integer? -- ms between reconnect attempts (default 10000)
+---@field origin string? -- Origin header value (default "radapter")
+---@field cert_file string? -- PEM certificate for wss://
+---@field key_file string? -- PEM private key for wss://
+---@field compression "zlib"? -- optional payload compression
+---@field protocol ("json"|"msgpack")? -- frame payload encoding (default "json")
+---@field compression_level integer? -- zlib level (default -1)
+
 ---@return Worker
+---@param params WebsocketServerParams
 function WebsocketServer(params) end
 
 ---@return Worker
+---@param params WebsocketClientParams
 function WebsocketClient(params) end
 
 ---@class LocalServerConfig : WorkerConfig
