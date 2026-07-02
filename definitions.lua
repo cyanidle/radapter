@@ -408,6 +408,11 @@ SCRIPT_PATH = nil
 ---@type string?
 SCRIPT_DIR = nil
 
+---True when this build has GUI support and `--gui` was passed
+---(i.e. `QML` / `QML_Tester` are usable).
+---@type boolean
+RADAPTER_GUI = false
+
 ---@class builtinTimer
 builtinTimer = {}
 function builtinTimer:Stop() end

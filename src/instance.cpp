@@ -53,6 +53,7 @@ void Instance::EnableGui() {
     if constexpr (GUI) {
         builtin::workers::gui(this);
         builtin::workers::qml_test_init(this);
+        RegisterGlobal("RADAPTER_GUI", true);
     } else {
         Raise("GUI support was not enabled during build");
     }
@@ -220,6 +221,10 @@ Instance::Instance(QObject *parent) :
     registerUnavailable(L, "QML", "QML worker is unavailable: run with --gui (needs a RADAPTER_GUI build)");
     registerUnavailable(L, "QML_Tester", "QML_Tester is unavailable: run with --gui (needs a RADAPTER_GUI build)");
     registerUnavailable(L, "tags", "tag API is unavailable: run with --tags");
+
+    // flipped to true by EnableGui() (GUI build + --gui)
+    lua_pushboolean(L, false);
+    lua_setglobal(L, "RADAPTER_GUI");
 }
 
 static string load_builtin(QString name) {
