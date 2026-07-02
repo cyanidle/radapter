@@ -192,9 +192,13 @@ function lfs.unlock (filehandle, start, length) end
 ---@return string
 function fmt(fmt, ...) end
 
+---@class JsonEncodeOpts
+---@field pretty boolean? -- human-readable indented output; default is compact
+
 ---@param data any
+---@param opts JsonEncodeOpts?
 ---@return string
-function json_encode(data) end
+function json_encode(data, opts) end
 
 ---@param json string
 ---@return any

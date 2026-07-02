@@ -513,7 +513,17 @@ int builtin::json_decode(lua_State* L) {
 
 int builtin::json_encode(lua_State* L) {
     auto variant = help::toQVar(L, 1);
-    auto enc = QJsonDocument::fromVariant(variant).toJson(QJsonDocument::Compact);
+    auto format = QJsonDocument::Compact;
+    if (lua_istable(L, 2)) {
+        lua_getfield(L, 2, "pretty");
+        if (lua_toboolean(L, -1)) {
+            format = QJsonDocument::Indented;
+        }
+        lua_pop(L, 1);
+    } else if (!lua_isnoneornil(L, 2)) {
+        Raise("json_encode: opts (arg #2) must be a table");
+    }
+    auto enc = QJsonDocument::fromVariant(variant).toJson(format);
     lua_pushlstring(L, enc.data(), size_t(enc.size()));
     return 1;
 }
