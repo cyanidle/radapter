@@ -321,6 +321,26 @@ function pipe(first, ...) end
 ---@return fun() cancel -- removes the subscription created by this on() call
 function on(source, part, handler) end
 
+---Linked pair of anonymous workers bridging the `key` namespace (neither is
+---registered in `workers`). Calling `up` with `{key = X}` emits `X` from
+---`down`; calling `down` with `X` emits `{key = X}` from `up`. Each side
+---notifies the other's listeners, so piping `up` both from and to a transport
+---does not echo.
+---@param key string
+---@param sep string? path separator (see get/set)
+---@return Pipable up # transport-facing side (wrapped messages)
+---@return Pipable down # child-facing side (unwrapped messages)
+function pair(key, sep) end
+
+---Lua-side analog of the QML model's node(): returns a worker exchanging
+---*unwrapped* messages with `parent` under the `key` namespace. The result is
+---itself a valid parent for nested node() calls.
+---@param parent pipeInput
+---@param key string
+---@param sep string? path separator (see get/set)
+---@return Pipable
+function node(parent, key, sep) end
+
 ---@param worker Worker
 ---@param msg any
 ---@param sender Worker?
@@ -338,12 +358,14 @@ workers = {}
 args = {}
 
 ---Absolute canonical path (realpath) of the currently executing script file.
----Set when a script is run via EvalFile; nil for inline evals (`-e`).
+---Set when a script is run via EvalFile and retargeted for the duration of
+---every require(), so modules see their own path. Nil for inline evals (`-e`).
 ---@type string?
 SCRIPT_PATH = nil
 
 ---Absolute canonical path (realpath) of the directory containing the currently
----executing script. Nil for inline evals (`-e`).
+---executing script (follows require(), like SCRIPT_PATH). Nil for inline
+---evals (`-e`).
 ---@type string?
 SCRIPT_DIR = nil
 

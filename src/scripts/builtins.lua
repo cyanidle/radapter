@@ -106,6 +106,56 @@ function on(worker, part, handler)
     return pipe(worker, unwrap(part), handler)
 end
 
+-- Linked pair of anonymous workers bridging the `key` namespace (neither is
+-- registered in `workers`). Calling `up` with {key = X} emits X from `down`;
+-- calling `down` with X emits {key = X} from `up`. Each side notifies the
+-- *other's* listeners, so `pipe(transport, up)` + `pipe(up, transport)` do not
+-- echo. Wire `up` to the transport, hand `down` to a child component.
+function pair(key, sep)
+    assert(type(key) == "string", "string expected as first arg")
+    local up, down
+    up = create_worker(function(_, msg, sender)
+        local inner = get(msg, key, sep)
+        if inner ~= nil then
+            notify_all(down, inner, sender)
+        end
+    end)
+    down = create_worker(function(_, msg, sender)
+        notify_all(up, set({}, key, msg, sep), sender)
+    end)
+    return up, down
+end
+
+-- Lua-side analog of the QML model's node(): returns a worker exchanging
+-- *unwrapped* messages with `parent` under the `key` namespace. Composable:
+-- the result is itself a valid parent for nested node() calls.
+function node(parent, key, sep)
+    local up, down = pair(key, sep)
+    pipe(parent, up)
+    pipe(up, parent)
+    return down
+end
+
+-- SCRIPT_DIR/SCRIPT_PATH point at the file being *executed*: EvalFile sets
+-- them for the main script; this override retargets them for the duration of
+-- every require() so required modules resolve their own siblings/assets.
+local lua_require = require
+function require(name)
+    local path = package.searchpath and package.searchpath(name, package.path)
+    if not path then
+        return lua_require(name)
+    end
+    local wasPath, wasDir = SCRIPT_PATH, SCRIPT_DIR
+    SCRIPT_PATH = path
+    SCRIPT_DIR = path:match("^(.-)[/\\][^/\\]*$") or "."
+    local ok, res = pcall(lua_require, name)
+    SCRIPT_PATH, SCRIPT_DIR = wasPath, wasDir
+    if not ok then
+        error(res, 2)
+    end
+    return res
+end
+
 -- Cross-version compatability
 unpack = unpack or table.unpack
 table.unpack = table.unpack or unpack

@@ -107,6 +107,9 @@ function(radapter_scripts)
     qt_add_resources(RADAPTER_QRC ${scripts_qrc}
         OPTIONS --compress 9 --threshold 70
     )
+    # rcc's configure-time qrc scan can't see the precompiled scripts (they are
+    # generated later), so without this a script edit needs a clean rebuild
+    add_custom_command(OUTPUT ${RADAPTER_QRC} APPEND DEPENDS ${prepared_scripts})
     set(RADAPTER_QRC ${RADAPTER_QRC} PARENT_SCOPE)
 endfunction()
 
