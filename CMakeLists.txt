@@ -259,4 +259,6 @@ if (NOT RADAPTER_SDK_ONLY)
     endforeach()
 endif()
 
-include(cmake/Packaging.cmake)
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    include(cmake/Packaging.cmake)
+endif()

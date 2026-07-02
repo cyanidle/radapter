@@ -446,7 +446,7 @@ void PopulateSchema(map<K, T>& in, QVariant& schema) {
 
 template<typename T> struct fmt::formatter<radapter::WithDefault<T>> : fmt::formatter<T>  {
     template<typename Ctx>
-    auto format(radapter::WithDefault<T>& s, Ctx& ctx) const {
+    auto format(radapter::WithDefault<T> const& s, Ctx& ctx) const {
         return fmt::formatter<T>::format(s.value, ctx);
     }
 };
