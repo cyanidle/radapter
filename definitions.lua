@@ -748,14 +748,14 @@ function LocalClient(params) end
 ---@field merge_stderr boolean? -- fold stderr into the stdout data channel
 ---@field binary BinaryParams? -- if set, use BinaryWorker msgpack framing for stdout and stdin
 
----A child process. Without `binary`: stdout arrives as `{stdout = <Bytes>}` on the data
----channel (use `chunk.stdout:str()` for the text); `pipe(proc, fn)` receives each chunk.
----stderr and lifecycle land on `proc.events`: `{stderr}`, `{started}`,
----`{finished=true, exit_code}` on normal exit / `{finished=true, signal=true}` when
----killed, `{error}`. Inbound strings/Bytes are written to stdin.
+---A child process. Without `binary`: stdout arrives as `{stdout = <string>}` on the
+---data channel; `pipe(proc, fn)` receives each chunk. stderr and lifecycle land on
+---`proc.events`: `{stderr}`, `{started}`, `{finished=true, exit_code}` on normal exit /
+---`{finished=true, signal=true}` when killed, `{error}`. Inbound strings/Bytes are
+---written to stdin.
 ---
 ---With `binary`: extends BinaryWorker — stdout and stdin use the configured framing
----and msgpack protocol. Inbound messages are arbitrary objects sent as msgpack frames.
+---and msgpack protocol; messages in both directions are arbitrary decoded objects.
 ---Destroying the worker terminates the child.
 ---@class ProcessWorker : Worker
 ProcessWorker = {}

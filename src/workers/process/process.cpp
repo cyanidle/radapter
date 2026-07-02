@@ -29,10 +29,10 @@ RAD_DESCRIBE(ProcessConfig) {
 }
 
 // Wraps a child process (QProcess). stdout lands on the data channel: in text
-// mode as {stdout = <bytes>}, in binary mode through the BinaryWorker framing.
-// stderr and lifecycle land on the event channel. Inbound messages are written
-// to stdin (text mode: strings/bytes/JSON; binary mode: arbitrary objects via
-// msgpack framing through BinaryWorker::OnMsg).
+// mode as {stdout = <string>}, in binary mode as arbitrary objects decoded by
+// the BinaryWorker framing. stderr and lifecycle land on the event channel.
+// Inbound messages are written to stdin (text mode: strings/bytes; binary
+// mode: arbitrary objects via msgpack framing through BinaryWorker::OnMsg).
 class ProcessWorker : public BinaryWorker {
     Q_OBJECT
 
@@ -61,12 +61,12 @@ public:
             });
         } else {
             connect(proc, &QProcess::readyReadStandardOutput, this, [this]{
-                emit SendMsgField("stdout", proc->readAllStandardOutput());
+                emit SendMsgField("stdout", QString::fromUtf8(proc->readAllStandardOutput()));
             });
         }
 
         connect(proc, &QProcess::readyReadStandardError, this, [this]{
-            emit SendEventField("stderr", proc->readAllStandardError());
+            emit SendEventField("stderr", QString::fromUtf8(proc->readAllStandardError()));
         });
         connect(proc, &QProcess::started, this, [this]{
             Info("started (pid {})", proc->processId());

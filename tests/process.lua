@@ -18,7 +18,10 @@ do
     local out = {}
     local proc = Process { program = "echo", arguments = { "hello", "radapter" } }
 
-    pipe(proc, function(chunk) out[#out + 1] = chunk.stdout:str() end)
+    pipe(proc, function(chunk)
+        assert(type(chunk.stdout) == "string", "text-mode stdout must be a string")
+        out[#out + 1] = chunk.stdout
+    end)
 
     pipe(proc.events, function(ev)
         if ev.finished then
