@@ -18,7 +18,7 @@ do
     local out = {}
     local proc = Process { program = "echo", arguments = { "hello", "radapter" } }
 
-    pipe(proc, function(chunk) out[#out + 1] = tostring(chunk.stdout) end)
+    pipe(proc, function(chunk) out[#out + 1] = chunk.stdout:str() end)
 
     pipe(proc.events, function(ev)
         if ev.finished then

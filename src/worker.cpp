@@ -277,6 +277,20 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     lua_settop(L, msgh - 1);
 }
 
+static int worker_tostring(lua_State* L) {
+    auto* impl = static_cast<WorkerImpl*>(lua_touserdata(L, 1));
+    auto cls = lua_tostring(L, lua_upvalueindex(1));
+    auto* w = impl ? impl->self.data() : nullptr;
+    if (!w) {
+        lua_pushfstring(L, "%s(destroyed)", cls);
+    } else if (auto name = w->objectName(); !name.isEmpty()) {
+        lua_pushfstring(L, "%s(%p, \"%s\")", cls, (void*)w, name.toUtf8().constData());
+    } else {
+        lua_pushfstring(L, "%s(%p)", cls, (void*)w);
+    }
+    return 1;
+}
+
 static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worker* w, ExtraMethods const& methods)
 {
     lua_pushstring(L, clsname);
@@ -313,6 +327,10 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
 
         lua_pushlightuserdata(L, &builtin::workers::Marker);
         lua_setfield(L, -2, "__marker");
+
+        lua_pushvalue(L, clsIdx);
+        lua_pushcclosure(L, worker_tostring, 1);
+        lua_setfield(L, -2, "__tostring");
 
         lua_pushvalue(L, clsIdx);
         lua_pushcclosure(L, glua::protect<worker_destroy>, 1);

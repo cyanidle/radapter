@@ -261,6 +261,44 @@ function json_encode(data) end
 ---@return any
 function json_decode(json) end
 
+---An immutable binary buffer (C++ QByteArray). This is how workers deliver binary
+---payloads to Lua (process stdout, serial reads, websocket binary frames, msgpack
+---binary fields). Reading: `b[i]`/`b:byte(i)` return the byte value at a 1-based
+---index (negative counts from the end, nil out of range), `#b` is the size.
+---`tostring(b)`/`fmt`/`log` render a hex dump (`bytes[3]: 01 02 ff`). Comparable
+---with `==`; `..` concatenates with Bytes or a string into new Bytes. Writing is
+---an error. Sent back to a worker, it stays binary (never UTF-8 reinterpreted).
+---@class Bytes
+local Bytes = {}
+
+---Raw content as a Lua string.
+---@return string
+function Bytes.str(self) end
+
+---Hex-encoded content (lowercase, no separators).
+---@return string
+function Bytes.hex(self) end
+
+---@return integer
+function Bytes.size(self) end
+
+---Byte value at a 1-based index (default 1, negative counts from the end).
+---@param i integer?
+---@return integer?
+function Bytes.byte(self, i) end
+
+---Sub-range as new Bytes, string.sub() semantics.
+---@param i integer?
+---@param j integer?
+---@return Bytes
+function Bytes.sub(self, i, j) end
+
+---Construct immutable Bytes from a string (raw copy), an array of integers
+---(0-255), another Bytes (copy), or nothing (empty).
+---@param from string|integer[]|Bytes|nil
+---@return Bytes
+function bytes(from) end
+
 ---Return a process-unique, monotonically increasing integer id.
 ---@return integer
 function next_id() end
@@ -710,11 +748,11 @@ function LocalClient(params) end
 ---@field merge_stderr boolean? -- fold stderr into the stdout data channel
 ---@field binary BinaryParams? -- if set, use BinaryWorker msgpack framing for stdout and stdin
 
----A child process. Without `binary`: stdout arrives as `{stdout = <bytes>}` on the data
----channel; `pipe(proc, fn)` receives each chunk. stderr and lifecycle land on
----`proc.events`: `{stderr}`, `{started}`, `{finished=true, exit_code}` on normal exit /
----`{finished=true, signal=true}` when killed, `{error}`. Inbound strings/bytes are
----written to stdin.
+---A child process. Without `binary`: stdout arrives as `{stdout = <Bytes>}` on the data
+---channel (use `chunk.stdout:str()` for the text); `pipe(proc, fn)` receives each chunk.
+---stderr and lifecycle land on `proc.events`: `{stderr}`, `{started}`,
+---`{finished=true, exit_code}` on normal exit / `{finished=true, signal=true}` when
+---killed, `{error}`. Inbound strings/Bytes are written to stdin.
 ---
 ---With `binary`: extends BinaryWorker — stdout and stdin use the configured framing
 ---and msgpack protocol. Inbound messages are arbitrary objects sent as msgpack frames.
@@ -725,7 +763,7 @@ ProcessWorker = {}
 ---Start the process if it is not already running.
 function ProcessWorker:Start() end
 ---Write bytes to the child's stdin; returns the number of bytes written.
----@param data string
+---@param data string|Bytes
 ---@return integer
 function ProcessWorker:Write(data) end
 ---Request graceful termination (SIGTERM).

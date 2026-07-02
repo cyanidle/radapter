@@ -97,6 +97,26 @@ local c2 = pipe(tmp)
 assert(type(c2) == "function", "pipe(single) returns cancel function")
 c2()  -- should not error
 
+-- bytes: immutable binary buffer
+local b = bytes("\1\2\255")
+assert(#b == 3 and b:size() == 3)
+assert(b[1] == 1 and b[2] == 2 and b[3] == 255 and b[4] == nil)
+assert(b[-1] == 255)
+assert(b:byte(2) == 2)
+assert(b:str() == "\1\2\255")
+assert(b:hex() == "0102ff")
+assert(b == bytes({ 1, 2, 255 }))
+assert(b ~= bytes("\1\2"))
+assert(b:sub(2) == bytes("\2\255"))
+assert(b:sub(1, -2) == bytes("\1\2"))
+assert(b .. bytes("\3") == bytes("\1\2\255\3"))
+assert((b .. "\3"):size() == 4)
+assert(tostring(b) == "bytes[3]: 01 02 ff")
+assert(fmt("{}", b) == "bytes[3]: 01 02 ff")
+assert(not pcall(function() b.x = 1 end), "bytes must be immutable")
+assert(not pcall(bytes, { 300 }), "non-byte item must fail")
+assert(bytes():size() == 0 and tostring(bytes()) == "bytes[0]")
+
 local test_func = function() end
 
 assert(type(pipe(test_func)) == "function", "pipe(func) returns cancel function")

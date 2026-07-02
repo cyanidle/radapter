@@ -48,6 +48,215 @@ void builtin::help::PrintStack(lua_State* L, string msg) {
 #define luaL_tolstring radapter::compat::luaL_tolstring
 #endif
 
+static const char BytesMeta[] = "radapter.bytes";
+
+QByteArray* builtin::help::testBytes(lua_State* L, int idx) {
+    return static_cast<QByteArray*>(luaL_testudata(L, idx, BytesMeta));
+}
+
+static QByteArray& checkBytes(lua_State* L, int idx) {
+    if (auto b = builtin::help::testBytes(L, idx)) {
+        return *b;
+    }
+    Raise("arg #{} is not bytes, but a {}", idx, luaL_typename(L, idx));
+}
+
+static string bytesRepr(QByteArray const& b) {
+    constexpr qsizetype cut = 32;
+    auto res = fmt::format("bytes[{}]", b.size());
+    if (b.isEmpty()) {
+        return res;
+    }
+    res += ':';
+    auto shown = (std::min)(b.size(), cut);
+    for (qsizetype i = 0; i < shown; ++i) {
+        res += fmt::format(" {:02x}", uint8_t(b[i]));
+    }
+    if (b.size() > cut) {
+        res += " ..";
+    }
+    return res;
+}
+
+static QVariant reprBinaries(QVariant v) {
+    switch (v.metaType().id()) {
+    case QMetaType::QByteArray:
+        return QString::fromStdString(bytesRepr(v.toByteArray()));
+    case QMetaType::QVariantMap: {
+        auto m = v.toMap();
+        for (auto it = m.begin(); it != m.end(); ++it) {
+            *it = reprBinaries(std::move(*it));
+        }
+        return m;
+    }
+    case QMetaType::QVariantList: {
+        auto l = v.toList();
+        for (auto& item: l) {
+            item = reprBinaries(std::move(item));
+        }
+        return l;
+    }
+    default:
+        return v;
+    }
+}
+
+static int bytesToString(lua_State* L) {
+    auto repr = bytesRepr(checkBytes(L, 1));
+    lua_pushlstring(L, repr.data(), repr.size());
+    return 1;
+}
+
+static int bytesStr(lua_State* L) {
+    auto& b = checkBytes(L, 1);
+    lua_pushlstring(L, b.data(), size_t(b.size()));
+    return 1;
+}
+
+static int bytesHex(lua_State* L) {
+    auto hex = checkBytes(L, 1).toHex();
+    lua_pushlstring(L, hex.data(), size_t(hex.size()));
+    return 1;
+}
+
+static int bytesSize(lua_State* L) {
+    lua_pushinteger(L, checkBytes(L, 1).size());
+    return 1;
+}
+
+static qsizetype bytesPos(lua_Integer i, qsizetype size) {
+    return i < 0 ? size + i : i - 1;
+}
+
+static int bytesByte(lua_State* L) {
+    auto& b = checkBytes(L, 1);
+    auto pos = bytesPos(luaL_optinteger(L, 2, 1), b.size());
+    if (pos < 0 || b.size() <= pos) {
+        return 0;
+    }
+    lua_pushinteger(L, uint8_t(b[pos]));
+    return 1;
+}
+
+static int bytesSub(lua_State* L) {
+    auto& b = checkBytes(L, 1);
+    auto i = (std::max)(bytesPos(luaL_optinteger(L, 2, 1), b.size()), qsizetype(0));
+    auto j = (std::min)(bytesPos(luaL_optinteger(L, 3, -1), b.size()), b.size() - 1);
+    builtin::help::pushBytes(L, i > j ? QByteArray{} : b.mid(i, j - i + 1));
+    return 1;
+}
+
+static int bytesEq(lua_State* L) {
+    auto a = builtin::help::testBytes(L, 1);
+    auto b = builtin::help::testBytes(L, 2);
+    lua_pushboolean(L, a && b && *a == *b);
+    return 1;
+}
+
+static QByteArray concatOperand(lua_State* L, int idx) {
+    if (auto b = builtin::help::testBytes(L, idx)) {
+        return *b;
+    }
+    if (lua_type(L, idx) == LUA_TSTRING) {
+        size_t len;
+        auto s = lua_tolstring(L, idx, &len);
+        return QByteArray(s, qsizetype(len));
+    }
+    Raise("cannot concatenate bytes with a {}", luaL_typename(L, idx));
+}
+
+static int bytesConcat(lua_State* L) {
+    builtin::help::pushBytes(L, concatOperand(L, 1) + concatOperand(L, 2));
+    return 1;
+}
+
+static int bytesNewIndex(lua_State* L) {
+    return luaL_error(L, "bytes are immutable");
+}
+
+static int bytesIndex(lua_State* L) {
+    if (lua_type(L, 2) == LUA_TNUMBER) {
+        return bytesByte(L);
+    }
+    lua_pushvalue(L, 2);
+    lua_rawget(L, lua_upvalueindex(1));
+    return 1;
+}
+
+void builtin::help::pushBytes(lua_State* L, QByteArray bytes) {
+    if (!lua_checkstack(L, 4)) {
+        Raise("pushBytes(): out of stack space");
+    }
+    auto ud = lua_udata(L, sizeof(QByteArray));
+    new (ud) QByteArray(std::move(bytes));
+    if (luaL_newmetatable(L, BytesMeta)) {
+        luaL_Reg methods[] = {
+            {"str", glua::protect<bytesStr>},
+            {"hex", glua::protect<bytesHex>},
+            {"size", glua::protect<bytesSize>},
+            {"byte", glua::protect<bytesByte>},
+            {"sub", glua::protect<bytesSub>},
+            {nullptr, nullptr},
+        };
+        lua_createtable(L, 0, 5);
+        luaL_setfuncs(L, methods, 0);
+        luaL_Reg meta[] = {
+            {"__gc", glua::dtor_for<QByteArray>},
+            {"__tostring", glua::protect<bytesToString>},
+            {"__len", glua::protect<bytesSize>},
+            {"__eq", bytesEq},
+            {"__concat", glua::protect<bytesConcat>},
+            {"__newindex", bytesNewIndex},
+            {"__index", glua::protect<bytesIndex>},
+            {nullptr, nullptr},
+        };
+        luaL_setfuncs(L, meta, 1);
+    }
+    lua_setmetatable(L, -2);
+}
+
+int builtin::api::Bytes(lua_State* L) {
+    switch (lua_type(L, 1)) {
+    case LUA_TNONE:
+    case LUA_TNIL: {
+        help::pushBytes(L, {});
+        break;
+    }
+    case LUA_TSTRING: {
+        size_t len;
+        auto s = lua_tolstring(L, 1, &len);
+        help::pushBytes(L, QByteArray(s, qsizetype(len)));
+        break;
+    }
+    case LUA_TTABLE: {
+        QByteArray b;
+        for (int i = 1; ; ++i) {
+            lua_rawgeti(L, 1, i);
+            if (lua_isnil(L, -1)) {
+                lua_pop(L, 1);
+                break;
+            }
+            auto n = lua_tonumber(L, -1);
+            auto v = lua_Integer(n);
+            if (!lua_isnumber(L, -1) || lua_Number(v) != n || v < 0 || 255 < v) {
+                Raise("bytes(): item #{} is not a byte (integer 0-255)", i);
+            }
+            b.append(char(v));
+            lua_pop(L, 1);
+        }
+        help::pushBytes(L, std::move(b));
+        break;
+    }
+    case LUA_TUSERDATA: {
+        help::pushBytes(L, checkBytes(L, 1));
+        break;
+    }
+    default:
+        Raise("bytes(): cannot convert a {}", luaL_typename(L, 1));
+    }
+    return 1;
+}
+
 
 int builtin::api::Format(lua_State* L) {
     int idx = 2;
@@ -98,7 +307,7 @@ int builtin::api::Format(lua_State* L) {
         case LUA_TTABLE: {
             lua_pushvalue(L, idx);
             auto var = builtin::help::toQVar(L);
-            auto j = QJsonDocument::fromVariant(var);
+            auto j = QJsonDocument::fromVariant(reprBinaries(std::move(var)));
             lua_pop(L, 1);
             args.push_back(j.toJson().toStdString());
             break;
@@ -111,12 +320,12 @@ int builtin::api::Format(lua_State* L) {
             args.push_back("<thread>");
             break;
         }
-        case LUA_TUSERDATA: {
-            args.push_back(fmt::format("<udata@0x{}>", lua_touserdata(L, -1)));
-            break;
-        }
+        case LUA_TUSERDATA:
         case LUA_TLIGHTUSERDATA: {
-            args.push_back(fmt::format("<light_udata@0x{}>", lua_touserdata(L, -1)));
+            size_t len;
+            auto s = luaL_tolstring(L, idx, &len);
+            args.push_back(string{s, len});
+            lua_pop(L, 1);
             break;
         }
         default:
@@ -360,6 +569,32 @@ static void pushQStr(lua_State* L, QString const& str) {
 using QObjPtr = QPointer<QObject>;
 DESCRIBE("_radapter::QObjPtr", QObjPtr, void) {}
 
+static int qobjToString(lua_State* L) {
+    auto& ptr = glua::CheckUData<QObjPtr>(L, 1);
+    auto* o = ptr.data();
+    if (!o) {
+        lua_pushliteral(L, "QObject(destroyed)");
+    } else if (auto name = o->objectName(); !name.isEmpty()) {
+        lua_pushfstring(L, "%s(%p, \"%s\")", o->metaObject()->className(), (void*)o, name.toUtf8().constData());
+    } else {
+        lua_pushfstring(L, "%s(%p)", o->metaObject()->className(), (void*)o);
+    }
+    return 1;
+}
+
+static void pushQObj(lua_State* L, QObject* q) {
+    glua::Push(L, QObjPtr{q});
+    lua_getmetatable(L, -1);
+    lua_getfield(L, -1, "__tostring");
+    auto missing = lua_isnil(L, -1);
+    lua_pop(L, 1);
+    if (missing) {
+        lua_pushcfunction(L, glua::protect<qobjToString>);
+        lua_setfield(L, -2, "__tostring");
+    }
+    lua_pop(L, 1);
+}
+
 
 struct ExtraHelper {
     ExtraFunction func;
@@ -450,8 +685,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
         break;
     }
     case QMetaType::QByteArray: {
-        auto arr = val.toByteArray();
-        lua_pushlstring(L, arr.data(), size_t(arr.size()));
+        builtin::help::pushBytes(L, val.toByteArray());
         break;
     }
     case QMetaType::QStringList: {
@@ -474,7 +708,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
         } else if (auto v = val.value<LuaValue>()) {
             lua_rawgeti(v._L, LUA_REGISTRYINDEX, v._ref);
         } else if (auto q = val.value<QObject*>()) {
-            glua::Push(L, QPointer<QObject>{q});
+            pushQObj(L, q);
         } else {
             lua_pushnil(L);
         }
@@ -585,6 +819,9 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
+        if (auto b = testBytes(L, idx)) {
+            return *b;
+        }
         auto isWorker = lua_getmetatable(L, idx);
         if (isWorker) {
             lua_getfield(L, -1, "__marker");

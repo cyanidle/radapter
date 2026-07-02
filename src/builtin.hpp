@@ -173,10 +173,13 @@ QVariant toQVar(lua_State* L, int idx = -1);
 QVariant toStrOrBinary(lua_State* L, int idx = -1);
 string_view toSV(lua_State* L, int idx = -1) noexcept;
 QVariantList toArgs(lua_State* L, int from);
+void pushBytes(lua_State* L, QByteArray bytes);
+QByteArray* testBytes(lua_State* L, int idx);
 }
 
 namespace api {
 int Format(lua_State* L);
+int Bytes(lua_State* L);
 int Get(lua_State* L);
 int Set(lua_State* L);
 int Each(lua_State* L);

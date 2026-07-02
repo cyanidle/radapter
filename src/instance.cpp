@@ -170,6 +170,7 @@ Instance::Instance(QObject *parent) :
     lua_register(L, "reload", glua::Wrap<luaReload>);
     lua_register(L, "on_shutdown", glua::protect<Impl::onShutdown>);
     lua_register(L, "fmt", glua::protect<builtin::api::Format>);
+    lua_register(L, "bytes", glua::protect<builtin::api::Bytes>);
     lua_register(L, "each", glua::protect<builtin::api::Each>);
     lua_register(L, "after", glua::protect<builtin::api::After>);
     lua_register(L, "get", glua::protect<builtin::api::Get>);
