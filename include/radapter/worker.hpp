@@ -118,7 +118,7 @@ Q_DECLARE_INTERFACE(radapter::WorkerPlugin, RadapterWorkerPlugin_iid)
         Q_PLUGIN_METADATA(IID iid) \
         Q_INTERFACES(radapter::WorkerPlugin)  \
     public:  \
-        void Initialize(radapter::Instance* radapter, QVariantList args) override;\
+        void Initialize(radapter::Instance* radapter, [[maybe_unused]] QVariantList args) override;\
     }; \
 void plugin##_RadPluginImpl::Initialize(radapter::Instance* radapter, QVariantList args)
 
