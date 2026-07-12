@@ -71,7 +71,7 @@ static std::shared_ptr<QQmlEngine> qmlEngineFor(Instance* inst) {
 }
 
 // A reactive node in the GUI data model, mirroring the radapter message tree:
-// each nested map is a child GuiModel reached via node(). State writes from QML
+// each nested map is a child GuiModel reached via branch(). State writes from QML
 // go through updateValue() and auto-emit the change; writes from C++ (insert via
 // applyIncoming) don't, so inbound data delivered by a pipe doesn't echo back.
 // The node also carries the event channel: send() emits a message and received()
@@ -84,7 +84,7 @@ public:
         _worker(worker), _up(parentNode), _key(std::move(key))
     {}
 
-    Q_INVOKABLE radapter::gui::GuiModel* node(QString const& key) {
+    Q_INVOKABLE radapter::gui::GuiModel* branch(QString const& key) {
         if (auto existing = qobject_cast<GuiModel*>(value(key).value<QObject*>())) {
             return existing;
         }
@@ -276,7 +276,7 @@ void GuiModel::applyIncoming(QVariant const& msg) {
     auto map = msg.toMap();
     for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
         if (it.value().metaType().id() == QMetaType::QVariantMap) {
-            node(it.key())->applyIncoming(it.value());
+            branch(it.key())->applyIncoming(it.value());
         } else {
             QQmlPropertyMap::insert(it.key(), it.value());
         }

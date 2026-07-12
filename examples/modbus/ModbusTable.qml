@@ -4,7 +4,7 @@ import QtQuick.Layouts 1.3
 
 // Configurable table that visualizes Modbus register values, bound to a radapter
 // GUI model node. Pass the node via `model`, e.g.
-//   ModbusTable { model: radapter.model.node("regs") }
+//   ModbusTable { model: radapter.model.branch("regs") }
 //
 // Add rows with "+", giving each a name, address, register type (and optional
 // data type / endianness). A row reads and writes `model[name]`, so data piped

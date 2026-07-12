@@ -336,14 +336,14 @@ function on(source, part, handler) end
 ---@return Pipable down # child-facing side (unwrapped messages)
 function pair(key, sep) end
 
----Lua-side analog of the QML model's node(): returns a worker exchanging
+---Lua-side analog of the QML model's branch(): returns a worker exchanging
 ---*unwrapped* messages with `parent` under the `key` namespace. The result is
----itself a valid parent for nested node() calls.
+---itself a valid parent for nested branch() calls.
 ---@param parent pipeInput
 ---@param key string
 ---@param sep string? path separator (see get/set)
 ---@return Pipable
-function node(parent, key, sep) end
+function branch(parent, key, sep) end
 
 ---@param worker Worker
 ---@param msg any

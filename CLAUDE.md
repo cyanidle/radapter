@@ -315,7 +315,7 @@ The GUI worker (`src/workers/gui/gui.cpp`) exposes a `radapter` context object w
 `radapter.model` is the root of a tree of `GuiModel` nodes (a `QQmlPropertyMap` subclass).
 Both data channels map onto the worker's `OnMsg`/`SendMsg` and are **scoped to a node's path
 in the tree** (the root node's path is empty → flat messages):
-- **State** — `model.node("regs")` gets/creates a nested node; `model[key]` is a reactive
+- **State** — `model.branch("regs")` gets/creates a nested node; `model[key]` is a reactive
   value (use `ensure(key)` to make a key bindable before data arrives). Inbound messages are
   merged in via `applyIncoming` (C++ `insert`, so no echo); a QML write to a key goes through
   `updateValue`, which auto-emits the change wrapped in the node's path (a write to the `regs`
@@ -323,7 +323,7 @@ in the tree** (the root node's path is empty → flat messages):
   / `pipe(view, unwrap("regs"), src)`. Bind `model[key]` and let edits emit automatically (no
   manual send). `ModbusTable` takes its node via `model:` and binds `model[name]` per row —
   no holders, no delegate routing.
-- **Events** — `node.send(msg)` (out) and the `node.received(msg)` signal (in), for
+- **Events** — `branch.send(msg)` (out) and the `branch.received(msg)` signal (in), for
   streams/RPC that aren't state (chat log, request/response). `send` wraps `msg` in the
   node's path and `received` fires on each node with the inbound sub-message scoped to it, so
   a nested component is addressed correctly without a manual prefix. `radapter.model.send` /

@@ -126,10 +126,10 @@ function pair(key, sep)
     return up, down
 end
 
--- Lua-side analog of the QML model's node(): returns a worker exchanging
+-- Lua-side analog of the QML model's branch(): returns a worker exchanging
 -- *unwrapped* messages with `parent` under the `key` namespace. Composable:
--- the result is itself a valid parent for nested node() calls.
-function node(parent, key, sep)
+-- the result is itself a valid parent for nested branch() calls.
+function branch(parent, key, sep)
     local up, down = pair(key, sep)
     pipe(parent, up)
     pipe(up, parent)

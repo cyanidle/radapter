@@ -11,7 +11,7 @@ ApplicationWindow {
     title: win_title
 
     ModbusTable {
-        model: radapter.model.node("regs")   // the "regs" sub-tree
+        model: radapter.model.branch("regs")   // the "regs" sub-tree
         anchors.fill: parent
         anchors.margins: 8
         Component.onCompleted: {
