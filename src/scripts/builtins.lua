@@ -19,6 +19,24 @@ function unwrap(key, sep)
     end
 end
 
+-- Keep only one key path while preserving its original nesting. Returning nil
+-- for a missing key makes pipe's function wrapper suppress that message.
+-- An empty key is an explicit identity filter.
+function filter(key, sep)
+    key = key or ""
+    assert(type(key) == "string", "string expected as first arg")
+    if key == "" then
+        return function(msg)
+            return msg
+        end
+    end
+    return function(msg)
+        local value = get(msg, key, sep)
+        if value == nil then return nil end
+        return set({}, key, value, sep)
+    end
+end
+
 local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")

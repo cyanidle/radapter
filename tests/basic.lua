@@ -78,6 +78,30 @@ local first_cancel = pipe (
 
 assert(type(first_cancel) == "function", "pipe(x, y, z) should return a cancel function")
 
+-- filter() selects a field without unwrapping it and suppresses messages that
+-- do not contain the selected path.
+local filtered = {}
+local filter_source = create_worker(function(self, msg, sender)
+    notify_all(self, msg, sender)
+end)
+pipe(filter_source, filter("objects"), function(msg)
+    filtered[#filtered + 1] = msg
+end)
+filter_source({ objects = { 10, 20 }, position = { x = 1 } })
+filter_source({ position = { x = 2 } })
+assert(#filtered == 1 and filtered[1].objects[2] == 20 and filtered[1].position == nil,
+    "filter should preserve only the selected key and suppress missing keys")
+
+local nested = filter("payload/value", "/")({
+    payload = { value = false, ignored = true },
+    ignored = true,
+})
+assert(nested.payload.value == false and nested.payload.ignored == nil and nested.ignored == nil,
+    "filter should support nested paths and preserve false values")
+local identity_msg = { value = 42 }
+assert(filter("")(identity_msg) == identity_msg, "empty filter key should disable filtering")
+assert(not pcall(filter, 42), "filter key must be a string")
+
 -- Verify cancellation works: after cancelling, new messages don't reach the listener
 local collected = {}
 local tmp = create_worker(function(self, msg, sender)

@@ -46,6 +46,13 @@ function wrap(key, sep) end
 ---@return fun(object: any): any
 function unwrap(key, sep) end
 
+---Keep only `key` in a message while preserving its path. Messages without
+---the key are suppressed by `pipe`; an empty key disables filtering.
+---@param key string
+---@param sep string?
+---@return fun(object: table): table?
+function filter(key, sep) end
+
 ---@param table any[]
 function call_all(table, ...) end
 

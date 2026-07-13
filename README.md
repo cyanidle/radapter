@@ -49,6 +49,8 @@ pipe(a, b, c)            -- connect workers/functions in sequence
 on(worker, "field", fn)  -- unwrap a field before the handler
 wrap("key")              -- { v } → { key = { v } }
 unwrap("key")            -- { key = { v } } → { v }
+filter("key")            -- keep { key = ... }; suppress messages without key
+filter("")               -- identity: disable filtering
 -- path syntax: "a:b:[2]"  or  "a/b/c" (custom separator)
 
 -- Timers
