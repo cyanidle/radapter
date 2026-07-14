@@ -7,10 +7,11 @@
 ---"geometry_msgs/msg/Twist". Inbound messages arrive as { [topic] = <fields> }
 ---(nested ROS messages become nested tables keyed by field name); a per-sub
 ---`handler` is also called with just the message.
----@class ROS2Sub
+---@generic T
+---@class ROS2Sub<T>
 ---@field type string -- ROS message type ("pkg/msg/Name")
 ---@field qos integer? -- QoS history depth (default plugin value)
----@field handler fun(msg: any)? -- called per inbound message on this topic
+---@field handler fun(msg: T)? -- called per inbound message on this topic
 
 ---@class ROS2Pub
 ---@field type string -- ROS message type ("pkg/msg/Name")
@@ -27,7 +28,7 @@
 ---@field auto_init_logging boolean? -- init rcl logging
 ---@field argv string[]? -- rcl init argv
 
----@class ROS2 : Worker
+---@class ROS2 : Worker<table<string, any>, table<string, any>>
 ---@field Request fun(self: ROS2, service: string, request: any): promise<any> -- call a service client
 
 ---ROS 2 bridge worker: subscribes/publishes generic topics and calls services.

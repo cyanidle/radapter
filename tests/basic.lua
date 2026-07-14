@@ -6,6 +6,15 @@ log "Start test"
 
 log.set_handler(nil)
 
+-- merge() is a Lua builtin used by declarative plugin/node setup. It must not
+-- mutate defaults, must recurse through maps, and must replace list values.
+do
+    local defaults = { map = { resolution = 0.02, inflate = { radius = 0.1 } }, obstacles = { 1, 2 } }
+    local combined = merge(defaults, { map = { inflate = { radius = 0.2 } }, obstacles = {} })
+    assert(combined.map.resolution == 0.02 and combined.map.inflate.radius == 0.2)
+    assert(#combined.obstacles == 0 and #defaults.obstacles == 2)
+end
+
 local deep = {
     a = { b = { c = 1 } }
 }

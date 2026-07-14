@@ -53,6 +53,14 @@ function unwrap(key, sep) end
 ---@return fun(object: table): table?
 function filter(key, sep) end
 
+---Recursively overlay configuration tables without mutating either input.
+---Map fields merge by key; lists replace defaults as a unit. This is useful for
+---passing deployment-specific options to plugin workers.
+---@param defaults table?
+---@param overrides table?
+---@return table
+function merge(defaults, overrides) end
+
 ---@param table any[]
 function call_all(table, ...) end
 
@@ -301,34 +309,44 @@ log = {
     set_level = function (level) end,
 }
 
----@alias MsgHandler fun(msg: any, source: Worker): any
----@alias MsgHandlerEx fun(self: Worker, msg: any, source: Worker): any
+---@generic T
+---@alias MsgHandler fun(msg: T, source: Worker<any, T>): any
+---@generic T
+---@alias MsgHandlerEx fun(self: Worker<T, any>, msg: T, source: Worker<any, T>): any
 
----@class Events
----@field get_listeners fun(self: Pipable): MsgHandler[]
+---@generic T
+---@class Events<T>
+---@field get_listeners fun(self: Pipable<any, T>): MsgHandler<T>[]
 
----@class Pipable: Events
----@field call MsgHandlerEx
+---`Pipable<In, Out>` documents the direction of a message endpoint. `In` is
+---what calling/sending to it accepts; `Out` is what it emits to `pipe()`.
+---@generic TIn, TOut
+---@class Pipable<TIn, TOut>: Events<TOut>
+---@field call MsgHandlerEx<TIn>
 
 
----@class Worker: Pipable
----@overload fun(msg: any, source: Worker)
+---@generic TIn, TOut
+---@class Worker<TIn, TOut>: Pipable<TIn, TOut>
+---@overload fun(msg: TIn, source: Worker<any, TIn>)
 ---@field events Events
 ---@field name string auto-generated or explicitly configured unique worker name
 ---@field origin string Lua "file:line" where the worker was created, or "<CPP>"
 ---@field destroy fun(self: Worker) synchronously stop and delete the worker
 ---@field shutdown fun(self: Worker): promise<nil> asynchronously stop the worker; await it to know when it has finished
 
----@alias pipeInput (Events | MsgHandler)
+---@generic T
+---@alias pipeInput Events<T>|MsgHandler<T>
 
----@param first pipeInput
----@vararg pipeInput
+---@generic T
+---@param first pipeInput<T>
+---@vararg pipeInput<T>
 ---@return fun() cancel -- removes all subscriptions created by this pipe() call
 function pipe(first, ...) end
 
----@param source pipeInput
+---@generic T
+---@param source pipeInput<T>
 ---@param part string
----@param handler pipeInput
+---@param handler pipeInput<T>
 ---@return fun() cancel -- removes the subscription created by this on() call
 function on(source, part, handler) end
 
@@ -339,17 +357,19 @@ function on(source, part, handler) end
 ---does not echo.
 ---@param key string
 ---@param sep string? path separator (see get/set)
----@return Pipable up # transport-facing side (wrapped messages)
----@return Pipable down # child-facing side (unwrapped messages)
+---@generic T
+---@return Pipable<{[string]: T}, T> up # transport-facing side (wrapped messages)
+---@return Pipable<T, {[string]: T}> down # child-facing side (unwrapped messages)
 function pair(key, sep) end
 
 ---Lua-side analog of the QML model's branch(): returns a worker exchanging
 ---*unwrapped* messages with `parent` under the `key` namespace. The result is
 ---itself a valid parent for nested branch() calls.
----@param parent pipeInput
+---@generic TIn, TOut
+---@param parent Pipable<TIn, TOut>
 ---@param key string
 ---@param sep string? path separator (see get/set)
----@return Pipable
+---@return Pipable<any, any>
 function branch(parent, key, sep) end
 
 ---@param worker Worker

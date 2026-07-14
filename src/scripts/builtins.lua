@@ -37,6 +37,38 @@ function filter(key, sep)
     end
 end
 
+-- Recursively overlay an options table without mutating either input. Maps are
+-- merged by key; non-empty lists replace the default list so configuration can
+-- override e.g. a plugin's default obstacles as one value. An empty override
+-- replaces a default only when that default is already a non-empty list (Lua
+-- has no native empty-list/empty-map distinction).
+local function is_list(value)
+    return type(value) == "table" and #value > 0
+end
+
+---@param defaults table?
+---@param overrides table?
+---@return table
+function merge(defaults, overrides)
+    assert(defaults == nil or type(defaults) == "table", "table or nil expected as first arg")
+    assert(overrides == nil or type(overrides) == "table", "table or nil expected as second arg")
+    if overrides and (is_list(overrides) or is_list(defaults)) then
+        local list = {}
+        for index, value in ipairs(overrides) do
+            list[index] = type(value) == "table" and merge(nil, value) or value
+        end
+        return list
+    end
+    local result = {}
+    for key, value in pairs(defaults or {}) do
+        result[key] = type(value) == "table" and merge(value, nil) or value
+    end
+    for key, value in pairs(overrides or {}) do
+        result[key] = type(value) == "table" and merge(result[key], value) or value
+    end
+    return result
+end
+
 local function connect(target, ipipe)
     local all = target:get_listeners()
     assert(type(all) == "table", ":get_listeners() should return a table")
