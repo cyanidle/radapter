@@ -1097,6 +1097,7 @@ function CAN(params) end
 ---@field can CanWorker
 ---@field node_id number
 ---@field heartbeat_period number?
+---@field tx_timeout number? tx deadline for queued frames, ms (default 200)
 ---@field tx_cap number?
 ---@field subscribe table<string, CyphalTopic>?
 ---@field publish table<string, CyphalTopic>?

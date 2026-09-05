@@ -90,6 +90,7 @@ struct CyphalConfig : WorkerConfig
     QObject* can;
     CanardNodeID node_id;
     WithDefault<int> heartbeat_period = 1000;
+    WithDefault<int> tx_timeout = 200;
     WithDefault<size_t> tx_cap = 100ull;
     WithDefault<std::map<QString, CyphalTopic>> subscribe;
     WithDefault<std::map<QString, CyphalTopic>> publish;
@@ -103,6 +104,7 @@ RAD_DESCRIBE(CyphalConfig)
     RAD_MEMBER(can);
     RAD_MEMBER(node_id);
     RAD_MEMBER(heartbeat_period);
+    RAD_MEMBER(tx_timeout);
     RAD_MEMBER(tx_cap);
     RAD_MEMBER(subscribe);
     RAD_MEMBER(publish);
@@ -285,7 +287,7 @@ public:
         size_t buf_size = dyn->extent;
         auto* buf = static_cast<uint8_t*>(arena.Allocate(buf_size, 1));
         dyn->serialize(msg, buf, buf_size);
-        auto err = canardTxPush(&tx, &canard, 0, meta, buf_size, buf);
+        auto err = canardTxPush(&tx, &canard, micros() + uint64_t(config.tx_timeout.value) * 1000, meta, buf_size, buf);
         if (err == -CANARD_ERROR_INVALID_ARGUMENT) {
             Raise("Could not push msg of type: {}: Invalid Argument", QString(dyn->name_and_ver.data(), int(dyn->name_and_ver.size())));
         }
@@ -377,7 +379,10 @@ private:
         size_t hbeat_ser_buf_size = uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;
         uint8_t hbeat_ser_buf[uavcan_node_Heartbeat_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_];
         uavcan_node_Heartbeat_1_0_serialize_(&test_heartbeat, hbeat_ser_buf, &hbeat_ser_buf_size);
-        canardTxPush(&tx, &canard, 0, &transfer_metadata, hbeat_ser_buf_size, hbeat_ser_buf);
+        auto err = canardTxPush(&tx, &canard, micros() + uint64_t(config.tx_timeout.value) * 1000, &transfer_metadata, hbeat_ser_buf_size, hbeat_ser_buf);
+        if (err < 0) {
+            Error("Could not push heartbeat: {}", int(err));
+        }
         processTx();
     }
     static uint64_t micros() {
@@ -388,16 +393,26 @@ private:
         auto* ican = can.data();
         if (!ican) {
             Error("Could not send frame: can is dead");
+            return;
         }
+        auto* device = ican->get_device();
         for (const CanardTxQueueItem* ti = NULL; (ti = canardTxPeek(&tx)) != NULL;)
         {
-            if ((0U == ti->tx_deadline_usec) || (ti->tx_deadline_usec > micros()))  // Check the deadline.
+            if (ti->tx_deadline_usec != 0U && ti->tx_deadline_usec <= micros())
+            {
+                Warn("Dropping expired frame, can id: {:x}", ti->frame.extended_can_id);
+            }
+            else
             {
                 QCanBusFrame frame;
                 frame.setExtendedFrameFormat(true);
                 frame.setFrameId(ti->frame.extended_can_id);
                 frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
-                can->get_device()->writeFrame(frame);
+                if (!device->writeFrame(frame)) {
+                    // keep the item queued; the next processTx() (publish/request/heartbeat) retries
+                    Error("Could not write CAN frame: {}", device->errorString());
+                    break;
+                }
             }
             canard.memory_free(&canard, canardTxPop(&tx, ti));
         }
