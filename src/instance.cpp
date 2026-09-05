@@ -588,6 +588,11 @@ void Instance::Shutdown(unsigned int timeout)
         }
     }
     d->shutdownHandlers.clear();
+    // each()/after() timers are direct children; stop them so they can't fire Lua
+    // callbacks into workers that are already mid-teardown
+    for (auto* t : findChildren<QTimer*>(QString(), Qt::FindDirectChildrenOnly)) {
+        t->stop();
+    }
     emit ShutdownRequest();
     QTimer::singleShot(timeout, this, [this]{
         if (!std::exchange(d->shutdownDone, true)) {
