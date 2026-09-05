@@ -41,6 +41,7 @@ public:
                 config.plugin,
                 fmt::join(bus->availableDevices(config.plugin), ", "));
         }
+        device->setParent(this);
         connect(device, &QCanBusDevice::framesReceived, this, &CanWorker::on_framesReceived);
         connect(device, &QCanBusDevice::errorOccurred, this, &CanWorker::on_errorOccurred);
         connect(device, &QCanBusDevice::framesWritten, this, &CanWorker::on_framesWritten);
@@ -71,6 +72,13 @@ public:
     QCanBusDevice* get_device() override
     {
         return device;
+    }
+    void Destroy() override
+    {
+        if (device) {
+            device->disconnectDevice();
+        }
+        ICanWorker::Destroy();
     }
 	void OnMsg(QVariant const& _msg) override {
         QCanBusFrame frame;
