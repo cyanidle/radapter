@@ -137,6 +137,7 @@ private:
     CanardTxQueue tx;
     QPointer<ICanWorker> can;
     QTime start;
+    bool in_process_tx = false;
     std::unordered_map<CanardPortID, CanardTransferID> pub_tids;
 
     struct RxSub : CanardRxSubscription
@@ -390,6 +391,12 @@ private:
         return std::chrono::duration_cast<std::chrono::duration<uint64_t, std::micro>>(ts).count();
     }
     void processTx() {
+        // framesWritten can be emitted synchronously from writeFrame(); a Lua listener
+        // publishing from it would reenter here and double-pop the current item
+        if (std::exchange(in_process_tx, true)) {
+            return;
+        }
+        defer reset([this]{ in_process_tx = false; });
         auto* ican = can.data();
         if (!ican) {
             Error("Could not send frame: can is dead");
