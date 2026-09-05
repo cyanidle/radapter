@@ -407,7 +407,7 @@ private:
                 QCanBusFrame frame;
                 frame.setExtendedFrameFormat(true);
                 frame.setFrameId(ti->frame.extended_can_id);
-                frame.setPayload(QByteArray::fromRawData(reinterpret_cast<const char*>(ti->frame.payload), static_cast<int>(ti->frame.payload_size)));
+                frame.setPayload(QByteArray(reinterpret_cast<const char*>(ti->frame.payload), qsizetype(ti->frame.payload_size)));
                 if (!device->writeFrame(frame)) {
                     // keep the item queued; the next processTx() (publish/request/heartbeat) retries
                     Error("Could not write CAN frame: {}", device->errorString());
