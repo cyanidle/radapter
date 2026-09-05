@@ -147,6 +147,34 @@ radapter is a C++/Qt6 engine with a public SDK (`include/radapter/`). Three ways
 
 Config structs are plain C++ structs annotated with `RAD_DESCRIBE`/`RAD_MEMBER`. The engine derives validation, conversion, and `--schema` output from that reflection automatically.
 
+### Native Plugin Lookup
+
+`load_plugin("gaz_nav")` can load `libgaz_nav.so` without a hard-coded path.
+Short names (no directory separators) are tried in this order:
+
+1. Existing `QPluginLoader` lookup, including Qt's configured library paths
+   (`QT_PLUGIN_PATH`, `qt.conf`, and the executable directory).
+2. `/usr/lib/radapter/plugins`.
+3. The executable directory, explicitly.
+4. The executable's `plugins` subdirectory.
+
+Qt handles platform library prefixes and suffixes; `gaz_nav` and `libgaz_nav.so`
+both work on Linux. Absolute paths and relative paths containing directory
+separators are passed to Qt unchanged, without the additional fallbacks. No
+global Qt library paths are changed. Extra Lua arguments still go to the plugin's
+`Initialize` method, and loading the same plugin twice in one instance is an error.
+Load failures include each attempted candidate and its Qt error.
+
+For a headless Debian deployment, build with `RADAPTER_GUI=OFF` and
+`RADAPTER_STATIC=OFF` (static SDK builds do not support runtime plugins). Install
+application plugins under `/usr/lib/radapter/plugins`. Their dependencies,
+including `libradapter-sdk.so`, must still be discoverable by the OS dynamic
+linker; plugin lookup does not configure dependency search paths.
+
+Invoke an installed script by absolute path from any working directory, e.g.
+`/usr/bin/radapter /usr/share/gaz_cart/cart.lua`. Sibling Lua modules are resolved
+relative to that script by `EvalFile`; native short names use the paths above.
+
 ## LuaJIT
 
 ```bash

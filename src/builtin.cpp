@@ -12,6 +12,8 @@
 #include "builtin.hpp"
 #include "glua/glua.hpp"
 #include <QPluginLoader>
+#include <QCoreApplication>
+#include <QDir>
 #include <QStringDecoder>
 
 using namespace radapter;
@@ -875,10 +877,24 @@ int builtin::api::LoadPlugin(lua_State *L)
     auto args = help::toArgs(L, 2);
     auto* self = Instance::FromLua(L);
     auto already_loaded = self->findChildren<QPluginLoader*>(QString(), Qt::FindDirectChildrenOnly);
-    auto* loader = new QPluginLoader(path, self);
+    QStringList candidates{path};
+    if (!path.isEmpty() && QDir::isRelativePath(path)
+        && !path.contains('/') && !path.contains('\\')) {
+        const QDir exeDir(QCoreApplication::applicationDirPath());
+        candidates << QDir(QStringLiteral("/usr/lib/radapter/plugins")).filePath(path)
+                   << exeDir.filePath(path)
+                   << exeDir.filePath(QStringLiteral("plugins/") + path);
+    }
+    auto* loader = new QPluginLoader(self);
     try {
-        if (!loader->load()) {
-            Raise("Could not load {} => {}", path, loader->errorString());
+        QStringList errors;
+        for (const auto& candidate : candidates) {
+            loader->setFileName(candidate);
+            if (loader->load()) break;
+            errors << QStringLiteral("%1 => %2").arg(candidate, loader->errorString());
+        }
+        if (!loader->isLoaded()) {
+            Raise("Could not load {} => {}", path, errors.join(QStringLiteral("\n")));
         }
         for (auto* l: already_loaded) {
             if (l->instance() == loader->instance())

@@ -1,5 +1,9 @@
 ---@meta radapter
 
+---Load a native plugin, forwarding extra arguments to its Initialize method.
+---Short names use Qt's plugin lookup first, then /usr/lib/radapter/plugins,
+---the executable directory, and its plugins subdirectory. Qt supplies platform
+---library prefixes/suffixes. Explicit paths retain Qt's existing path behavior.
 ---@param path string
 function load_plugin(path, ...) end
 
