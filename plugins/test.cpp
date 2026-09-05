@@ -36,6 +36,7 @@ public:
 
 RADAPTER_PLUGIN(Test, "radapter.plugins.Test") {
     radapter->Info("global!", "Log on plugin load!");
+    radapter->RegisterGlobal("test_plugin_args", args);
     radapter->RegisterWorker<TestPlugin>("TestPlugin");
 }
 

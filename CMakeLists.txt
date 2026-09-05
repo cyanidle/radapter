@@ -201,6 +201,19 @@ endif()
 
 enable_testing()
 
+if (NOT RADAPTER_SDK_ONLY AND NOT RADAPTER_STATIC)
+    add_test(NAME plugin_search
+        COMMAND ${CMAKE_COMMAND}
+            -DRADAPTER=$<TARGET_FILE:radapter>
+            -DSDK=$<TARGET_FILE:radapter-sdk>
+            -DPLUGIN=$<TARGET_FILE:radapter_test_plugin>
+            -DPREFIX=${CMAKE_SHARED_LIBRARY_PREFIX}
+            -DSUFFIX=${CMAKE_SHARED_LIBRARY_SUFFIX}
+            -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/plugin-search-test
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/search.cmake)
+    set_tests_properties(plugin_search PROPERTIES TIMEOUT 30)
+endif()
+
 file(GLOB RADAPTER_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.lua")
 
 foreach(test_file ${RADAPTER_TESTS})
