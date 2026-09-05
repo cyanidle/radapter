@@ -360,7 +360,11 @@ public:
                 CANARD_NODE_ID_UNSET,
                 pub_tids[port]++,
             };
-            pushMsg(&transfer_metadata, dyn, v);
+            try {
+                pushMsg(&transfer_metadata, dyn, v);
+            } catch (std::exception& e) {
+                Error("Could not publish {}: {}", k, e.what());
+            }
         }
         processTx();
     }
