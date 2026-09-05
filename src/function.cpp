@@ -15,6 +15,7 @@ QVariant LuaFunction::Call(QVariantList const& args, TracebackMode trace) const
     if (trace) {
         lua_pushcfunction(_L, builtin::traceback);
     }
+    auto base = trace ? lua_gettop(_L) - 1 : lua_gettop(_L);
     auto msgh = trace ? lua_gettop(_L) : 0;
     lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
     for (auto& a: args) {
@@ -22,9 +23,13 @@ QVariant LuaFunction::Call(QVariantList const& args, TracebackMode trace) const
     }
     auto status = lua_pcall(_L, args.size(), 1, msgh);
     if (status != LUA_OK) {
-        Raise("{}", lua_tostring(_L, -1));
+        auto err = QString::fromUtf8(lua_tostring(_L, -1));
+        lua_settop(_L, base);
+        Raise("{}", err);
     }
-    return builtin::help::toQVar(_L);
+    auto res = builtin::help::toQVar(_L);
+    lua_settop(_L, base);
+    return res;
 }
 
 fut::Future<QVariant> LuaFunction::CallAsync(QVariantList args, TracebackMode mode) const
