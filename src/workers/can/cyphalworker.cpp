@@ -137,6 +137,7 @@ private:
     CanardTxQueue tx;
     QPointer<ICanWorker> can;
     QTime start;
+    bool is_fd = false;
     bool in_process_tx = false;
     std::unordered_map<CanardPortID, CanardTransferID> pub_tids;
 
@@ -187,7 +188,7 @@ public:
         canard = canardInit(CANARD_WRAP(memAllocate), CANARD_WRAP(memFree));
         canard.user_reference = this;
         canard.node_id = config.node_id;
-        bool is_fd = can->get_device()->configurationParameter(QCanBusDevice::CanFdKey).toBool();
+        is_fd = can->get_device()->configurationParameter(QCanBusDevice::CanFdKey).toBool();
         tx = canardTxInit(config.tx_cap, is_fd ? CANARD_MTU_CAN_FD : CANARD_MTU_CAN_CLASSIC);
         QTimer* hb = new QTimer(this);
         hb->callOnTimeout(this, &CyphalWorker::heartbeat);
@@ -415,6 +416,10 @@ private:
                 frame.setExtendedFrameFormat(true);
                 frame.setFrameId(ti->frame.extended_can_id);
                 frame.setPayload(QByteArray(reinterpret_cast<const char*>(ti->frame.payload), qsizetype(ti->frame.payload_size)));
+                if (is_fd) {
+                    frame.setFlexibleDataRateFormat(true);
+                    frame.setBitrateSwitch(true);
+                }
                 if (!device->writeFrame(frame)) {
                     // keep the item queued; the next processTx() (publish/request/heartbeat) retries
                     Error("Could not write CAN frame: {}", device->errorString());
