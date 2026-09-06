@@ -470,27 +470,44 @@ public:
     void runWait(int ms) { busyWaitMs(ms); }
 
     void mouseClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
-        auto* win = checkWindow();
+        QPointer<QQuickWindow> win = checkWindow();
         auto button = btnFromStr(btn);
         auto gp = toGlobal(win, x, y);
+        // Each QMouseEvent must be constructed only after the previous one was
+        // delivered: the ctor snapshots the pointing device's persistent point
+        // state, which carries the exclusive grab set by the press. Constructing
+        // the release up front would leave it ungrabbed, and the delivery agent
+        // drops ungrabbed release events — Controls then stay stuck in "pressed".
         QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &press);
+        processEvents();
+        if (!win) return; // destroyed by the press (e.g. a close button)
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &release);
         processEvents();
     }
 
+    // Note: the injected MouseButtonDblClick is dropped by Qt's delivery agent
+    // (double-click events are normally synthesized by the platform from a
+    // second press, and a hand-sent one does not reproduce that state), so this
+    // currently behaves as a single click: onDoubleClicked will not fire.
     void mouseDblClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
-        auto* win = checkWindow();
+        QPointer<QQuickWindow> win = checkWindow();
         auto button = btnFromStr(btn);
         auto gp = toGlobal(win, x, y);
         QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
-        QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QMouseEvent release2(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &press);
+        processEvents();
+        if (!win) return;
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &release);
+        processEvents();
+        if (!win) return;
+        QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(x, y), gp, button, button, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &dbl);
+        processEvents();
+        if (!win) return;
+        QMouseEvent release2(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &release2);
         processEvents();
     }
@@ -500,6 +517,7 @@ public:
         auto button = btnFromStr(btn);
         QMouseEvent e(QEvent::MouseButtonPress, QPointF(x, y), toGlobal(win, x, y), button, button, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &e);
+        processEvents();
     }
 
     void mouseRelease(qreal x, qreal y, QString const& btn) {
@@ -507,6 +525,7 @@ public:
         auto button = btnFromStr(btn);
         QMouseEvent e(QEvent::MouseButtonRelease, QPointF(x, y), toGlobal(win, x, y), button, Qt::NoButton, Qt::NoModifier);
         QCoreApplication::sendEvent(win, &e);
+        processEvents();
     }
 
     void mouseMove(qreal x, qreal y) {
