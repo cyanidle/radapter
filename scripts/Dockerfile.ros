@@ -11,6 +11,11 @@
 # Quick cross-compile and extract the plugin:
 #   docker build -f scripts/Dockerfile.ros --target cross-pkg --output=out .
 #   ls out/radapter_ros_aarch64.so
+#
+# Build the radapter-ros DEB (ROS 2 Jazzy runtime dependencies included):
+#   docker build -f scripts/Dockerfile.ros --target native-deb-pkg --output=out .
+#   docker build -f scripts/Dockerfile.ros --target cross-deb-pkg --output=out .
+#   ls out/radapter-ros_*.deb
 
 ARG TARGET_PLATFORM=arm64
 ARG TARGET_ARCH=aarch64
@@ -119,6 +124,21 @@ RUN --mount=type=cache,target=/cpm \
     && cmake --build /build -j$(nproc) --target radapter_ros"
 
 # ═══════════════════════════════════════════════════════════════════════
+# Stage: cross-deb — full build + CPack (engine and ros-plugin DEBs)
+# ═══════════════════════════════════════════════════════════════════════
+FROM cross-builder AS cross-deb
+WORKDIR /build
+RUN --mount=type=cache,target=/cpm \
+    bash -c "source /opt/ros/jazzy/setup.bash && \
+        cmake --build /build -j$(nproc) && cpack -G DEB"
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: cross-deb-pkg — extract the radapter-ros DEB
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS cross-deb-pkg
+COPY --from=cross-deb /build/radapter-ros_*.deb /
+
+# ═══════════════════════════════════════════════════════════════════════
 # Stage: cross-pkg — extract the cross-compiled plugin with arch suffix
 # ═══════════════════════════════════════════════════════════════════════
 FROM scratch AS cross-pkg
@@ -143,6 +163,21 @@ RUN --mount=type=cache,target=/cpm \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -G Ninja -B /build \
     && cmake --build /build -j$(nproc) --target radapter_ros"
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: native-deb — full build + CPack (engine and ros-plugin DEBs)
+# ═══════════════════════════════════════════════════════════════════════
+FROM native-builder AS native-deb
+WORKDIR /build
+RUN --mount=type=cache,target=/cpm \
+    bash -c "source /opt/ros/jazzy/setup.bash && \
+        cmake --build /build -j$(nproc) && cpack -G DEB"
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage: native-deb-pkg — extract the radapter-ros DEB
+# ═══════════════════════════════════════════════════════════════════════
+FROM scratch AS native-deb-pkg
+COPY --from=native-deb /build/radapter-ros_*.deb /
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: native-pkg — extract the native-compiled plugin with arch suffix

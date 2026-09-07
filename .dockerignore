@@ -1,4 +1,7 @@
 build/
+build-jit/
+out/
+.cache/
 .vscode/
 .vs/
 *.user

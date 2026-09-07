@@ -166,7 +166,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)
 endif()
 
-install(TARGETS radapter-sdk EXPORT radapter-config)
+install(TARGETS radapter-sdk EXPORT radapter-config COMPONENT radapter_runtime)
 install(DIRECTORY include/radapter DESTINATION include)
 install(FILES ${CMAKE_BINARY_DIR}/_info/radapter_info.hpp DESTINATION include/radapter)
 
@@ -187,7 +187,7 @@ if (NOT RADAPTER_SDK_ONLY)
         argparse
         efsw-static
         radapter-sdk)
-    install(TARGETS radapter EXPORT radapter-config)
+    install(TARGETS radapter EXPORT radapter-config COMPONENT radapter_runtime)
 
     create_radapter_plugin(radapter_test_plugin
         FILES plugins/test.cpp

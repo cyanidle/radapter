@@ -63,6 +63,31 @@ set(CPACK_DEBIAN_PACKAGE_NAME       "${CPACK_PACKAGE_NAME}")
 set(CPACK_PACKAGE_VERSION           "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME         "${CPACK_PACKAGE_NAME}")
 
+# ============================================================================
+# ROS2 plugin packaging: with RADAPTER_ROS2=ON, switch to component install —
+# one DEB for the engine (radapter-headless/radapter-gui) and one for the
+# plugin (radapter-ros). The plugin DEB carries the ROS 2 Jazzy runtime
+# dependencies, so installing it on a target pulls in (and thus verifies)
+# a matching ROS 2 installation.
+# ============================================================================
+if(RADAPTER_ROS2 AND NOT RADAPTER_SDK_ONLY AND NOT RADAPTER_STATIC AND TARGET radapter_ros)
+    install(TARGETS radapter_ros
+        LIBRARY DESTINATION lib/radapter/plugins
+        COMPONENT ros_plugin)
+    set(CPACK_DEB_COMPONENT_INSTALL ON)
+    set(CPACK_COMPONENTS_GROUPING IGNORE)
+    set(CPACK_COMPONENTS_ALL radapter_runtime ros_plugin)
+    set(CPACK_DEBIAN_RADAPTER_RUNTIME_PACKAGE_NAME "${CPACK_PACKAGE_NAME}")
+    set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_NAME "radapter-ros")
+    # CPackDeb falls back to the engine-wide Conflicts (radapter-gui) when the
+    # per-component variable is undefined — that would break the alternation below.
+    set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_CONFLICTS "")
+    # The plugin links rclcpp and the introspection typesupport directly;
+    # Qt and the rest of the ROS client stack arrive transitively.
+    set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_DEPENDS
+        "radapter-headless | radapter-gui, ros-jazzy-rclcpp, ros-jazzy-rosidl-typesupport-introspection-cpp")
+endif()
+
 # Install prefix for Debian packaging
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Install prefix for DEB packaging" FORCE)
@@ -84,3 +109,9 @@ set(CPACK_SOURCE_TZ    OFF)
 set(CPACK_SOURCE_ZIP   OFF)
 
 include(CPack)
+
+if(CPACK_DEB_COMPONENT_INSTALL)
+    foreach(component IN LISTS CPACK_COMPONENTS_ALL)
+        cpack_add_component(${component})
+    endforeach()
+endif()
