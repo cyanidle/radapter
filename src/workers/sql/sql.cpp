@@ -141,9 +141,9 @@ public:
         });
         if (args.size() == 1 || (args.size() == 2 && !cb)) {
             //async signature
-            return makeLuaPromise(this, future);
+            return MakeLuaPromise(this, future);
         } else {
-            resolveLuaCallback(this, future, cb);
+            ResolveLuaCallback(this, future, cb);
             return {};
         }
     }

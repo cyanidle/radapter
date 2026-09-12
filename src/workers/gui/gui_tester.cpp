@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <optional>
 
+#include "radapter/async_helpers.hpp"
 #include "radapter/radapter.hpp"
 #include "builtin.hpp"
 #include "instance_impl.hpp"
@@ -467,82 +468,89 @@ private:
     // signature already matches (see qml_test_init); wrappers exist only where a
     // call needs default/optional/variadic handling.
 public:
-    void runWait(int ms) { busyWaitMs(ms); }
-
-    void mouseClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
-        QPointer<QQuickWindow> win = checkWindow();
-        auto button = btnFromStr(btn);
-        auto gp = toGlobal(win, x, y);
-        // Each QMouseEvent must be constructed only after the previous one was
-        // delivered: the ctor snapshots the pointing device's persistent point
-        // state, which carries the exclusive grab set by the press. Constructing
-        // the release up front would leave it ungrabbed, and the delivery agent
-        // drops ungrabbed release events — Controls then stay stuck in "pressed".
-        QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &press);
-        processEvents();
-        if (!win) return; // destroyed by the press (e.g. a close button)
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &release);
-        processEvents();
+    void runWait(int ms) {
+        RunOnLoop(this, [&]{
+            busyWaitMs(ms);
+        });
     }
 
-    // Note: the injected MouseButtonDblClick is dropped by Qt's delivery agent
-    // (double-click events are normally synthesized by the platform from a
-    // second press, and a hand-sent one does not reproduce that state), so this
-    // currently behaves as a single click: onDoubleClicked will not fire.
+    void mouseClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
+        RunOnLoop(this, [&] {
+            QPointer<QQuickWindow> win = checkWindow();
+            auto button = btnFromStr(btn);
+            auto gp = toGlobal(win, x, y);
+            QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &press);
+            processEvents();
+            if (!win) return; // destroyed by the press (e.g. a close button)
+            QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &release);
+            processEvents();
+        });
+    }
+
     void mouseDblClick(qreal x, qreal y, QString const& btn = QStringLiteral("left")) {
-        QPointer<QQuickWindow> win = checkWindow();
-        auto button = btnFromStr(btn);
-        auto gp = toGlobal(win, x, y);
-        QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &press);
-        processEvents();
-        if (!win) return;
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &release);
-        processEvents();
-        if (!win) return;
-        QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(x, y), gp, button, button, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &dbl);
-        processEvents();
-        if (!win) return;
-        QMouseEvent release2(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &release2);
-        processEvents();
+        RunOnLoop(this, [&] {
+            QPointer<QQuickWindow> win = checkWindow();
+            auto button = btnFromStr(btn);
+            auto gp = toGlobal(win, x, y);
+            QMouseEvent press(QEvent::MouseButtonPress, QPointF(x, y), gp, button, button, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &press);
+            processEvents();
+            if (!win) return;
+            QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &release);
+            processEvents();
+            if (!win) return;
+            QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(x, y), gp, button, button, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &dbl);
+            processEvents();
+            if (!win) return;
+            QMouseEvent release2(QEvent::MouseButtonRelease, QPointF(x, y), gp, button, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &release2);
+            processEvents();
+        });
     }
 
     void mousePress(qreal x, qreal y, QString const& btn) {
-        auto* win = checkWindow();
-        auto button = btnFromStr(btn);
-        QMouseEvent e(QEvent::MouseButtonPress, QPointF(x, y), toGlobal(win, x, y), button, button, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &e);
-        processEvents();
+        RunOnLoop(this, [&] {
+            auto* win = checkWindow();
+            auto button = btnFromStr(btn);
+            QMouseEvent e(QEvent::MouseButtonPress, QPointF(x, y), toGlobal(win, x, y), button, button, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &e);
+            processEvents();
+        });
     }
 
     void mouseRelease(qreal x, qreal y, QString const& btn) {
-        auto* win = checkWindow();
-        auto button = btnFromStr(btn);
-        QMouseEvent e(QEvent::MouseButtonRelease, QPointF(x, y), toGlobal(win, x, y), button, Qt::NoButton, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &e);
-        processEvents();
+        RunOnLoop(this, [&] {
+            auto* win = checkWindow();
+            auto button = btnFromStr(btn);
+            QMouseEvent e(QEvent::MouseButtonRelease, QPointF(x, y), toGlobal(win, x, y), button, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &e);
+            processEvents();
+        });
     }
 
     void mouseMove(qreal x, qreal y) {
-        auto* win = checkWindow();
-        QMouseEvent e(QEvent::MouseMove, QPointF(x, y), toGlobal(win, x, y),
-                      Qt::NoButton, Qt::NoButton, Qt::NoModifier);
-        QCoreApplication::sendEvent(win, &e);
+        RunOnLoop(this, [&] {
+            auto* win = checkWindow();
+            QMouseEvent e(QEvent::MouseMove, QPointF(x, y), toGlobal(win, x, y),
+                        Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(win, &e);
+        });
     }
 
     void mouseWheel(qreal x, qreal y, int delta) {
-        auto* win = checkWindow();
-        auto gp = toGlobal(win, x, y);
-        auto angleDelta = QPoint(0, delta);
-        QWheelEvent e(QPointF(x, y), gp, QPoint(), angleDelta,
-                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
-        QCoreApplication::sendEvent(win, &e);
-        processEvents();
+        RunOnLoop(this, [&] {
+            auto* win = checkWindow();
+            auto gp = toGlobal(win, x, y);
+            auto angleDelta = QPoint(0, delta);
+            QWheelEvent e(QPointF(x, y), gp, QPoint(), angleDelta,
+                        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(win, &e);
+            processEvents();
+        });
     }
 
     void clickItem(QString const& itemName) {
@@ -558,24 +566,31 @@ public:
     }
 
     void pressKey(int key, Qt::KeyboardModifiers mods, QString const& text) {
+        RunOnLoop(this, [&] {
         auto* win = checkWindow();
         QKeyEvent e(QEvent::KeyPress, key, mods, text);
         QCoreApplication::sendEvent(win, &e);
+        });
     }
 
     void releaseKey(int key, Qt::KeyboardModifiers mods, QString const& text) {
+        RunOnLoop(this, [&] {
         auto* win = checkWindow();
         QKeyEvent e(QEvent::KeyRelease, key, mods, text);
         QCoreApplication::sendEvent(win, &e);
+        });
     }
 
     void clickKey(int key, Qt::KeyboardModifiers mods, QString const& text = QString{}) {
+        RunOnLoop(this, [&] {
         pressKey(key, mods, text);
         releaseKey(key, mods, text);
         processEvents();
+        });
     }
 
     void typeText(QString const& text) {
+        RunOnLoop(this, [&] {
         for (auto const& ch : text) {
             int key = 0;
             QString txt(ch);
@@ -586,10 +601,15 @@ public:
             clickKey(key, Qt::NoModifier, txt);
             runWait(5);
         }
+        });
     }
 
     bool doScreenshot(QString const& path) {
-        return grabWindowTo(checkWindow(), path);
+        bool res;
+        RunOnLoop(this, [&] {
+            res = grabWindowTo(checkWindow(), path);
+        });
+        return res;
     }
 
     void startRecording() {
@@ -605,18 +625,24 @@ public:
     }
 
     void replayFile(QString const& path, double speed) {
-        QFile f(path);
-        if (!f.open(QIODevice::ReadOnly))
-            Raise("QML_Tester.replay: cannot open '{}'", path);
-        replayEventsOn(checkWindow(), parseEventsArray(f.readAll(), "QML_Tester.replay"), speed);
+        RunOnLoop(this, [&] {
+            QFile f(path);
+            if (!f.open(QIODevice::ReadOnly))
+                Raise("QML_Tester.replay: cannot open '{}'", path);
+            replayEventsOn(checkWindow(), parseEventsArray(f.readAll(), "QML_Tester.replay"), speed);
+        });
     }
 
     void replayJson(QString const& jsonData, double speed) {
-        replayEventsOn(checkWindow(), parseEventsArray(jsonData.toUtf8(), "QML_Tester.replay_data"), speed);
+        RunOnLoop(this, [&] {
+            replayEventsOn(checkWindow(), parseEventsArray(jsonData.toUtf8(), "QML_Tester.replay_data"), speed);
+        });
     }
 
     void processEvents() {
-        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        RunOnLoop(this, [&] {
+            QCoreApplication::processEvents(QEventLoop::AllEvents);
+        });
     }
 
     void setWindowIndex(int idx) {
@@ -670,12 +696,18 @@ public:
     }
 
     QVariant prop(QString name, std::optional<QString> sub) {
-        return sub ? itemProperty(name, *sub) : itemProperty(name);
+        QVariant res;
+        RunOnLoop(this, [&] {
+            res = sub ? itemProperty(name, *sub) : itemProperty(name);
+        });
+        return res;
     }
 
     void set_prop(QString name, QVariant a, std::optional<QVariant> b) {
-        if (b) setItemProperty(name, a.toString(), *b);
-        else setItemProperty(name, a);
+        RunOnLoop(this, [&] {
+            if (b) setItemProperty(name, a.toString(), *b);
+            else setItemProperty(name, a);
+        });
     }
 
     QVariantList center(std::optional<QString> name) {
@@ -691,7 +723,9 @@ public:
     void replay_data(QString json, std::optional<double> speed) { replayJson(json, speed.value_or(1.0)); }
 
     void click_item(std::optional<QString> name) {
-        if (name) clickItem(*name); else clickItem();
+        RunOnLoop(this, [&] {
+            if (name) clickItem(*name); else clickItem();
+        });
     }
 
     // key + arbitrary modifiers → raw arg list

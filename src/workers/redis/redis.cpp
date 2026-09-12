@@ -211,7 +211,7 @@ public:
     QVariant Exec(QVariantList args) {
         QStringList rawcmd = args.value(0).toString().split(' ');
         RedisCmd cmd;
-        for (auto& part: qAsConst(rawcmd)) {
+        for (auto& part: std::as_const(rawcmd)) {
             cmd.Temp(part.toStdString());
         }
         int funcIdx = 1;
@@ -224,10 +224,10 @@ public:
         auto future = client->Execute(cmd);
         if (args.size() == funcIdx) {
             //async signature
-            return makeLuaPromise(this, future);
+            return MakeLuaPromise(this, future);
         } else {
             LuaFunction cb = args.value(funcIdx).value<LuaFunction>();
-            resolveLuaCallback(this, future, cb);
+            ResolveLuaCallback(this, future, cb);
             return {};
         }
     }

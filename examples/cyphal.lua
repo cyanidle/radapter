@@ -8,12 +8,12 @@ Cyphal {
         {
             type = "uavcan.node.ExecuteCommand.1.2",
             port = 400,
-            handler = async(function(req)
+            handler = function(req)
                 log("Req: {}", req)
                 return {
                     status = 1
                 }
-            end)
+            end
         }
     }
 }
@@ -32,13 +32,12 @@ local executeParams = {
     port = 400,
 }
 
-async(function (x, y, z)
-    local promise = node2:Request(executeParams, {
+spawn(function (x, y, z)
+    local res, err = node2:Request(executeParams, {
         command = 65529,
         parameter = "kekus",
-    })
-    local res, err = await(promise)
+    }):await()
     log("Res: {}. Err: {}", res, err)
-end)(1, 2, 3)
+end, 1, 2, 3)
 
 

@@ -163,8 +163,6 @@ inline void Push(lua_State* L, radapter::LuaValue const& val) {
 namespace radapter::builtin {
 
 int traceback(lua_State* L) noexcept;
-int json_decode(lua_State* L);
-int json_encode(lua_State* L);
 
 namespace help {
 
@@ -185,6 +183,10 @@ int Set(lua_State* L);
 int Each(lua_State* L);
 int After(lua_State* L);
 int LoadPlugin(lua_State* L);
+int AwaitNative(lua_State* L);
+int SpawnNative(lua_State* L);
+int json_decode(lua_State* L);
+int json_encode(lua_State* L);
 }
 
 

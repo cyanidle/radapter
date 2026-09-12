@@ -177,7 +177,7 @@ static int worker_shutdown(lua_State* L) {
         Raise("worker not usable");
     }
     auto fut = w->shutdown().ThenSync([]() -> QVariant { return QVariant{}; });
-    glua::Push(L, makeLuaPromise(w, fut));
+    glua::Push(L, MakeLuaPromise(w, fut));
     return 1;
 }
 
@@ -251,7 +251,6 @@ static int worker_index(lua_State* L) {
 
 static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool is_event) {
     if (!msg.isValid()) return;
-    auto* L = impl->L;
     auto* w = impl->self.data();
     if (!w) {
         Raise("worker not usable");
@@ -260,21 +259,28 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
         if (is_event) reg->onWorkerEvent(w, msg);
         else          reg->onWorkerMsg(w, msg);
     }
-    if (!lua_checkstack(L, 4)) {
-        w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
-        return;
-    }
-    lua_pushcfunction(L, builtin::traceback);
-    auto msgh = lua_gettop(L);
-    lua_getglobal(L, "call_all");
-    Push(L, is_event ? impl->evListeners : impl->listeners);
-    glua::Push(L, msg);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, workerSelfRef);
-    auto ok = lua_pcall(L, 3, 0, msgh);
-    if (ok != LUA_OK) {
-        w->Error("Could not notify listeners: {}", lua_tostring(L, -1));
-    }
-    lua_settop(L, msgh - 1);
+    auto listeners = is_event ? impl->evListeners : impl->listeners;
+    LuaValue workerObj(listeners._L, RegistryRef, workerSelfRef);
+    auto notify = [listeners, msg, workerObj = std::move(workerObj), is_event, w = QPointer(w)](Fiber* f) {
+        auto* T = f->LuaState();
+        if (!lua_checkstack(T, 5)) {
+            if (w) w->Error("Could not reserve stack to send {}", is_event ? "msg" : "event");
+            return;
+        }
+        lua_pushcfunction(T, builtin::traceback);
+        auto msgh = lua_gettop(T);
+        lua_getglobal(T, "call_all");
+        Push(T, listeners);
+        glua::Push(T, msg);
+        workerObj.Push(T);
+        auto ok = lua_pcall(T, 3, 0, msgh);
+        if (ok != LUA_OK) {
+            if (w)
+                w->Error("Could not notify listeners: {}", lua_tostring(T, -1));
+        }
+        lua_settop(T, msgh - 1);
+    };
+    w->_Inst->Fibers()->run(std::move(notify));
 }
 
 static int worker_tostring(lua_State* L) {

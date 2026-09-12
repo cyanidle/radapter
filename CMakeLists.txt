@@ -138,12 +138,6 @@ else()
     target_compile_options(radapter-sdk PRIVATE -Wno-old-style-cast -Wno-stringop-overflow)
 endif()
 
-target_link_libraries(radapter-sdk PRIVATE
-    rpcxx-future
-    rpcxx-json
-    radapter-luafs
-    radapter-luasock)
-
 add_library(radapter-qt INTERFACE)
 
 target_link_libraries(radapter-qt INTERFACE
@@ -154,13 +148,20 @@ if (RADAPTER_GUI)
     target_link_libraries(radapter-qt INTERFACE Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Widgets)
 endif()
 
-target_link_libraries(radapter-sdk PUBLIC 
+target_link_libraries(radapter-sdk PUBLIC
     radapter-qt
+    rpcxx-future
     glua
     radapter-lua
     describe
     fmt
     libcxxcanard)
+
+target_link_libraries(radapter-sdk PRIVATE
+    rpcxx-json
+    radapter-luafs
+    radapter-luasock
+    Boost::coroutine2)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_definitions(radapter-sdk PUBLIC QT_QML_DEBUG)

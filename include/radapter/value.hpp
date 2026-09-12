@@ -13,10 +13,12 @@ namespace radapter {
 class Instance;
 
 enum ConsumeTopTag {ConsumeTop};
+enum RegistryRefTag {RegistryRef};
 
 struct RADAPTER_API LuaValue {
     LuaValue(lua_State* L, int idx);
     LuaValue(lua_State* L, ConsumeTopTag);
+    LuaValue(lua_State* L, RegistryRefTag, int ref);
 
     LuaValue();
     LuaValue(const LuaValue& o);
@@ -70,8 +72,8 @@ private:
 }
 
 Q_DECLARE_METATYPE(radapter::LuaValue)
-Q_DECLARE_TYPEINFO(radapter::LuaValue, Q_MOVABLE_TYPE);
+Q_DECLARE_TYPEINFO(radapter::LuaValue, Q_RELOCATABLE_TYPE);
 Q_DECLARE_METATYPE(radapter::LuaUserData)
-Q_DECLARE_TYPEINFO(radapter::LuaUserData, Q_MOVABLE_TYPE);
+Q_DECLARE_TYPEINFO(radapter::LuaUserData, Q_RELOCATABLE_TYPE);
 
 #endif //RADAPTER_VALUE

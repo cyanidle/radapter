@@ -22,17 +22,19 @@ static void pushPipable(lua_State* L, LuaValue& listeners) {
 
 static void callListeners(Instance* inst, LuaValue& listeners, QVariant const& ev) {
     if (!listeners) return;
-    auto* L = inst->LuaState();
-    lua_pushcfunction(L, builtin::traceback);
-    auto msgh = lua_gettop(L);
-    lua_getglobal(L, "call_all");
-    listeners.Push(L);
-    glua::Push(L, ev);
-    lua_pushnil(L);
-    if (lua_pcall(L, 3, 0, msgh) != LUA_OK) {
-        inst->Error("tags", "call_all error: {}", lua_tostring(L, -1));
-    }
-    lua_settop(L, msgh - 1);
+    inst->Fibers()->run([inst, listeners, ev](Fiber* f) {
+        auto* T = f->LuaState();
+        lua_pushcfunction(T, builtin::traceback);
+        auto msgh = lua_gettop(T);
+        lua_getglobal(T, "call_all");
+        listeners.Push(T);
+        glua::Push(T, ev);
+        lua_pushnil(T);
+        if (lua_pcall(T, 3, 0, msgh) != LUA_OK) {
+            inst->Error("tags", "call_all error: {}", lua_tostring(T, -1));
+        }
+        lua_settop(T, msgh - 1);
+    });
 }
 
 TagRegistry::TagRegistry(Instance* inst) : QObject(inst), _inst(inst) {
@@ -148,11 +150,7 @@ void TagRegistry::notifyTag(QString const& tagName, Tag const& tag) {
     ev["ts"] = tag.ts;
 
     for (auto& fn : tag.subscribers) {
-        try {
-            fn.Call({ev});
-        } catch (std::exception& e) {
-            _inst->Error("tags", "subscriber error for '{}': {}", tagName, e.what());
-        }
+        fn.CallNoWait({ev}, fmt::format("tags/{}", tagName));
     }
 
     QVariant evVar(ev);

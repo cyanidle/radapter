@@ -3,6 +3,7 @@
 #include <radapter/function.hpp>
 #include "builtin.hpp"
 #include "instance_impl.hpp"
+#include "radapter/async_helpers.hpp"
 #include "tags.hpp"
 #include <QQmlEngine>
 #include <QQmlComponent>
@@ -55,6 +56,10 @@ class QMLWorker;
 // destroyed once the last QML worker of the instance goes away.
 static std::shared_ptr<QQmlEngine> qmlEngineFor(Instance* inst) {
     static std::unordered_map<Instance*, std::weak_ptr<QQmlEngine>> engines;
+    for (auto it = engines.begin(); it != engines.end();) {
+        if (it->second.expired()) it = engines.erase(it);
+        else ++it;
+    }
     auto& slot = engines[inst];
     if (auto engine = slot.lock()) {
         return engine;
@@ -131,7 +136,7 @@ public:
                 [this](QString const& name, QVariant const& value, QString const& q) {
             QQmlPropertyMap::insert(name, value);
             _quality->insert(name, q);
-        });
+        }, Qt::QueuedConnection);
     }
 
     Q_INVOKABLE void ensure(QString const& name) {
@@ -177,61 +182,63 @@ public:
     QMLWorker(QVariantList const& args, radapter::Instance* inst) :
 		Worker(inst, baseConfig(args), "qml")
     {
-        _engine = qmlEngineFor(inst);
-        auto* engine = _engine.get();
-        model = new GuiModel(this, nullptr, QString(), this);
-        if (auto* reg = inst->Tags()) {
-            quality = new QQmlPropertyMap(this);
-            tags = new TagsProxy(reg, quality, this);
-        }
-        proxy = new GuiInstanceProxy{this};
-        auto ctx = new QQmlContext(engine, this);
-        ctx->setContextProperty("radapter", proxy);
-        auto first = args.value(0);
-        if (first.metaType().id() == QMetaType::QString) {
-            creator = new QQmlComponent(engine);
-            auto f = inst->CurrentFile();
-            auto base = QUrl::fromLocalFile(f ? QString::fromStdString(f->u8string()) : QDir::currentPath());
-            creator->setData(first.toByteArray(), base);
-        } else {
-            Parse(config, first);
-            // A relative url resolves against the running script's URL when that script was
-            // itself loaded over HTTP, mirroring how `require` resolves Lua modules.
-            QUrl qmlUrl(config.url);
-            auto const& scriptBase = inst->_GetPrivate()->scriptBaseUrl;
-            if (qmlUrl.isRelative() && !scriptBase.isEmpty()) {
-                qmlUrl = QUrl(scriptBase).resolved(qmlUrl);
+        RunOnLoop(this, [&]{
+            _engine = qmlEngineFor(inst);
+            auto* engine = _engine.get();
+            model = new GuiModel(this, nullptr, QString(), this);
+            if (auto* reg = inst->Tags()) {
+                quality = new QQmlPropertyMap(this);
+                tags = new TagsProxy(reg, quality, this);
             }
-            if (qmlUrl.scheme() == "http" || qmlUrl.scheme() == "https") {
-                creator = new QQmlComponent(engine, qmlUrl);
+            proxy = new GuiInstanceProxy{this};
+            auto ctx = new QQmlContext(engine, this);
+            ctx->setContextProperty("radapter", proxy);
+            auto first = args.value(0);
+            if (first.metaType().id() == QMetaType::QString) {
+                creator = new QQmlComponent(engine);
+                auto f = inst->CurrentFile();
+                auto base = QUrl::fromLocalFile(f ? QString::fromStdString(f->u8string()) : QDir::currentPath());
+                creator->setData(first.toByteArray(), base);
             } else {
-                creator = new QQmlComponent(engine, config.url);
+                Parse(config, first);
+                // A relative url resolves against the running script's URL when that script was
+                // itself loaded over HTTP, mirroring how `require` resolves Lua modules.
+                QUrl qmlUrl(config.url);
+                auto const& scriptBase = inst->_GetPrivate()->scriptBaseUrl;
+                if (qmlUrl.isRelative() && !scriptBase.isEmpty()) {
+                    qmlUrl = QUrl(scriptBase).resolved(qmlUrl);
+                }
+                if (qmlUrl.scheme() == "http" || qmlUrl.scheme() == "https") {
+                    creator = new QQmlComponent(engine, qmlUrl);
+                } else {
+                    creator = new QQmlComponent(engine, config.url);
+                }
             }
-        }
-        if (config.properties) {
-            for (auto it = config.properties->constBegin(); it != config.properties->constEnd(); ++it) {
-                ctx->setContextProperty(it.key(), it.value());
+            if (config.properties) {
+                for (auto it = config.properties->constBegin(); it != config.properties->constEnd(); ++it) {
+                    ctx->setContextProperty(it.key(), it.value());
+                }
             }
-        }
-        // Remote QML (http/https) loads asynchronously; block until the component resolves
-        // before creating it. Local files and inline data are already synchronous.
-        if (creator->isLoading()) {
-            QEventLoop loop;
-            QObject::connect(creator, &QQmlComponent::statusChanged, &loop, &QEventLoop::quit);
-            QTimer::singleShot(30000, &loop, &QEventLoop::quit);
-            loop.exec();
+            // Remote QML (http/https) loads asynchronously; block until the component resolves
+            // before creating it. Local files and inline data are already synchronous.
             if (creator->isLoading()) {
-                Raise("Timed out loading remote QML: {}", config.url.toStdString());
+                QEventLoop loop;
+                QObject::connect(creator, &QQmlComponent::statusChanged, &loop, &QEventLoop::quit);
+                QTimer::singleShot(30000, &loop, &QEventLoop::quit);
+                loop.exec();
+                if (creator->isLoading()) {
+                    Raise("Timed out loading remote QML: {}", config.url.toStdString());
+                }
             }
-        }
-        root = creator->create(ctx);
-        if (!root) {
-            Raise("Could not create qml view: {}", creator->errorString());
-        }
-        root->setParent(this);
-        // Item-rooted QML (no QQuickWindow) — register for QML_Tester searches
-        if (auto* item = qobject_cast<QQuickItem*>(root))
-            inst->_GetPrivate()->guiItems.push_back(item);
+            root = creator->create(ctx);
+            if (!root) {
+                Raise("Could not create qml view: {}", creator->errorString());
+            }
+            root->setParent(this);
+            // Item-rooted QML (no QQuickWindow) — register for QML_Tester searches
+            if (auto* item = qobject_cast<QQuickItem*>(root))
+                inst->_GetPrivate()->guiItems.push_back(item);
+        });
     }
     ~QMLWorker() override {
         // tear the view (and its bindings) down first, so they don't re-evaluate
@@ -244,7 +251,9 @@ public:
         delete root;
     }
 	void OnMsg(QVariant const& msg) override {
-        model->applyIncoming(msg);
+        RunOnLoop(this, [&]{
+            model->applyIncoming(msg);
+        });
     }
     GuiModel* dataModel() const { return model; }
     TagsProxy* tagsProxy() const { return tags; }

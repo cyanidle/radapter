@@ -6,12 +6,9 @@ QtRedisAdapter::QtRedisAdapter(QObject* parent) :
     QObject{parent}
 {}
 
-QtRedisAdapter::~QtRedisAdapter()
-{
-    if (m_ctx != nullptr) {
-        m_ctx->ev.data = NULL;
-    }
-}
+// no destructor: the hiredis context is always freed first (Client::~Client
+// -> redisAsyncDisconnect -> ev.cleanup -> redisFree), so touching m_ctx here
+// would be a use-after-free
 
 struct QtRedisAdapter::Impl
 {

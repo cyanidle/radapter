@@ -9,8 +9,8 @@
 radapter::modbus::MasterDevice::MasterDevice(RtuDevice config, QObject *parent) :
     MasterDevice(static_cast<Device&>(config), parent)
 {
-    using Param = QModbusRtuSerialMaster::ConnectionParameter;
-    auto dev = new QModbusRtuSerialMaster(this);
+    using Param = QModbusRtuSerialClient::ConnectionParameter;
+    auto dev = new QModbusRtuSerialClient(this);
     dev->setInterFrameDelay(int(config.frame_gap.value));
     device = dev;
     connectionString = config.port;

@@ -57,8 +57,9 @@ filter("")               -- identity: disable filtering
 after(1000, fn)          -- one-shot
 each(500, fn)            -- repeating
 
--- Async/await across the Qt event loop
-local rows, err = await(sql:Exec("SELECT * FROM users LIMIT 10"))
+-- Async/await across the Qt event loop (every Lua entry runs on a fiber,
+-- so any function can await directly - no callbacks required)
+local rows, err = sql:Exec("SELECT * FROM users LIMIT 10"):await()
 
 -- Request/response correlation
 local call = make_service(req_worker, resp_worker, timeout_ms)
@@ -192,13 +193,13 @@ See `examples/` — runnable demonstrations (most need live hardware/services):
 | Script | What to see |
 |---|---|
 | `examples/websocket.lua` | Server ↔ client with msgpack + zlib compression |
-| `examples/redis.lua` | RedisCache + RedisStream + async/await |
-| `examples/sql.lua` | SQLite insert/select with callbacks and `await` |
+| `examples/redis.lua` | RedisCache + RedisStream + `:await()` |
+| `examples/sql.lua` | SQLite insert/select with callbacks and `:await()` |
 | `examples/modbus.lua` | Modbus TCP master (needs a device on :1502) |
 | `examples/serial/serial.lua` | Serial + SLIP + msgpack (pass port as arg) |
 | `examples/chat/` | Multi-client group chat: headless server + QML GUI client |
 | `examples/demo/` | QML gauge + Redis + Serial + `make_service` request/response |
-| `examples/test_async.lua` | `async`/`await`/`promisify` patterns |
+| `tests/async.lua` | `promise`/`spawn`/`promisify`/`:await()` patterns |
 | `examples/gui.lua` | Inline QML string, bidirectional color binding |
 | `examples/modbus_table.lua` | `import radapter`'s `ModbusTable` — configurable live register table |
 | `examples/can.lua` / `examples/cyphal.lua` | CAN/Cyphal (see `examples/setup_vcan.sh` for a virtual interface) |

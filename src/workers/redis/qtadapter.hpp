@@ -8,7 +8,6 @@ class QtRedisAdapter : public QObject
     Q_OBJECT
 public:
     QtRedisAdapter(QObject * parent = nullptr);
-    ~QtRedisAdapter() override;
     int SetContext(redisAsyncContext * ac);
 private slots:
     void read();

@@ -156,8 +156,8 @@ local function save_to(params)
                 fields[#fields + 1] = VIZ_FIELD
                 fields[#fields + 1] = json_encode(config.visualization)
             end
-            await(cache:Exec("DEL " .. params.key))
-            await(cache:Exec("HSET " .. params.key, fields))
+            cache:Exec("DEL " .. params.key):await()
+            cache:Exec("HSET " .. params.key, fields):await()
         end)
         cache:destroy()
         if not ok then error(err) end
@@ -176,7 +176,7 @@ local function read(params)
     elseif params.key then
         local cache = redis_conn(params)
         local ok, res = pcall(function()
-            local flat = await(cache:Exec("HGETALL " .. params.key))
+            local flat = cache:Exec("HGETALL " .. params.key):await()
             local objects = {}
             local pipes = {}
             local visualization = nil

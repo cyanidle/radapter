@@ -242,7 +242,7 @@ public:
             srv->req_dyn = req;
             srv->resp_dyn = resp;
             srv->handler = [func = service.handler](QVariant msg){
-                return func.CallAsync(QVariantList{msg});
+                return func.Call(QVariantList{msg});
             };
             CanardPortID port_id = service.port;
             if (!canardRxSubscribe(&canard, CanardTransferKindRequest, port_id, req->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, srv)) {
@@ -337,10 +337,10 @@ public:
         processTx();
 
         if (cb) {
-            resolveLuaCallback(this, future, *cb);
+            ResolveLuaCallback(this, future, *cb);
             return {};
         } else {
-            return makeLuaPromise(this, future);
+            return MakeLuaPromise(this, future);
         }
     }
     void OnMsg(QVariant const& msg) override {

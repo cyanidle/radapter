@@ -4,13 +4,13 @@
 --   * per_client=false + msgpack+zlib : broadcast — server echoes the raw payload
 -- A structured payload must survive the round-trip; the server must observe the
 -- connect and the disconnect (on client :destroy()).
--- Uses async/await to sequence events instead of fixed delays.
+-- Uses awaits to sequence events instead of fixed delays.
 
 local os = require "os"
 
 local results = {}   -- label -> { connected, echo, disconnected }
 
-local run = async(function(label, opts)
+local function run(label, opts)
     local r = { connected = false, echo = false, disconnected = false }
     results[label] = r
 
@@ -49,20 +49,20 @@ local run = async(function(label, opts)
 
     -- Wait for the connection (event is queued via QueuedConnection; always
     -- arrives after our subscription), then send the test payload.
-    await(match_msg(client.events, function(ev) return ev.state == "ConnectedState" end))
+    match_msg(client.events, function(ev) return ev.state == "ConnectedState" end):await()
     client { n = 42, nested = { flag = true }, list = { "a", "b", "c" } }
 
     -- Wait for the echoed payload, then destroy the client.
-    await(echo_promise)
+    echo_promise:await()
     client:destroy()
 
     -- Wait for the server to see the disconnect.
-    await(match_msg(server.events, function(ev) return ev.disconnected end))
-end)
+    match_msg(server.events, function(ev) return ev.disconnected end):await()
+end
 
 -- Kick off both variants in parallel; wait for both then verify.
-local p1 = run("perclient_json", { per_client = true })
-local p2 = run("broadcast_msgpack", { per_client = false, protocol = "msgpack", compression = "zlib" })
+local p1 = spawn(run, "perclient_json", { per_client = true })
+local p2 = spawn(run, "broadcast_msgpack", { per_client = false, protocol = "msgpack", compression = "zlib" })
 
 after(5000, function()
     local missing = {}
@@ -79,8 +79,8 @@ after(5000, function()
     os.exit(1)
 end)
 
-await(p1)
-await(p2)
+p1:await()
+p2:await()
 for label, r in pairs(results) do
     assert(r.connected, label .. ": server should report a connection")
     assert(r.echo, label .. ": client should receive its echoed structured payload")

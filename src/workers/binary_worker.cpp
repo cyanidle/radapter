@@ -167,7 +167,7 @@ radapter::BinaryWorker::~BinaryWorker()
 void radapter::BinaryWorker::ReceiveBinary(QByteArray& buffer)
 {
 	QVariantList msgs = d->framesParser(this, buffer, d->protoParser);
-	for (auto& m : qAsConst(msgs)) {
+	for (auto& m : std::as_const(msgs)) {
 		emit SendMsg(m);
 	}
 }

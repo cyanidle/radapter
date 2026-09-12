@@ -245,10 +245,10 @@ public:
         }
         auto fut = request(method, url, body, opts);
         if (cb) {
-            resolveLuaCallback(this, fut, cb);
+            ResolveLuaCallback(this, fut, cb);
             return {};
         }
-        return makeLuaPromise(this, fut);
+        return MakeLuaPromise(this, fut);
     }
 
     QVariant Get(QVariantList args)     { return invoke("GET", args, false); }

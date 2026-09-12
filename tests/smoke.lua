@@ -103,12 +103,12 @@ db:Exec("SELECT x FROM t", function(rows, err)
     pass("sql_roundtrip")
 end)
 
--- await works at the top level (Eval/EvalFile run in a coroutine)
+-- await works at the top level (Eval/EvalFile run on a fiber)
 local sleep = promisify(function(ms, cb) after(ms, cb) end)
-await(sleep(10))
+sleep(10):await()
 pass("top_level_await")
 
--- async: a discarded failing promise must be reported as an error;
+-- spawn: a discarded failing promise must be reported as an error;
 -- a subscribed one must reach its callback and NOT be reported
 local unhandled_seen = false
 local handled_misreported = false
@@ -124,9 +124,9 @@ log.set_handler(function(msg)
     end
 end)
 
-async(function() error("boom_unhandled") end)()
+spawn(function() error("boom_unhandled") end)
 
-local p = async(function() error("boom_handled") end)()
+local p = spawn(function() error("boom_handled") end)
 p(function(res, err)
     assert(err and err:find("boom_handled"), "subscriber must receive the error")
     handled_ok = true

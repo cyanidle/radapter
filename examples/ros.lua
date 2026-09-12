@@ -1,6 +1,4 @@
-assert(args[1], "Please specify plugins dir")
-
-load_plugin(args[1].."/radapter_ros")
+load_plugin("radapter_ros")
 
 local node = ROS2 {
     name = "test_node",
@@ -36,12 +34,11 @@ each(3000, function ()
     })
 end)
 
-each(1000, async(function ()
+each(1000, function ()
     log("Request!")
-    local promise = node:Request("/add_two_ints", {
+    local res = node:Request("/add_two_ints", {
         a = 3,
         b = 5,
-    })
-    local res = await(promise)
+    }):await()
     log("Req result: {}", res)
-end))
+end)

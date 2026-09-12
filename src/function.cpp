@@ -1,70 +1,101 @@
 #include "radapter/function.hpp"
+#include "radapter/async_helpers.hpp"
 #include "builtin.hpp"
-#include "future/future.hpp"
+#include <boost/context/detail/exception.hpp>
+#include <QMetaObject>
+#include <QThread>
 
 using namespace radapter;
 
-QVariant LuaFunction::Call(QVariantList const& args, TracebackMode trace) const
+static QVariant callOn(lua_State* T, LuaFunction const& fn, QVariantList const& args, bool result)
+{
+    if (!lua_checkstack(T, int(args.size() + 2))) {
+        Raise("Could not reserve stack for call");
+    }
+    auto base = lua_gettop(T);
+    lua_pushcfunction(T, builtin::traceback);
+    auto msgh = lua_gettop(T);
+    lua_rawgeti(T, LUA_REGISTRYINDEX, fn._ref);
+    for (auto& a: args) {
+        glua::Push(T, a);
+    }
+    auto status = lua_pcall(T, int(args.size()), 1, msgh);
+    if (status != LUA_OK) {
+        auto err = QString::fromUtf8(lua_tostring(T, -1));
+        lua_settop(T, base);
+        Raise("{}", err);
+    }
+    if (result) {
+        auto res = builtin::help::toQVar(T);
+        lua_settop(T, base);
+        return res;
+    } else {
+        lua_settop(T, base);
+        return {};
+    }
+}
+
+void LuaFunction::CallNoWait(QVariantList const& args, std::string ctx) const
 {
     if (!(*this)) {
         Raise("Attempt to call invalid lua function");
     }
-    if (!lua_checkstack(_L, args.size() + 2)) {
-        Raise("Could not reserve stack for call");
+    auto* inst = Instance::FromLua(_L);
+    inst->Fibers()->run([inst, self = *this, args, MV(ctx)](Fiber* f) {
+        try {
+            callOn(f->LuaState(), self, args, false);
+        } catch (std::exception& e) {
+            inst->Error(ctx.c_str(), "Uncaught error:\n\t{}", e.what());
+        }
+    });
+}
+
+fut::Future<QVariant> LuaFunction::Call(QVariantList args) const
+{
+    fut::Promise<QVariant> promise;
+    fut::Future<QVariant> res = promise.GetFuture();
+    if (!(*this)) {
+        promise(std::make_exception_ptr(std::runtime_error("Attempt to call invalid lua function")));
+        return res;
     }
-    if (trace) {
-        lua_pushcfunction(_L, builtin::traceback);
-    }
-    auto base = trace ? lua_gettop(_L) - 1 : lua_gettop(_L);
-    auto msgh = trace ? lua_gettop(_L) : 0;
-    lua_rawgeti(_L, LUA_REGISTRYINDEX, _ref);
-    for (auto& a: args) {
-        glua::Push(_L, a);
-    }
-    auto status = lua_pcall(_L, args.size(), 1, msgh);
-    if (status != LUA_OK) {
-        auto err = QString::fromUtf8(lua_tostring(_L, -1));
-        lua_settop(_L, base);
-        Raise("{}", err);
-    }
-    auto res = builtin::help::toQVar(_L);
-    lua_settop(_L, base);
+    auto* inst = Instance::FromLua(_L);
+    inst->Fibers()->run([self = *this, MV(promise), args = std::move(args)](Fiber* f) mutable {
+        try {
+            promise(callOn(f->LuaState(), self, args, true));
+        } catch (boost::context::detail::forced_unwind const&) {
+            throw;
+        } catch (...) {
+            promise(std::current_exception());
+        }
+    });
     return res;
 }
 
-fut::Future<QVariant> LuaFunction::CallAsync(QVariantList args, TracebackMode mode) const
+int builtin::api::SpawnNative(lua_State* L)
 {
-    fut::SharedPromise<QVariant> promise;
-    fut::Future<QVariant> res = promise.GetFuture();
-    QVariant on_done = MakeFunction([promise](Instance* inst, QVariantList args) mutable -> QVariant {
-        if (args.size() == 0) {
-            promise(QVariant{});
-        } else if (args.size() == 1) {
-            promise(args.at(0));
-        } else if (args.size() == 2) {
-            auto res = args.at(0);
-            auto err = args.at(1);
-            if (res.isValid()) {
-                promise(std::move(res));
-            } else {
-                if (!err.canConvert<QString>()) {
-                    inst->Error("async", "In async function: second return value (res, _err_) should be convertible to string");
-                }
-                promise(std::make_exception_ptr(std::runtime_error(err.toString().toStdString())));
-            }
-        } else {
-            Raise("Expected 0, 1 or 2 return values from async function. ([ok], [err])");
-        }
-        return {};
-    });
-    try {
-        args.append(on_done);
-        auto res = Call(args, mode);
-        if (res.isValid()) {
-            promise(res);
-        }
-    } catch (...) {
-        promise(std::current_exception());
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    auto* inst = Instance::FromLua(L);
+    QMetaObject::invokeMethod(inst, [fn = LuaFunction(L, 1)]() mutable {
+        fn.CallNoWait({}, "spawn");
+    }, Qt::QueuedConnection);
+    return 0;
+}
+
+void radapter::RunOnLoop(QObject* ctx, fut::MoveFunc<void()> body)
+{
+    if (!Fiber::Current() && QThread::currentThread() == ctx->thread()) {
+        body();
+        return;
     }
-    return res;
+    fut::Promise<void> prom;
+    auto fut = prom.GetFuture();
+    QMetaObject::invokeMethod(ctx, [body = std::move(body), MV(prom)] () mutable {
+        try {
+            body();
+            prom();
+        } catch (...) {
+            prom(std::current_exception());
+        }
+    }, Qt::QueuedConnection);
+    Await(std::move(fut));
 }

@@ -209,6 +209,9 @@ end
 -- Cross-version compatability
 unpack = unpack or table.unpack
 table.unpack = table.unpack or unpack
+table.pack = table.pack or function(...)
+    return { n = select('#', ...), ... }
+end
 
 function make_service(request, responce, timeout)
     timeout = timeout or 3000

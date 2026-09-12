@@ -5,10 +5,11 @@
 #include <QObject>
 #include <QMap>
 #include <QVariant>
-#include "radapter/config.hpp"
 #include "logs.hpp"
 #include "radapter/worker.hpp"
 #include "glua/glua.hpp"
+#include "fibers.hpp"
+#include "radapter/config.hpp"
 
 struct lua_State;
 typedef int(*lua_CFunction)(lua_State*);
@@ -109,7 +110,9 @@ public:
 
     void RegisterGlobal(const char* name, QVariant const& value);
     void RegisterFunc(const char* name, ExtraFunction func);
-    
+
+    FiberPool* Fibers();
+
     void EnableGui();
     void EnableTags();
     // the tag registry, or nullptr when --tags was not enabled

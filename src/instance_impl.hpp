@@ -13,8 +13,10 @@ class RecordFilter;
 }
 
 struct radapter::Instance::Impl {
+    Instance* self;
     lua_State* L;
-    lua_State* currentCaller = nullptr; // thread invoking a worker factory (may be a coroutine)
+    lua_State* currentCaller = nullptr; // thread invoking a worker factory (may be a fiber's Lua thread)
+    std::unique_ptr<FiberPool> fibers;
     std::unique_ptr<TagRegistry> tagRegistry;
     QSet<Worker*> workers;
     LogLevel globalLevel = LogLevel::debug;
@@ -23,6 +25,9 @@ struct radapter::Instance::Impl {
     std::vector<LuaFunction> shutdownHandlers;
     bool shutdown = false;
     bool shutdownDone = false;
+    bool shutdownIdleArmed = false;
+    unsigned shutdownTimeout = 5000; // Shutdown()'s default budget
+    int debuggerActive = 0; // 1 normal, 2 vscode
     int insideLogHandler = false;
     int luaLogHandler = LUA_NOREF;
     unsigned logCatLen = 12;
@@ -41,5 +46,7 @@ struct radapter::Instance::Impl {
     static int log__call(lua_State* L); // convert __call(t, ...) -> luaLog(...)
     static int log_handler(lua_State* L);
     static int onShutdown(lua_State* L);
+
+    void onThread(lua_State* T);
 };
 

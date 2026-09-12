@@ -1,5 +1,17 @@
 ---@diagnostic disable: lowercase-global
-local co = coroutine
+-- Promise plumbing over the native fiber pool. Every Lua entry point already
+-- runs on a fiber, so any function may call promise:await() directly - there
+-- are no Lua coroutines and no async()/await() wrappers:
+--   * promise(executor) - wrap callback-style async: executor(done) runs
+--     immediately; the first done(res, err) settles the promise
+--   * spawn(fn, ...)   - run fn detached on its own fiber entry; the promise
+--     settles with fn's return values, or (nil, traceback) if fn raises
+--   * promisify(func)  - adapt a trailing-callback function to promises
+--   * gather{...}      - await a list of promises concurrently; resolves with
+--     a list of all results in the same order, rejects with the first error
+--   * match_msg(src, f) - promise for the first pipe message matching f
+-- A rejected promise with no subscriber is reported as an error one event
+-- loop turn later, so fire-and-forget can not swallow failures silently.
 
 ---@alias callback<T> fun(res: T?, err: string?)
 
@@ -11,154 +23,145 @@ end
 
 local promise_mt = {
     __call = function(self, callback)
-        self.cb = callback
-        if self.done then
-            callback(self.res, self.err)
+        assert(is_callable(callback), "callback function expected")
+        self._subscribe(callback)
+    end,
+    __index = {
+        await = function(self)
+            return __await_native(self._subscribe)
+        end,
+    },
+}
+debug.getregistry().radapter_promise_mt = promise_mt
+
+local function make_state()
+    local subs = {}
+    local had_sub = false
+    local settled = false
+    local res, err
+
+    local function subscribe(cb)
+        had_sub = true
+        if settled then
+            cb(res, err)
+        else
+            subs[#subs + 1] = cb
         end
     end
-}
 
--- Subscription is synchronous in practice (await resumes and subscribes
--- immediately; explicit promise(cb) follows the call on the same line), so a
--- rejected promise still unsubscribed one event-loop turn later is
--- fire-and-forget: report it instead of swallowing the error.
-local function unhandled_check(p)
-    after(0, function()
-        if not p.cb then
-            error("Unhandled async error: " .. tostring(p.err), 0)
+    local function done(r, e)
+        if settled then return end
+        settled = true
+        res, err = r, e
+        if #subs > 0 then
+            for i = 1, #subs do subs[i](res, err) end
+        elseif e ~= nil then
+            after(0, function()
+                if not had_sub then
+                    error("Unhandled async error: " .. tostring(e), 0)
+                end
+            end)
+        end
+    end
+
+    return subscribe, done
+end
+
+---Create a promise around callback-style async: `executor(done)` runs
+---immediately (it may subscribe listeners, start timers, issue requests);
+---the first `done(res, err)` settles the promise.
+---@generic T
+---@param executor fun(done: callback<T>)
+---@return promise<T>
+function promise(executor)
+    assert(is_callable(executor), "promise(executor): executor must be callable")
+    local subscribe, done = make_state()
+    local p = setmetatable({ _subscribe = subscribe }, promise_mt)
+    local ok, rerr = xpcall(executor, debug.traceback, done)
+    if not ok then
+        done(nil, rerr)
+    end
+    return p
+end
+
+---Run `fn` detached from the current fiber, so it executes concurrently with
+---the calling flow; returns a promise settling with fn's first two return
+---values, or (nil, traceback) when fn raises. A plain call already suspends
+---only the calling chain - spawn only to gain parallelism.
+---@generic T
+---@param fn fun(...): T?, string?
+---@return promise<T?>
+function spawn(fn, ...)
+    local args = table.pack(...)
+    return promise(function(done)
+        __spawn_native(function()
+            local res = table.pack(xpcall(fn, debug.traceback, table.unpack(args, 1, args.n)))
+            if res[1] then
+                done(res[2], res[3])
+            else
+                done(nil, res[2])
+            end
+        end)
+    end)
+end
+
+---Await a list of promises concurrently: resolves with a list of all results
+---in the same order (`{res1, res2, ...}`), or rejects with the first error.
+---@generic T
+---@param promises promise<T>[]
+---@return promise<T[]>
+function gather(promises)
+    return promise(function(done)
+        local n = #promises
+        if n == 0 then return done({}) end
+        local results, left = {}, n
+        for i, p in ipairs(promises) do
+            p(function(res, err)
+                if err ~= nil then
+                    done(nil, err)
+                else
+                    results[i] = res
+                    left = left - 1
+                    if left == 0 then done(results) end
+                end
+            end)
         end
     end)
 end
 
----@return promise
-local function make_promise(thread, ...)
-    local p = setmetatable({}, promise_mt)
-    local step
-    local function settle(res, err)
-        p.done, p.res, p.err = true, res, err
-        if p.cb then
-            p.cb(res, err)
-        elseif err ~= nil then
-            unhandled_check(p)
-        end
-    end
-    step = function (...) -- Args or (res, err) here
-        local ok, res, err = co.resume(thread, ...)
-        if not ok then
-            settle(nil, debug.traceback(thread, res))
-            return
-        end
-        if co.status(thread) == "dead" then
-            settle(res, err)
-        else
-            res(step)
-        end
-    end
-    step(...)
-    return p
-end
-
-
+---Adapt a trailing-callback function: the returned wrapper produces a promise
+---settling with whatever the callback receives as (res, err).
 ---@generic T
----@param func fun(...): T?
----@return fun(...): promise<T?>
-function async(func)
-    return function(...)
-        local thread = co.create(func)
-        local params = {...}
-        local promise = make_promise(thread, ...)
-        local last = params[#params]
-        if type(last) == "function" then
-            promise(last)
-        else
-            return promise
-        end
-    end
-end
-
----@generic T
----@overload fun(...)
+---@param func fun(..., callback<T>)
 ---@return fun(...): promise<T>
 function promisify(func)
     return function(...)
-        local cb
-        local res, err
-        local params = {...}
-        local last = params[#params]
-        local inline = type(last) == "function"
-        if not inline then
-            table.insert(params, function (_res, _err)
-                if cb then
-                    cb(_res, _err)
-                else
-                    res, err = _res, _err
-                end
-            end)
-        end
-        local thread = co.create(func)
-        local ok, rerr = co.resume(thread, unpack(params))
-        if not ok then
-            rerr = debug.traceback(thread, rerr)
-            if inline then
-                last(nil, rerr)
-                return
-            end
-            err = rerr
-        end
-        if not inline then
-            return function (callback)
-                if res ~= nil or err ~= nil then
-                    callback(res, err)
-                else
-                    cb = callback
-                end
-            end
-        end
+        local args = table.pack(...)
+        return promise(function(done)
+            args.n = args.n + 1
+            args[args.n] = done
+            func(table.unpack(args, 1, args.n))
+        end)
     end
 end
 
----@generic T
----@param promise promise<T>
-function await(promise)
-    assert(is_callable(promise), "callable (promise) expected")
-    return co.yield(promise)
-end
-
---- Wait for a message matching a filter from a pipe-able source.
---- Returns a promise that resolves with the first message for which
---- `filter(msg)` returns true, then automatically unsubscribes.
+---Wait for a message matching a filter from a pipe-able source. The promise
+---resolves with the first message for which `filter(msg)` returns true, then
+---automatically unsubscribes.
 ---@generic T
 ---@param source table|userdata pipe-able source (has get_listeners)
 ---@param filter fun(msg: T): boolean
 ---@return promise<T>
 function match_msg(source, filter)
-    return function(cb)
+    return promise(function(done)
+        -- forward declaration: the listener must close over `cancel` as an
+        -- upvalue, but a `local x = f(g)` only scopes x after the statement
         local cancel
         cancel = pipe(source, function(msg)
             if filter(msg) then
                 cancel()
-                cb(msg)
+                done(msg)
             end
         end)
-    end
-end
-
--- Runs a main chunk (Eval/EvalFile) inside a coroutine so that await() works
--- at the top level. Errors before the first await are re-raised synchronously
--- (startup failures must still fail Eval); later errors are logged.
-function __eval_async(chunk, chunkname)
-    local sync_phase = true
-    local sync_err = nil
-    local p = async(chunk)()
-    p(function(_, err)
-        if sync_phase then
-            sync_err = err
-        elseif err ~= nil then
-            log.error("In ({}): {}", chunkname, err)
-        end
     end)
-    sync_phase = false
-    if sync_err ~= nil then
-        error(sync_err, 0)
-    end
 end

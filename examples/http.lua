@@ -16,16 +16,16 @@ local api = Http {
     timeout_ms = 10000,
 }
 
--- await form (top-level await works; the script runs inside a coroutine)
-local r = await(api:Get("/get", { query = { hello = "world" } }))
+-- await form (top-level await works; the script runs on a fiber)
+local r = api:Get("/get", { query = { hello = "world" } }):await()
 log.info("GET /get -> status {}, args = {}", r.status, r.body.args)
 
 -- A table body is JSON-encoded automatically and Content-Type is set.
-local p = await(api:Post("/post", { name = "radapter", count = 42 }))
+local p = api:Post("/post", { name = "radapter", count = 42 }):await()
 log.info("POST /post echoed json = {}", p.body.json)
 
 -- Custom headers per request.
-local h = await(api:Get("/headers", { headers = { ["X-Demo"] = "1" } }))
+local h = api:Get("/headers", { headers = { ["X-Demo"] = "1" } }):await()
 log.info("server saw headers = {}", h.body.headers)
 
 -- Callback form: pass a function as the last argument.

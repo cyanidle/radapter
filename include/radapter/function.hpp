@@ -3,6 +3,8 @@
 
 #include "radapter/value.hpp"
 #include <functional>
+#include <memory>
+#include "future/move_func.hpp"
 
 namespace fut
 {
@@ -12,28 +14,25 @@ struct Future;
 
 }
 
+
 namespace radapter
 {
 
 struct RADAPTER_API LuaFunction : LuaValue {
     using LuaValue::LuaValue;
 
-    enum TracebackMode {
-        NoTraceback = 0,
-        Traceback = 1,
-    };
-
-    QVariant Call(const QVariantList &args, TracebackMode mode = Traceback) const;
-    fut::Future<QVariant> CallAsync(QVariantList args, TracebackMode mode = Traceback) const;
+    void CallNoWait(const QVariantList &args, std::string ctx) const;
+    fut::Future<QVariant> Call(QVariantList args) const;
 };
 
-using ExtraFunction = std::function<QVariant(Instance*, QVariantList const&)>;
+using ExtraFunction = fut::MoveFunc<QVariant(Instance*, QVariantList const&)>;
+using ExtraFunctionPtr = std::shared_ptr<ExtraFunction>;
 
 }
 
 Q_DECLARE_METATYPE(radapter::LuaFunction)
-Q_DECLARE_TYPEINFO(radapter::LuaFunction, Q_MOVABLE_TYPE);
-Q_DECLARE_METATYPE(radapter::ExtraFunction)
-Q_DECLARE_TYPEINFO(radapter::ExtraFunction, Q_MOVABLE_TYPE);
+Q_DECLARE_TYPEINFO(radapter::LuaFunction, Q_RELOCATABLE_TYPE);
+Q_DECLARE_METATYPE(radapter::ExtraFunctionPtr)
+Q_DECLARE_TYPEINFO(radapter::ExtraFunctionPtr, Q_RELOCATABLE_TYPE);
 
 #endif //RADAPTER_LUA_FUNC_HPP

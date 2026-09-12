@@ -27,7 +27,7 @@ pipe(stream, unwrap("wrapped!"), function(msg)
 end)
 
 local count = 0
-each(1000, async(function()
+each(1000, function()
     count = count + 1
     cache {
         current = count,
@@ -37,10 +37,10 @@ each(1000, async(function()
     cache:Exec("GET test", function(res, err)
         log("callback version: Result: {}, Error: {}", res, err)
     end)
-    local res, err = await(cache:Exec("GET test"));
+    local res, err = cache:Exec("GET test"):await()
     log("async version: GET Result: {}, Error: {}", res, err)
-    log("async version (err): GET Result: {}, Error: {}", await(cache:Exec("asdGET test")))
-end))
+    log("async version (err): GET Result: {}, Error: {}", cache:Exec("asdGET test"):await())
+end)
 
 
 

@@ -265,7 +265,7 @@ public:
                         members->fini_function(ros_msg);
                         QMetaObject::invokeMethod(this, [this, topic, var = std::move(var), h]{
                             if (h)
-                                h->Call({var});
+                                h->CallNoWait({var}, ("ros/" + topic).toStdString());
                             emit SendMsgField(topic, var);
                         }, Qt::QueuedConnection);
                     } catch (std::exception& e) {
@@ -364,10 +364,10 @@ public:
         }
         members->fini_function(ros_msg);
         if (cb) {
-            resolveLuaCallback(this, future, *cb);
+            ResolveLuaCallback(this, future, *cb);
             return {};
         } else {
-            return makeLuaPromise(this, future);
+            return MakeLuaPromise(this, future);
         }
     }
 };

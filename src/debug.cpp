@@ -5,6 +5,7 @@
 #include <qfileinfo.h>
 #include <qthread.h>
 #include <QAbstractEventDispatcher>
+#include "instance_impl.hpp"
 
 void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
 {
@@ -35,4 +36,18 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
         Raise("debugger: Not available");
     }
     lua_pop(L, 1);
+    d->debuggerActive = opts.vscode ? 2 : 1;
+    d->onThread(L);
+}
+
+
+void radapter::Instance::Impl::onThread(lua_State* T)
+{
+    if (!debuggerActive)
+        return;
+    self->LoadEmbeddedFile(debuggerActive == 1 ? "mobdebug" : "mobdebug.vscode", LoadEmbedNoPop);
+    lua_xmove(L, T, 1);
+    lua_getfield(T, -1, "on");
+    lua_pcall(T, 0, 0, 0);
+    lua_pop(T, 1);
 }

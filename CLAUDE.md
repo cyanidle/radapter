@@ -41,6 +41,11 @@ build/bin/radapter -e 'log.info("hi")'              # eval inline; --gui enables
 build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 ```
 
+`--debug` caveat: every Lua entry point runs on a pool fiber's own Lua thread under
+`lua_pcall`, and Lua debug hooks are per-thread — mobdebug can set breakpoints and step
+code, but yields from its debug hooks do not work across those C-call boundaries.
+Known limitation; don't try to "fix" it inside hook callbacks.
+
 Set `CPM_SOURCE_CACHE` (e.g. `export CPM_SOURCE_CACHE="$HOME/.cache/CPM"`) to cache fetched
 packages across builds/clones.
 
@@ -87,10 +92,9 @@ There is no unit-test framework. Self-checking scripts live under `tests/`; runn
 demonstrations live under `examples/`.
 
 **Tests (`tests/`)** are self-checking — the binary runs them and they exit 0 on success /
-1 on failure. **`tests/all.lua` runs the whole suite** — it spawns every other
-`tests/*.lua` in its own radapter process (via the `Process` worker, so they can't clash on
-ports/sockets/shutdown), applies any needed flags, and exits 0 iff all pass
-(`build/bin/radapter tests/all.lua`); new tests are auto-discovered. **The primary
+1 on failure. **ctest runs the whole suite** — `tests/*.lua` are globbed (`CONFIGURE_DEPENDS`)
+and each registered as its own ctest entry, so run `ctest` from the build directory; new
+tests are auto-discovered. **The primary
 smoke test is `tests/smoke.lua`** — run it after any engine change
 (`build/bin/radapter tests/smoke.lua`); it constructs every worker that needs no external
 hardware/services, verifies live roundtrips (websocket pairs, sqlite, a modbus slave/master
@@ -101,7 +105,7 @@ ModbusMaster test; `tests/basic.lua` covers the Lua builtins (pipe/get/set);
 
 After making some changes **ALWAYS** check result somehow
 
-When the engine code (src/, include/) is touched, always run `build/bin/radapter tests/all.lua`.
+When the engine code (src/, include/) is touched, always run `ctest` from the build directory.
 When the project (projects/) touches QML or Lua config files, always launch QML **headlessly**
 to verify the visual components (write short test as inline -e "code" for example, dont forget to shutdown() at the end)
 
@@ -299,8 +303,9 @@ from any `lua_State` via a registry lightuserdata key. Shutdown is cooperative: 
 Only **fundamental** Lua scripts are embedded: they live in `src/scripts/*.lua`, are
 compiled to bytecode by the `radapter-luac` host tool, and baked into a Qt resource
 (`:/scripts/...`) at build time — except under JIT/cross builds, where they ship as source.
-`builtins.lua` defines the pipeline primitives; `async.lua` provides coroutine-based
-promises (`await`); `mobdebug*.lua` is the remote debugger; `socket.lua` is luasocket glue.
+`builtins.lua` defines the pipeline primitives; `async.lua` provides the promise
+plumbing (`promise:await()` suspends the current fiber; there are no Lua coroutines —
+every Lua entry already runs on a fiber); `mobdebug*.lua` is the remote debugger; `socket.lua` is luasocket glue.
 Non-fundamental modules (e.g. `declare`) are **not** embedded — they live next to the
 project that uses them and are `require`d from disk: `EvalFile` prepends the running
 script's directory to `package.path`, so a script resolves sibling modules.
@@ -399,12 +404,29 @@ nested described structs all compose recursively.
 
 ### Async, values, and Lua interop
 
+- **Fibers**: every entry into Lua (top-level chunk, worker listeners, timers) runs on a
+  `FiberPool` fiber (`src/fibers.cpp`) with its own Lua thread and a Boost.Context
+  guarded stack (`boost::context::protected_fixedsize_stack`, 4MiB; no custom stack
+  allocation anywhere). Fibers park at C++ level inside `promise:await()` — there are no
+  Lua coroutines. The first 8 fibers are pooled for reuse; demand beyond that gets
+  transient fibers whose stacks are freed when their entry completes, so concurrent
+  awaits are unbounded. At teardown `FiberPool::stop(timeout)` pumps the event loop until
+  every entry parked and unwinds the ones that outlast the budget. `radapter::RunOnLoop`
+  (`include/radapter/async_helpers.hpp`) runs `op` on
+  `ctx`'s thread through the event loop; from a fiber the caller parks until the op
+  completes. **All QML access from Lua must go through it** (QML worker ctor body, `OnMsg`,
+  QML_Tester action methods): Qt's V4 engine checks each JS frame against the native
+  stack window below `__libc_stack_end` and throws `Maximum call stack size exceeded`
+  from fiber stacks — delegating to the event loop keeps every QML/JS evaluation on the
+  main stack. When adding a Lua-facing method that touches QML, wrap it in
+  `RunOnLoop`; internal call chains run inline inside a queued op (not on a
+  fiber), so nesting is harmless.
 - `LuaValue` / `LuaUserData` (`include/radapter/value.hpp`) are RAII handles to Lua
   registry refs. `LuaFunction` (`function.hpp`) wraps a callable Lua value: `Call(args)`
-  and `CallAsync(args)` (returns a `fut::Future`).
-- `async_helpers.hpp` bridges C++ `fut::Future`s to Lua: `makeLuaPromise` /
-  `resolveLuaCallback` turn a future into a Lua callback-or-`await`able. Workers like Redis
-  expose async ops this way (`await(cache:Exec("GET test"))` in `tests/redis.lua`).
+  (returns a `fut::Future`) and `CallNoWait(args, ctx)`.
+- `async_helpers.hpp` bridges C++ `fut::Future`s to Lua: `MakeLuaPromise` /
+  `ResolveLuaCallback` turn a future into a Lua promise. Workers like Redis
+  expose async ops this way (`cache:Exec("GET test"):await()` in `tests/redis.lua`).
 
 ## Conventions
 

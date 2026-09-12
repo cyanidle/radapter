@@ -265,19 +265,43 @@ function bytes(from) end
 ---@return integer
 function next_id() end
 
----@class promise<T>: { __call: fun(self: promise<T>, callback: fun(result: T, err: string)) }
+---@class promise<T>
+---Subscribe to the settlement: the callback receives (result, err) exactly once.
+---@overload fun(self: promise<T>, callback: fun(result: T?, err: string?))
+promise = {
+    ---Suspend the current fiber until the promise settles; returns (result, err).
+    ---Works anywhere - every Lua entry point runs on a fiber.
+    ---@generic T
+    ---@param self promise<T>
+    ---@return T?, string?
+    await = function(self) end,
+}
 
 ---@alias asyncThunk<TIn, TOut> fun(input: TIn): promise<TOut>
 
+---Create a promise around callback-style async: `executor(done)` runs
+---immediately; the first `done(result, err)` settles the promise. A rejected
+---promise with no subscriber is reported as an error one event loop turn later.
 ---@generic T
----@param fn fun(...): T
----@return fun(...): promise<T>
-function async(fn) end
+---@param executor fun(done: fun(result: T?, err: string?))
+---@return promise<T>
+function promise(executor) end
 
+---Run `fn` detached from the current fiber (concurrent execution); returns a
+---promise settling with fn's first two return values, or (nil, traceback) if
+---fn raises. Plain calls already suspend only the calling chain - spawn only
+---to gain parallelism.
 ---@generic T
----@param p promise<T>
----@return T
-function await(p) end
+---@param fn fun(...): T?, string?
+---@return promise<T?>
+function spawn(fn, ...) end
+
+---Await a list of promises concurrently: resolves with a list of all results
+---in the same order, or rejects with the first error.
+---@generic T
+---@param promises promise<T>[]
+---@return promise<T[]>
+function gather(promises) end
 
 --- Wait for a message matching a filter from a pipe-able source.
 --- Returns a promise that resolves with the first matching message and
@@ -288,6 +312,8 @@ function await(p) end
 ---@return promise<T>
 function match_msg(source, filter) end
 
+---Adapt a trailing-callback function: the returned wrapper produces a promise
+---settling with whatever the callback receives as (result, err).
 ---@param fn fun(...) wrapped function whose last arg is a callback(result, err)
 ---@return fun(...): promise<any>
 function promisify(fn) end
@@ -304,7 +330,7 @@ log = {
     error = function (fmt, ...) end,
     ---@param fmt string
     debug = function (fmt, ...) end,
- 
+
     ---@param handler fun(msg: loggingMsg)?
     set_handler = function (handler) end,
 
@@ -446,12 +472,12 @@ function SqlWorker:Exec(statement, callback) end
 function SqlWorker:Exec(statement, params, callback) end
 
 ---@param statement string
----@return fun(defer: SqlCallback)
+---@return promise<any[][]>
 function SqlWorker:Exec(statement) end
 
 ---@param statement string
 ---@param params table
----@return fun(defer: SqlCallback)
+---@return promise<any[][]>
 function SqlWorker:Exec(statement, params) end
 
 ---@return SqlWorker
@@ -577,7 +603,9 @@ function QML_Tester:center(itemName) end
 ---@param button? string
 function QML_Tester:click(x, y, button) end
 
----Double-click at window coordinates (x, y).
+---Double-click at window coordinates (x, y).  NOTE: the injected
+---MouseButtonDblClick is dropped by Qt's delivery agent, so this currently
+---behaves as a single click — onDoubleClicked handlers will not fire.
 ---@param x number
 ---@param y number
 ---@param button? string
@@ -664,7 +692,7 @@ RedisCacheWorker = {}
 ---@alias RedisCallback fun(result: any, error: string)
 
 ---@param query string
----@return fun(defer: RedisCallback)
+---@return promise<any>
 function RedisCacheWorker:Exec(query) end
 
 ---@param query string
@@ -674,7 +702,7 @@ function RedisCacheWorker:Exec(query, callback) end
 
 ---@param query string
 ---@param args any[]
----@return fun(defer: RedisCallback)
+---@return promise<any>
 function RedisCacheWorker:Exec(query, args) end
 
 ---@param query string
@@ -839,7 +867,7 @@ HttpWorker = {}
 
 ---@param url string
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Get(url, opts) end
 ---@param url string
 ---@param callback HttpCallback
@@ -854,7 +882,7 @@ function HttpWorker:Get(url, opts, callback) end
 ---@param url string
 ---@param body any?
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Post(url, body, opts) end
 ---@param url string
 ---@param body any?
@@ -866,28 +894,28 @@ function HttpWorker:Post(url, body, opts, callback) end
 ---@param url string
 ---@param body any?
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Put(url, body, opts) end
 
 ---@param url string
 ---@param body any?
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Patch(url, body, opts) end
 
 ---@param url string
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Delete(url, opts) end
 
 ---@param url string
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Head(url, opts) end
 
 ---@param url string
 ---@param opts HttpRequestOpts?
----@return fun(defer: HttpCallback)
+---@return promise<HttpResponse>
 function HttpWorker:Options(url, opts) end
 
 ---@param params HttpConfig
@@ -1080,7 +1108,7 @@ function CAN(params) end
 ---@class LocalCyphalService
 ---@field type CyphalService
 ---@field port number
----@field handler asyncThunk<any, any>
+---@field handler fun(req: any): any receives the request, returns the response (may await inside)
 
 ---@class CyphalNodeInfoVersion
 ---@field major number

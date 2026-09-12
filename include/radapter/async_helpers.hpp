@@ -1,8 +1,13 @@
+#ifndef RADAPTER_ASYNC_HELPERS_HPP
+#define RADAPTER_ASYNC_HELPERS_HPP
+
 #include <future/future.hpp>
+#include <optional>
 #include <QPointer>
 
 #include "radapter/radapter.hpp"
 #include "radapter/worker.hpp"
+#include "radapter/function.hpp"
 
 namespace radapter
 {
@@ -10,7 +15,7 @@ namespace radapter
 using namespace fut;
 
 template<typename T>
-void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
+void ResolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
     // QPointer: the future may resolve as/after the worker is destroyed (e.g.
     // Worker::shutdown resolves on destroyed), so never deref a dead worker.
     fut.AtLastSync([worker = QPointer(worker), cb = std::move(func)](Result<T> res) mutable noexcept {
@@ -24,27 +29,14 @@ void resolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
         } catch (std::exception& e) {
             args = {QVariant{}, e.what()};
         }
-        try {
-            cb.Call(std::move(args));
-        } catch (std::exception& e) {
-            if (worker) worker->Error("Error in callback: {}", e.what());
-        }
+        cb.CallNoWait(std::move(args), "worker callback: " + (worker ? worker->_Origin : "<dead>"));
     });
 }
 
+QVariant RADAPTER_API MakeLuaPromise(Worker* worker, Future<QVariant>& future);
 
-template<typename T>
-QVariant makeLuaPromise(Worker* worker, Future<T>& future) {
-    return MakeFunction([worker, _state = future.TakeState()](Instance*, QVariantList args) mutable -> QVariant {
-        auto cb = args.value(0).value<LuaFunction>();
-        if (!cb) {
-            Raise("Expected function as single argument");
-        }
-        auto fut = Future(_state);
-        resolveLuaCallback(worker, fut, cb);
-        return {};
-    });
-}
-
+void RunOnLoop(QObject* ctx, fut::MoveFunc<void()> body);
 
 }
+
+#endif //RADAPTER_ASYNC_HELPERS_HPP

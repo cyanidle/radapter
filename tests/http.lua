@@ -62,25 +62,26 @@ end)
 
 local http = Http { base_url = "http://127.0.0.1:" .. PORT, response_format = "json" }
 
-await(match_msg(server.events, function (msg)
+match_msg(server.events, function (msg)
     return msg.started
-end))
+end):await()
 
--- Give the server a moment to bind, then drive the requests from a coroutine.
-after(200, async(function()
-    local r = await(http:Get("/hello"))
+-- Give the server a moment to bind, then drive the requests (the timer
+-- callback runs detached on its own fiber, so the awaits below only suspend it)
+after(200, function()
+    local r = http:Get("/hello"):await()
     assert(r.status == 200, "GET status: " .. tostring(r.status))
     assert(r.body.method == "GET", "GET method")
     assert(r.body.path == "/hello", "GET path: " .. tostring(r.body.path))
     pass("get_await")
 
-    local p = await(http:Post("/x", { a = 1, b = "two" }))
+    local p = http:Post("/x", { a = 1, b = "two" }):await()
     assert(p.body.method == "POST", "POST method")
     assert(p.body.ct == "application/json", "auto json content-type: " .. tostring(p.body.ct))
     assert(p.body.echo:find('"a"'), "POST echoed json body: " .. tostring(p.body.echo))
     pass("post_json")
 
-    local q = await(http:Get("/q", { query = { foo = "bar" }, headers = { ["X-Test"] = "1" } }))
+    local q = http:Get("/q", { query = { foo = "bar" }, headers = { ["X-Test"] = "1" } }):await()
     assert(q.body.path == "/q?foo=bar", "query string: " .. tostring(q.body.path))
     pass("query_and_headers")
 
@@ -98,4 +99,4 @@ after(200, async(function()
         assert(err and #err > 0, "expected error string")
         pass("connection_error")
     end)
-end))
+end)

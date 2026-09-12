@@ -1,11 +1,11 @@
 #include "radapter/radapter.hpp"
+#include "radapter/async_helpers.hpp"
 #include <QVariant>
 #include <QMap>
 #include <QTimer>
 #include <qdatetime.h>
 #include <QDir>
 #include <QUrl>
-#include <QEventLoop>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -120,10 +120,25 @@ static void registerUnavailable(lua_State* L, const char* name, const char* msg)
     lua_setglobal(L, name);
 }
 
+// ShutdownDone fires only when the workers are gone AND every fiber entry has
+// parked; the Shutdown(timeout) singleShot remains the escape hatch.
+static void emitDoneWhenIdle(Instance* inst)
+{
+    auto* d = inst->_GetPrivate();
+    if (std::exchange(d->shutdownIdleArmed, true)) {
+        return;
+    }
+    inst->Fibers()->stop(d->shutdownTimeout);
+    if (!std::exchange(d->shutdownDone, true)) {
+        emit inst->ShutdownDone();
+    }
+}
+
 Instance::Instance(QObject *parent) :
     QObject(parent),
     d(new Impl)
 {
+    d->self = this;
     auto L = d->L = luaL_newstate();
     init_qrc();
     lua_gc(L, LUA_GCSTOP, 0);
@@ -164,8 +179,12 @@ Instance::Instance(QObject *parent) :
     lua_setglobal(L, "log");
 
     lua_register(L, "next_id", _gen_id);
-    lua_register(L, "json_decode", glua::protect<builtin::json_decode>);
-    lua_register(L, "json_encode", glua::protect<builtin::json_encode>);
+    lua_register(L, "json_decode", glua::protect<builtin::api::json_decode>);
+    lua_register(L, "json_encode", glua::protect<builtin::api::json_encode>);
+
+    d->fibers = std::make_unique<FiberPool>(this);
+    lua_register(L, "__await_native", glua::protect<builtin::api::AwaitNative>);
+    lua_register(L, "__spawn_native", glua::protect<builtin::api::SpawnNative>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "reload", glua::Wrap<luaReload>);
@@ -203,9 +222,7 @@ Instance::Instance(QObject *parent) :
                 d->workers.erase(it);
             }
             if (d->workers.empty() && d->shutdown) {
-                if (!std::exchange(d->shutdownDone, true)) {
-                    emit ShutdownDone();
-                }
+                emitDoneWhenIdle(this);
             }
         });
         connect(w, &Worker::ShutdownDone, w, &QObject::deleteLater);
@@ -336,33 +353,22 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
 
     if (d->luaLogHandler != LUA_NOREF && !d->insideLogHandler) {
         auto L = d->L;
-        lua_pushcfunction(L, builtin::traceback);
-        auto msgh = lua_gettop(L);
-        d->insideLogHandler = true;
-        defer reset([&]{
-            d->insideLogHandler = false;
-            lua_settop(L, msgh - 1);
-        });
-        if (!lua_checkstack(L, 3)) {
-            Raise("Could not reserve stack for log handler");
-        }
         lua_rawgeti(L, LUA_REGISTRYINDEX, d->luaLogHandler);
-        lua_createtable(L, 0, 4);
-        lua_pushliteral(L, "level");
-        lua_pushlstring(L, name.data(), name.size());
-        lua_rawset(L, -3);
-        lua_pushliteral(L, "timestamp");
-        lua_pushinteger(L, dt.toSecsSinceEpoch());
-        lua_rawset(L, -3);
-        lua_pushliteral(L, "msg");
-        lua_pushstring(L, fmt::vformat(fmt, args).c_str());
-        lua_rawset(L, -3);
-        lua_pushliteral(L, "category");
-        lua_pushstring(L, cat);
-        lua_rawset(L, -3);
-        if (lua_pcall(L, 1, 0, msgh) != LUA_OK) {
-            Raise("Error in lua log handler: {}", lua_tostring(L, -1));
-        }
+        LuaFunction handler(L, ConsumeTop);
+        QVariantMap record;
+        record.insert("level", QString::fromUtf8(name.data(), int(name.size())));
+        record.insert("timestamp", dt.toSecsSinceEpoch());
+        record.insert("msg", QString::fromUtf8(fmt::vformat(fmt, args).c_str()));
+        record.insert("category", QString::fromUtf8(cat));
+        // the guard spans the whole async hop (set here, cleared when the handler
+        // returns on its fiber), so a handler that logs cannot re-enter forever
+        d->insideLogHandler = true;
+        Fibers()->run([impl = d.get(), self = std::move(handler), record](Fiber*) {
+            defer reset([&]{
+                impl->insideLogHandler = false;
+            });
+            self.CallNoWait(QVariantList{record}, "log handler");
+        });
     }
 } catch (std::exception& e) {
     fprintf(stderr, "Error in Log(): %s\n", e.what());
@@ -373,36 +379,34 @@ void Instance::RegisterSchema(const char *name, ExtraSchema schemaGen)
     d->schemas[name] = schemaGen;
 }
 
-// Blocking HTTP(S) GET, driven by a nested event loop. `require` is synchronous, so a
-// script loader has no other option; this only runs while resolving scripts/modules.
-static optional<QByteArray> httpGetSync(QUrl const& url, QString& err, int timeoutMs = 30000)
+static fut::Future<QByteArray> httpGet(QUrl const& url, int timeoutMs = 30000)
 {
     static QNetworkAccessManager manager;
+    fut::Promise<QByteArray> prom;
+    auto fut = prom.GetFuture();
     QNetworkRequest req(url);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = manager.get(req);
-    QEventLoop loop;
-    QTimer timer;
-    timer.setSingleShot(true);
-    QObject::connect(&timer, &QTimer::timeout, reply, &QNetworkReply::abort);
-    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    timer.start(timeoutMs);
-    loop.exec();
-
-    optional<QByteArray> res;
-    if (reply->error() != QNetworkReply::NoError) {
-        err = reply->errorString();
-    } else {
-        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (status >= 200 && status < 300) {
-            res = reply->readAll();
+    auto* timer = new QTimer(reply); // dies with the reply
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, reply, &QNetworkReply::abort);
+    QObject::connect(reply, &QNetworkReply::finished, reply,
+                     [prom = std::move(prom), reply] {
+        if (reply->error() == QNetworkReply::NoError) {
+            int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (status >= 200 && status < 300) {
+                prom(reply->readAll());
+            } else {
+                prom(std::runtime_error(fmt::format("HTTP {}", status)));
+            }
         } else {
-            err = QString("HTTP %1").arg(status);
+            prom(std::runtime_error(reply->errorString().toStdString()));
         }
-    }
-    reply->deleteLater();
-    return res;
+        reply->deleteLater();
+    });
+    timer->start(timeoutMs);
+    return fut;
 }
 
 // package.searchers entry (installed only in HTTP mode): map a module name to a relative
@@ -421,15 +425,17 @@ static int httpSearcher(lua_State* L)
     rel += ".lua";
     QUrl url = QUrl(base).resolved(QUrl(rel));
 
-    QString err;
-    auto body = httpGetSync(url, err);
-    if (!body) {
+    QByteArray body;
+    try {
+        auto fut = httpGet(url);
+        body = Await(std::move(fut));
+    } catch (std::exception& e) {
         lua_pushfstring(L, "\n\tno http '%s' (%s)",
-                        url.toString().toUtf8().constData(), err.toUtf8().constData());
+                        url.toString().toUtf8().constData(), e.what());
         return 1;
     }
     auto chunk = ("@" + url.toString()).toUtf8();
-    if (luaL_loadbufferx(L, body->constData(), size_t(body->size()), chunk.constData(), "t") != LUA_OK) {
+    if (luaL_loadbufferx(L, body.constData(), size_t(body.size()), chunk.constData(), "t") != LUA_OK) {
         return lua_error(L);
     }
     lua_pushstring(L, url.toString().toUtf8().constData()); // loader arg (module "filename")
@@ -464,34 +470,57 @@ static void installHttpSearcher(lua_State* L)
     lua_pop(L, 2);
 }
 
+static void runChunkOnFiber(Instance* inst, lua_State* L, string what)
+{
+    inst->Fibers()->run([inst, L, what = std::move(what)](Fiber* f) {
+        auto* T = f->LuaState();
+        lua_pushcfunction(T, builtin::traceback);
+        lua_xmove(L, T, 1);
+        int msgh = lua_gettop(T) - 1;
+        auto base = f->suspends();
+        auto status = lua_pcall(T, 0, 0, msgh);
+        if (status == LUA_OK) {
+            return;
+        }
+        auto err = builtin::help::toSV(T);
+        if (f->suspends() == base) {
+            Raise("{} error:\n\t{}", what, err);
+        }
+        inst->Error("radapter", "In ({}): {}", what, err);
+    });
+}
+
 void Instance::EvalHttp(QString const& url)
 {
-    QString err;
-    auto body = httpGetSync(QUrl(url), err);
-    if (!body) {
-        Raise("Could not fetch script {}: {}", url.toStdString(), err.toStdString());
-    }
+    Fibers()->run([this, url](Fiber*) {
+        QByteArray body;
+        try {
+            auto fut = httpGet(QUrl(url));
+            body = Await(std::move(fut));
+        } catch (std::exception& e) {
+            Error("radapter", "Could not fetch script {}: {}", url.toStdString(), e.what());
+            Shutdown();
+            return;
+        }
+        auto L = d->L;
+        d->scriptBaseUrl = url;
+        installHttpSearcher(L);
 
-    auto L = d->L;
-    d->scriptBaseUrl = url;
-    installHttpSearcher(L);
+        QUrl dir = QUrl(url).resolved(QUrl("."));
+        RegisterGlobal("SCRIPT_PATH", QVariant(url));
+        RegisterGlobal("SCRIPT_DIR", QVariant(dir.toString()));
 
-    QUrl dir = QUrl(url).resolved(QUrl("."));
-    RegisterGlobal("SCRIPT_PATH", QVariant(url));
-    RegisterGlobal("SCRIPT_DIR", QVariant(dir.toString()));
-
-    auto chunk = ("@" + url).toStdString();
-    auto load = luaL_loadbufferx(L, body->constData(), size_t(body->size()), chunk.c_str(), "t");
-    if (load != LUA_OK) {
-        Raise("Error loading {}: {}", url.toStdString(), builtin::help::toSV(L));
-    }
-    lua_getglobal(L, "__eval_async");
-    lua_insert(L, -2);
-    lua_pushstring(L, url.toUtf8().constData());
-    auto res = lua_pcall(L, 2, 0, 0);
-    if (res != LUA_OK) {
-        Raise("EvalHttp error:\n\t{}", builtin::help::toSV(L));
-    }
+        try {
+            auto chunk = ("@" + url).toStdString();
+            if (luaL_loadbufferx(L, body.constData(), size_t(body.size()), chunk.c_str(), "t") != LUA_OK) {
+                Raise("Error loading {}: {}", url.toStdString(), builtin::help::toSV(L));
+            }
+            runChunkOnFiber(this, L, std::move(chunk));
+        } catch (std::exception& e) {
+            Error("radapter", "EvalHttp: {}", e.what());
+            Shutdown();
+        }
+    });
 }
 
 void Instance::EvalFile(fs::path path)
@@ -510,10 +539,6 @@ void Instance::EvalFile(fs::path path)
     }
 
     auto dir = path.parent_path();
-    auto wasCwd = QDir::currentPath();
-    if (!dir.empty()) {
-        QDir::setCurrent(QString::fromUtf8(dir.u8string().c_str()));
-    }
     // let `require` find modules sitting next to the script (absolute, so it holds
     // regardless of cwd or when the require runs). Prepend once.
     {
@@ -532,18 +557,7 @@ void Instance::EvalFile(fs::path path)
     RegisterGlobal("SCRIPT_PATH", QVariant(QString::fromStdString(path.u8string())));
     RegisterGlobal("SCRIPT_DIR", QVariant(QString::fromStdString(dir.u8string())));
 
-    lua_getglobal(L, "__eval_async");
-    lua_insert(L, -2);
-    lua_pushstring(L, path.string().c_str());
-    // no message handler: sync errors already carry the coroutine traceback
-    auto res = lua_pcall(L, 2, 0, 0);
-    if (!dir.empty()) {
-        QDir::setCurrent(wasCwd);
-    }
-    if (res != LUA_OK) {
-        auto e = builtin::help::toSV(L);
-        Raise("EvalFile error:\n\t{}", e);
-    }
+    runChunkOnFiber(this, L, path.string());
 }
 
 void Instance::Eval(string_view code, string_view chunk)
@@ -556,15 +570,7 @@ void Instance::Eval(string_view code, string_view chunk)
     if (load != LUA_OK) {
         Raise("Error loading code: {}", builtin::help::toSV(L));
     }
-    lua_getglobal(L, "__eval_async");
-    lua_insert(L, -2);
-    lua_pushlstring(L, chunk.data(), chunk.size());
-    // no message handler: sync errors already carry the coroutine traceback
-    auto res = lua_pcall(L, 2, 0, 0);
-    if (res != LUA_OK) {
-        auto e = builtin::help::toSV(L);
-        Raise("Eval error:\n\t{}", e);
-    }
+    runChunkOnFiber(this, L, string{chunk});
 }
 
 void Instance::RequestReload()
@@ -579,13 +585,10 @@ void Instance::Shutdown(unsigned int timeout)
         return;
     }
     d->shutdown = true;
+    d->shutdownTimeout = timeout;
     Warn("radapter", "Shutting down...");
     for (auto& fn : d->shutdownHandlers) {
-        try {
-            fn.Call({});
-        } catch (std::exception& e) {
-            Error("radapter", "on_shutdown handler error: {}", e.what());
-        }
+        fn.CallNoWait({}, "on_shutdown");
     }
     d->shutdownHandlers.clear();
     // each()/after() timers are direct children; stop them so they can't fire Lua
@@ -600,15 +603,18 @@ void Instance::Shutdown(unsigned int timeout)
         }
     });
     if (d->workers.empty()) {
-        if (!std::exchange(d->shutdownDone, true)) {
-            emit ShutdownDone();
-        }
+        emitDoneWhenIdle(this);
     }
 }
 
 lua_State *Instance::LuaState()
 {
     return d->L;
+}
+
+FiberPool* Instance::Fibers()
+{
+    return d->fibers.get();
 }
 
 Instance::~Instance()
@@ -620,6 +626,9 @@ Instance::~Instance()
     // the tag registry holds LuaFunctions whose destructors luaL_unref into L, so it
     // must be torn down before lua_close (else it unrefs into a freed state -> crash)
     d->tagRegistry.reset();
+    // fibers hold refs to their Lua threads: release them before lua_close (the pool
+    // unwinds whatever is still suspended, so nothing outlives the state)
+    d->fibers.reset();
     lua_close(d->L);
 }
 
@@ -630,23 +639,23 @@ void Instance::RegisterGlobal(const char *name, const QVariant &value)
     lua_setglobal(L, name);
 }
 
-
-QVariant MakeFunction(ExtraFunction func) {
-    return QVariant::fromValue(std::move(func));
+QVariant MakeFunction(ExtraFunction func)
+{
+    return QVariant::fromValue(std::make_shared<ExtraFunction>(std::move(func)));
 }
 
-void Instance::RegisterFunc(const char *name, ExtraFunction func)
+void Instance::RegisterFunc(const char* name, ExtraFunction func)
 {
     glua::Push(d->L, MakeFunction(std::move(func)));
     lua_setglobal(d->L, name);
 }
 
 #ifndef RADAPTER_GUI
-constexpr auto unav_fmt = "{}: available only in GUI builds";
-RADAPTER_API void gui::StartRecording(Instance*) {Raise(unav_fmt, __func__);}
-RADAPTER_API QVariantList gui::StopRecording(Instance*) {Raise(unav_fmt, __func__);}
-RADAPTER_API void gui::ReplayFile(QString const&, double) {Raise(unav_fmt, __func__);}
-RADAPTER_API void gui::RecordNote(radapter::Instance*, QVariant const&) {Raise(unav_fmt, __func__);}
+constexpr auto unavail_fmt = "{}: available only in GUI builds";
+RADAPTER_API void gui::StartRecording(Instance*) {Raise(unavail_fmt, __func__);}
+RADAPTER_API QVariantList gui::StopRecording(Instance*) {Raise(unavail_fmt, __func__);}
+RADAPTER_API void gui::ReplayFile(QString const&, double) {Raise(unavail_fmt, __func__);}
+RADAPTER_API void gui::RecordNote(radapter::Instance*, QVariant const&) {Raise(unavail_fmt, __func__);}
 #endif
 
 }

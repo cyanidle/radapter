@@ -76,9 +76,8 @@ pipe(master, function(msg)
 end)
 
 -- Master -> Slave: write over the wire, slave reports the change
-await(match_msg(master.events, function(ev)
-    return ev.state == "ConnectedState" end)
-)
+match_msg(master.events, function(ev)
+    return ev.state == "ConnectedState" end):await()
 
 master {
     to_slave = 9,

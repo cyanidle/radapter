@@ -107,7 +107,7 @@ public:
             auto& reg = it->second;
             if (reg.validator) {
                 try {
-                    auto res = reg.validator->Call({});
+                    auto res = Await(reg.validator->Call(QVariantList{}));
                     if (!res.value<bool>()) {
                         Debug("Writing {} with => {} failed validation", k, v.toString());
                         continue;

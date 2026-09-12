@@ -40,7 +40,7 @@ public:
     }
 
     void Call(std::optional<LuaFunction> fn) {
-        if (fn) fn->Call({1, 2, 3});
+        if (fn) fn->CallNoWait({1, 2, 3}, "TestWorker");
     }
 };
 

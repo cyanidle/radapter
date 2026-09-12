@@ -470,11 +470,7 @@ static int timer(lua_State* L, bool oneshot) {
     t->setObjectName(QString::number(ref));
     t->setSingleShot(oneshot);
     t->callOnTimeout([t, f = std::move(func)]() mutable {
-        try {
-            f.Call({});
-        } catch (std::exception& e) {
-            static_cast<Instance*>(t->parent())->Error("timers", "Error calling timer:\n\t{}", e.what());
-        }
+        f.CallNoWait({}, "timers");
         if (t->isSingleShot()) {
             luaL_unref(f._L, LUA_REGISTRYINDEX, t->objectName().toInt());
             t->setObjectName(QString::number(LUA_NOREF));
@@ -500,7 +496,7 @@ string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
     return {s, len};
 }
 
-int builtin::json_decode(lua_State* L) {
+int builtin::api::json_decode(lua_State* L) {
     size_t len;
     auto* str = luaL_checklstring(L, 1, &len);
     auto bytes = QByteArray::fromRawData(str, int(len));
@@ -513,7 +509,7 @@ int builtin::json_decode(lua_State* L) {
     return 1;
 }
 
-int builtin::json_encode(lua_State* L) {
+int builtin::api::json_encode(lua_State* L) {
     auto variant = help::toQVar(L, 1);
     auto format = QJsonDocument::Compact;
     if (lua_istable(L, 2)) {
@@ -609,7 +605,7 @@ static void pushQObj(lua_State* L, QObject* q) {
 
 
 struct ExtraHelper {
-    ExtraFunction func;
+    ExtraFunctionPtr func;
 };
 DESCRIBE("radapter::ExtraHelper", ExtraHelper, void) {}
 
@@ -622,7 +618,7 @@ static int wrapFunc(lua_State* L) {
         args.push_back(builtin::help::toQVar(L));
         lua_pop(L, 1);
     }
-    glua::Push(L, glua::CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func(Instance::FromLua(L), std::move(args)));
+    glua::Push(L, (*glua::CheckUData<ExtraHelper>(L, lua_upvalueindex(1)).func)(Instance::FromLua(L), std::move(args)));
     return 1;
 }
 
@@ -632,7 +628,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
     case QMetaType::QVariantMap: {
         lua_checkstack(L, 3); //key, val, table
         auto map = val.toMap();
-        lua_createtable(L, 0, map.size());
+        lua_createtable(L, 0, int(map.size()));
         for (auto it = map.keyValueBegin(); it != map.keyValueEnd(); ++it) {
             pushQStr(L, it->first);
             Push(L, it->second);
@@ -643,7 +639,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
     case QMetaType::QVariantList: {
         lua_checkstack(L, 2); //val, table
         auto arr = val.toList();
-        lua_createtable(L, arr.size(), 0);
+        lua_createtable(L, int(arr.size()), 0);
         int i = 1;
         for (auto& v: arr) {
             Push(L, v);
@@ -703,7 +699,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
     case QMetaType::QStringList: {
         lua_checkstack(L, 1); //val
         auto arr = val.toStringList();
-        lua_createtable(L, arr.size(), 0);
+        lua_createtable(L, int(arr.size()), 0);
         int i = 1;
         for (auto& v: arr) {
             pushQStr(L, v);
@@ -713,12 +709,12 @@ void glua::Push(lua_State* L, QVariant const& val) {
     }
     default:
         if (auto f = val.value<LuaFunction>()) {
-            lua_rawgeti(f._L, LUA_REGISTRYINDEX, f._ref);
-        } else if (auto cf = val.value<ExtraFunction>()) {
+            f.Push(L);
+        } else if (auto cf = val.value<ExtraFunctionPtr>()) {
             glua::Push(L, ExtraHelper{std::move(cf)});
             lua_pushcclosure(L, glua::protect<wrapFunc>, 1);
         } else if (auto v = val.value<LuaValue>()) {
-            lua_rawgeti(v._L, LUA_REGISTRYINDEX, v._ref);
+            v.Push(L);
         } else if (auto q = val.value<QObject*>()) {
             pushQObj(L, q);
         } else {

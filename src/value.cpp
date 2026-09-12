@@ -3,9 +3,6 @@
 
 using namespace radapter;
 
-// values may be captured while a coroutine runs (e.g. top-level await in main
-// files): the registry ref is state-independent, but the creating thread can
-// be collected - keep the always-alive main state instead
 static lua_State* mainState(lua_State* L) {
     if (auto* inst = Instance::FromLua(L)) {
         return inst->LuaState();
@@ -54,6 +51,13 @@ LuaValue::LuaValue(lua_State *L, int idx)
 LuaValue::LuaValue(lua_State *L, ConsumeTopTag)
 {
     this->_L = mainState(L);
+    _ref = luaL_ref(L, LUA_REGISTRYINDEX);
+}
+
+LuaValue::LuaValue(lua_State* L, RegistryRefTag, int ref)
+{
+    this->_L = mainState(L);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
     _ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 

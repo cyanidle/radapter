@@ -22,11 +22,11 @@ each(1000, function ()
     id = id + 1
 end)
 
-each(1000, async(function ()
+each(1000, function ()
     sql:Exec("SELECT * FROM users", function(rows, err)
         log("SELECT: {}", rows)
     end)
-    local rows, err = await(sql:Exec("SELECT * FROM users LIMIT 1"));
+    local rows, err = sql:Exec("SELECT * FROM users LIMIT 1"):await()
     log("Async select 1: res {}, err {}", rows, err)
-    log("Async select 2 (err): res {}, err {}", await((sql:Exec("SLECT * FROM users LIMIT 1"))))
-end))
+    log("Async select 2 (err): res {}, err {}", sql:Exec("SLECT * FROM users LIMIT 1"):await())
+end)
