@@ -94,11 +94,11 @@ struct FiberPool::StepGuard
     }
 };
 
-Fiber::Fiber(FiberPool* pool) : d()
+Fiber::Fiber(FiberPool* pool) : d(new Impl)
 {
     d->pool = pool;
     d->self = this;
-    d->step.emplace(boost::context::protected_fixedsize_stack{pool->d->stackSize}, std::ref(*d.data()));
+    d->step.emplace(boost::context::protected_fixedsize_stack{pool->d->stackSize}, std::ref(*d));
 }
 
 void Fiber::Impl::operator()(push_type& yield)
@@ -123,7 +123,7 @@ void Fiber::Impl::operator()(push_type& yield)
 }
 
 FiberPool::FiberPool(Instance* inst, size_t pooledFibers, size_t stackSize)
-    : d()
+    : d(new Impl)
 {
     d->self = this;
     d->inst = inst;
@@ -167,6 +167,7 @@ void FiberPool::Run(fut::MoveFunc<void(Fiber*)> closure)
 
 void FiberPool::Stop(unsigned timeout)
 {
+    Q_ASSERT(Fiber::Current() == nullptr);
     QDeadlineTimer deadline(timeout);
     while (d->flying.size() && !deadline.hasExpired()) {
         QEventLoop loop;
@@ -174,12 +175,16 @@ void FiberPool::Stop(unsigned timeout)
         connect(this, &FiberPool::idle, &loop, &QEventLoop::quit);
         loop.exec();
     }
-    QEventLoop loop;
-    connect(this, &FiberPool::idle, &loop, &QEventLoop::quit, Qt::QueuedConnection);
-    for (auto f: d->flying) {
-        f->d->step.reset();
+    // Force-kill any remaining
+    if (d->flying.size()) {
+        QEventLoop loop;
+        connect(this, &FiberPool::idle, &loop, &QEventLoop::quit, Qt::QueuedConnection);
+        for (auto f: d->flying) {
+            f->d->step.reset();
+            f->d->thread = {};
+        }
+        loop.exec();
     }
-    loop.exec();
 }
 
 void Fiber::Impl::await(fut::Future<void>& sig)
@@ -188,7 +193,8 @@ void Fiber::Impl::await(fut::Future<void>& sig)
         throw ForcedShutdown{};
     }
     sig.AtLastSync([f = rc::Strong<Fiber>(self)](fut::Result<void> res) mutable {
-        QMetaObject::invokeMethod(f->d->pool->d->inst, [MV(f), exc = res.get_exception()]() mutable {
+        Instance* inst = f->d->pool->d->inst;
+        QMetaObject::invokeMethod(inst, [MV(f), exc = res.get_exception()]() mutable {
             f->d->resume(std::move(exc));
         }, Qt::QueuedConnection);
     });
@@ -239,6 +245,12 @@ lua_State* Fiber::LuaState()
 size_t Fiber::SuspendCount() const
 {
     return d->suspendCount;
+}
+
+
+bool Fiber::Unwinding() const
+{
+    return bool(d->unwind);
 }
 
 Fiber* Fiber::Current()
@@ -320,11 +332,14 @@ int builtin::api::AwaitNative(lua_State* L)
     lua_insert(L, -2);
     lua_pcall(L, 1, 0, 0);
     AwaitRes out;
+    bool shutdown = false;
     try {
         out = Await(std::move(fut));
     } catch (ForcedShutdown const&) {
-        return luaL_error(L, "Forced shutdown");
+        shutdown = true;
     }
+    if (shutdown)
+        return luaL_error(L, "Forced shutdown");
     glua::Push(L, out.res);
     glua::Push(L, out.err);
     return 2;

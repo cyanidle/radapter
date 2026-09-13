@@ -39,6 +39,8 @@ public:
     FiberPool& operator=(FiberPool const&) = delete;
 
     void Run(fut::MoveFunc<void(Fiber*)> closure);
+
+    // Must not be called from a Fiber
     void Stop(unsigned timeout);
 signals:
     void idle();
@@ -47,7 +49,7 @@ private:
     friend class Fiber;
     struct StepGuard;
     struct Impl;
-    rpcxx::FastPimpl<Impl, 512> d;
+    std::unique_ptr<Impl> d;
 };
 
 struct RADAPTER_API ForcedShutdown : std::exception
@@ -61,6 +63,8 @@ class RADAPTER_API Fiber : public rc::DefaultBase
 public:
     lua_State* LuaState();
     size_t SuspendCount() const;
+    bool Unwinding() const;
+
     static Fiber* Current();
 
     ~Fiber();
@@ -69,7 +73,7 @@ private:
     Fiber(FiberPool* pool);
     friend void Await(fut::Future<void> signal);
     struct Impl;
-    rpcxx::FastPimpl<Impl, 512> d;
+    std::unique_ptr<Impl> d;
 };
 
 void Await(fut::Future<void> signal);

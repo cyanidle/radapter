@@ -22,6 +22,9 @@ static QVariant callOn(lua_State* T, LuaFunction const& fn, QVariantList const& 
     if (status != LUA_OK) {
         auto err = QString::fromUtf8(lua_tostring(T, -1));
         lua_settop(T, base);
+        if (auto f = Fiber::Current(); f && f->Unwinding()) {
+            throw ForcedShutdown{};
+        }
         Raise("{}", err);
     }
     if (result) {
@@ -58,7 +61,7 @@ void LuaFunction::CallNoWait(QVariantList const& args, std::string ctx) const
         try {
             callOn(f->LuaState(), self, args, false);
         } catch (ForcedShutdown const&) {
-            throw;
+            // pass
         } catch (std::exception& e) {
             inst->Error(ctx.c_str(), "Uncaught error:\n\t{}", e.what());
         }
@@ -77,8 +80,6 @@ fut::Future<QVariant> LuaFunction::Call(QVariantList args) const
     inst->Fibers()->Run([self = *this, MV(promise), args = std::move(args)](Fiber* f) mutable {
         try {
             promise(callOn(f->LuaState(), self, args, true));
-        } catch (ForcedShutdown const&) {
-            throw;
         } catch (...) {
             promise(std::current_exception());
         }
@@ -100,8 +101,6 @@ int builtin::api::SpawnNative(lua_State* L)
         inst->Fibers()->Run([fn, args = std::move(args), MV(promise)](Fiber* f) mutable {
             try {
                 promise(callOn(f->LuaState(), fn, args, true));
-            } catch (ForcedShutdown const&) {
-                throw;
             } catch (...) {
                 promise(std::current_exception());
             }

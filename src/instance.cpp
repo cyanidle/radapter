@@ -122,8 +122,6 @@ static void registerUnavailable(lua_State* L, const char* name, const char* msg)
     lua_setglobal(L, name);
 }
 
-// ShutdownDone fires only when the workers are gone AND every fiber entry has
-// parked; the Shutdown(timeout) singleShot remains the escape hatch.
 static void emitDoneWhenIdle(Instance* inst)
 {
     auto* d = inst->_GetPrivate();
@@ -602,8 +600,6 @@ void Instance::Shutdown(unsigned int timeout)
         fn.CallNoWait({}, "on_shutdown");
     }
     d->shutdownHandlers.clear();
-    // each()/after() timers are direct children; stop them so they can't fire Lua
-    // callbacks into workers that are already mid-teardown
     for (auto* t : findChildren<QTimer*>(QString(), Qt::FindDirectChildrenOnly)) {
         t->stop();
     }
@@ -614,7 +610,9 @@ void Instance::Shutdown(unsigned int timeout)
         }
     });
     if (d->workers.empty()) {
-        emitDoneWhenIdle(this);
+        QMetaObject::invokeMethod(this, [this]{
+            emitDoneWhenIdle(this);
+        }, Qt::QueuedConnection);
     }
 }
 
