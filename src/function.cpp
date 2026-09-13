@@ -58,13 +58,30 @@ void LuaFunction::CallNoWait(QVariantList const& args, std::string ctx) const
         Raise("Attempt to call invalid lua function");
     }
     auto* inst = Instance::FromLua(_L);
-    inst->Fibers()->Run([inst, self = *this, args, MV(ctx)](Fiber* f) {
+    CallOnFiber(args, [inst, ctx = std::move(ctx)](std::string_view err) {
+        inst->Error(ctx.c_str(), "Uncaught error:\n\t{}", err);
+    });
+}
+
+LuaFunction LuaFunction::Global(lua_State* L, char const* name)
+{
+    lua_getglobal(L, name);
+    return {L, ConsumeTop};
+}
+
+void LuaFunction::CallOnFiber(QVariantList args, fut::MoveFunc<void(std::string_view)> onError) const
+{
+    if (!(*this)) {
+        Raise("Attempt to call invalid lua function");
+    }
+    auto* inst = Instance::FromLua(_L);
+    inst->Fibers()->Run([self = *this, args = std::move(args), onError = std::move(onError)](Fiber* f) mutable {
         try {
             callOn(f->LuaState(), self, args, false);
         } catch (ForcedShutdown const&) {
             throw;
         } catch (std::exception& e) {
-            inst->Error(ctx.c_str(), "Uncaught error:\n\t{}", e.what());
+            onError(e.what());
         }
     });
 }

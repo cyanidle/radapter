@@ -479,23 +479,11 @@ static void installHttpSearcher(lua_State* L)
     lua_pop(L, 2);
 }
 
-static void runChunkOnFiber(Instance* inst, lua_State* L, string what)
+static void runChunkOnFiber(lua_State* L, string what)
 {
-    inst->Fibers()->Run([inst, L, what = std::move(what)](Fiber* f) {
-        auto* T = f->LuaState();
-        lua_pushcfunction(T, builtin::traceback);
-        lua_xmove(L, T, 1);
-        int msgh = lua_gettop(T) - 1;
-        auto base = f->SuspendCount();
-        auto status = lua_pcall(T, 0, 0, msgh);
-        if (status == LUA_OK) {
-            return;
-        }
-        auto err = builtin::help::toSV(T);
-        if (f->SuspendCount() == base) {
-            Raise("{} error:\n\t{}", what, err);
-        }
-        inst->Error("radapter", "In ({}): {}", what, err);
+    LuaFunction chunk(L, ConsumeTop);
+    chunk.CallOnFiber({}, [what = std::move(what)](std::string_view err) {
+        Raise("{} error:\n\t{}", what, err);
     });
 }
 
@@ -524,7 +512,7 @@ void Instance::EvalHttp(QString const& url)
             if (luaL_loadbufferx(L, body.constData(), size_t(body.size()), chunk.c_str(), "t") != LUA_OK) {
                 Raise("Error loading {}: {}", url.toStdString(), builtin::help::toSV(L));
             }
-            runChunkOnFiber(this, L, std::move(chunk));
+            runChunkOnFiber(L, std::move(chunk));
         } catch (std::exception& e) {
             Error("radapter", "EvalHttp: {}", e.what());
             Shutdown();
@@ -566,7 +554,7 @@ void Instance::EvalFile(fs::path path)
     RegisterGlobal("SCRIPT_PATH", QVariant(QString::fromStdString(path.u8string())));
     RegisterGlobal("SCRIPT_DIR", QVariant(QString::fromStdString(dir.u8string())));
 
-    runChunkOnFiber(this, L, path.string());
+    runChunkOnFiber(L, path.string());
 }
 
 void Instance::Eval(string_view code, string_view chunk)
@@ -579,7 +567,7 @@ void Instance::Eval(string_view code, string_view chunk)
     if (load != LUA_OK) {
         Raise("Error loading code: {}", builtin::help::toSV(L));
     }
-    runChunkOnFiber(this, L, string{chunk});
+    runChunkOnFiber(L, string{chunk});
 }
 
 void Instance::RequestReload()

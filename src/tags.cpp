@@ -1,5 +1,4 @@
 #include "tags.hpp"
-#include "builtin.hpp"
 #include "glua/glua.hpp"
 #include "instance_impl.hpp"
 
@@ -22,19 +21,10 @@ static void pushPipable(lua_State* L, LuaValue& listeners) {
 
 static void callListeners(Instance* inst, LuaValue& listeners, QVariant const& ev) {
     if (!listeners) return;
-    inst->Fibers()->Run([inst, listeners, ev](Fiber* f) {
-        auto* T = f->LuaState();
-        lua_pushcfunction(T, builtin::traceback);
-        auto msgh = lua_gettop(T);
-        lua_getglobal(T, "call_all");
-        listeners.Push(T);
-        glua::Push(T, ev);
-        lua_pushnil(T);
-        if (lua_pcall(T, 3, 0, msgh) != LUA_OK) {
-            inst->Error("tags", "call_all error: {}", lua_tostring(T, -1));
-        }
-        lua_settop(T, msgh - 1);
-    });
+    LuaFunction::Global(inst->LuaState(), "call_all")
+        .CallOnFiber({QVariant::fromValue(listeners), ev, QVariant{}}, [inst](std::string_view err) {
+            inst->Error("tags", "call_all error: {}", err);
+        });
 }
 
 TagRegistry::TagRegistry(Instance* inst) : QObject(inst), _inst(inst) {

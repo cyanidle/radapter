@@ -62,7 +62,6 @@ class RADAPTER_API Fiber : public rc::DefaultBase
 {
 public:
     lua_State* LuaState();
-    size_t SuspendCount() const;
     bool Unwinding() const;
 
     static Fiber* Current();

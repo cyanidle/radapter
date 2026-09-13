@@ -55,7 +55,7 @@ struct Fiber::Impl
 
     LuaValue thread;
 
-    void afterStep();
+    void afterStep(bool resumed);
     void operator()(push_type& yield);
     void await(fut::Future<void>& sig);
     void resume(std::exception_ptr exc);
@@ -137,11 +137,24 @@ FiberPool::~FiberPool()
     Stop(1);
 }
 
-void Fiber::Impl::afterStep() {
+void Fiber::Impl::afterStep(bool resumed) {
     if (!busy)
         pool->d->returnFiber(self);
     if (unwind)
         throw ForcedShutdown{};
+    if (auto pending = std::exchange(exc, nullptr)) {
+        try {
+            std::rethrow_exception(pending);
+        } catch (std::exception& e) {
+            if (!resumed)
+                throw;
+            pool->d->inst->Error("fibers", "Unhandled error in fiber: {}", e.what());
+        } catch (...) {
+            if (!resumed)
+                throw;
+            pool->d->inst->Error("fibers", "Unhandled non-standard exception in fiber");
+        }
+    }
 }
 
 void FiberPool::Run(fut::MoveFunc<void(Fiber*)> closure)
@@ -165,7 +178,7 @@ void FiberPool::Run(fut::MoveFunc<void(Fiber*)> closure)
         StepGuard guard_(fiber.get());
         fiber->d->step.value()();
     }
-    fiber->d->afterStep();
+    fiber->d->afterStep(false);
 }
 
 void FiberPool::Stop(unsigned timeout)
@@ -221,7 +234,7 @@ void Fiber::Impl::resume(std::exception_ptr exc)
         FiberPool::StepGuard guard(self);
         step.value()();
     }
-    afterStep();
+    afterStep(true);
 }
 
 Fiber::~Fiber()
@@ -244,12 +257,6 @@ lua_State* Fiber::LuaState()
     }
     return T;
 }
-
-size_t Fiber::SuspendCount() const
-{
-    return d->suspendCount;
-}
-
 
 bool Fiber::Unwinding() const
 {
