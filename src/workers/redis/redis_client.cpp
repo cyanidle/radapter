@@ -59,6 +59,7 @@ struct Client::Impl {
     {
         auto adapter = static_cast<Client*>(context->data);
         if (status != REDIS_OK) {
+            adapter->ctx = nullptr; // hiredis frees the failed context once this callback returns
             emit adapter->Error(context->errstr);
             adapter->ReconnectLater();
         } else {
@@ -69,6 +70,7 @@ struct Client::Impl {
     static void disconnectCallback(const redisAsyncContext *context, int)
     {
         auto adapter = static_cast<Client*>(context->data);
+        adapter->ctx = nullptr; // the context is freed as soon as this callback returns
         adapter->ok = false;
         emit adapter->ConnectedChanged(false);
     }
@@ -128,6 +130,12 @@ Client::~Client()
         redisAsyncDisconnect(ctx);
         ctx = nullptr;
     }
+    // redisAsyncDisconnect skips the context free while replies are pending;
+    // those subscriptions will never see their null delivery
+    for (auto& [glob, sub] : liveSubs) {
+        delete sub;
+    }
+    liveSubs.clear();
 }
 
 void radapter::redis::Client::Start() {
@@ -196,8 +204,11 @@ static void subCallback(redisAsyncContext* ctx, void *reply, void *_data) noexce
     auto adapter = static_cast<Client*>(ctx->data);
     auto cast = static_cast<redisReply*>(reply);
     auto* data = static_cast<Client::Subscriber*>(_data);
+    if (!cast) { // null reply = hiredis is freeing the context; this callback will not fire again
+        adapter->ForgetSubscription(data);
+        return;
+    }
     try {
-        if (!cast) Raise("null reply");
         auto r = parseReply(cast).toStringList();
         if (r.size() < 3) {
             Raise("Invalid responce: small list?");
@@ -219,7 +230,24 @@ void Client::PSubscribe(string_view glob, Subscriber _sub)
     auto* sub = new Subscriber(std::move(_sub));
     auto status = redisAsyncCommand(ctx, subCallback, sub, "PSUBSCRIBE %s", string{glob}.c_str());
     if (status != REDIS_OK) {
+        delete sub;
         Raise("Could not psubscribe to: {}", glob);
+    }
+    auto [it, inserted] = liveSubs.try_emplace(string{glob}, sub);
+    if (!inserted) {
+        delete it->second; // hiredis replaced the old callback without delivering it
+        it->second = sub;
+    }
+}
+
+void Client::ForgetSubscription(Subscriber const* sub)
+{
+    for (auto it = liveSubs.begin(); it != liveSubs.end(); ++it) {
+        if (it->second == sub) {
+            delete it->second;
+            liveSubs.erase(it);
+            return;
+        }
     }
 }
 
@@ -235,7 +263,6 @@ void radapter::redis::Client::doConnect() {
     reconPending = false;
     adapter = new QtRedisAdapter{this};
     auto options = redisOptions{};
-    options.options |= REDIS_OPT_NOAUTOFREE;
     REDIS_OPTIONS_SET_TCP(&options, config.host.value.c_str(), config.port);
     ctx = redisAsyncConnectWithOptions(&options);
     ctx->data = this;

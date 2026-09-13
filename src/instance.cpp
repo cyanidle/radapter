@@ -1,6 +1,7 @@
 #include "radapter/radapter.hpp"
 #include "radapter/async_helpers.hpp"
 #include <QVariant>
+#include <QCoreApplication>
 #include <QMap>
 #include <QTimer>
 #include <qdatetime.h>
@@ -128,7 +129,7 @@ static void emitDoneWhenIdle(Instance* inst)
     if (std::exchange(d->shutdownIdleArmed, true)) {
         return;
     }
-    inst->Fibers()->stop(d->shutdownTimeout);
+    inst->Fibers()->Stop(d->shutdownTimeout);
     if (!std::exchange(d->shutdownDone, true)) {
         emit inst->ShutdownDone();
     }
@@ -360,13 +361,11 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         record.insert("timestamp", dt.toSecsSinceEpoch());
         record.insert("msg", QString::fromUtf8(fmt::vformat(fmt, args).c_str()));
         record.insert("category", QString::fromUtf8(cat));
-        // the guard spans the whole async hop (set here, cleared when the handler
-        // returns on its fiber), so a handler that logs cannot re-enter forever
         d->insideLogHandler = true;
-        Fibers()->run([impl = d.get(), self = std::move(handler), record](Fiber*) {
-            defer reset([&]{
-                impl->insideLogHandler = false;
-            });
+        auto cleanup = [this]{
+            d->insideLogHandler = false;
+        };
+        Fibers()->Run([drop = defer{cleanup}, self = std::move(handler), record](Fiber*) {
             self.CallNoWait(QVariantList{record}, "log handler");
         });
     }
@@ -472,18 +471,18 @@ static void installHttpSearcher(lua_State* L)
 
 static void runChunkOnFiber(Instance* inst, lua_State* L, string what)
 {
-    inst->Fibers()->run([inst, L, what = std::move(what)](Fiber* f) {
+    inst->Fibers()->Run([inst, L, what = std::move(what)](Fiber* f) {
         auto* T = f->LuaState();
         lua_pushcfunction(T, builtin::traceback);
         lua_xmove(L, T, 1);
         int msgh = lua_gettop(T) - 1;
-        auto base = f->suspends();
+        auto base = f->SuspendCount();
         auto status = lua_pcall(T, 0, 0, msgh);
         if (status == LUA_OK) {
             return;
         }
         auto err = builtin::help::toSV(T);
-        if (f->suspends() == base) {
+        if (f->SuspendCount() == base) {
             Raise("{} error:\n\t{}", what, err);
         }
         inst->Error("radapter", "In ({}): {}", what, err);
@@ -492,7 +491,7 @@ static void runChunkOnFiber(Instance* inst, lua_State* L, string what)
 
 void Instance::EvalHttp(QString const& url)
 {
-    Fibers()->run([this, url](Fiber*) {
+    Fibers()->Run([this, url](Fiber*) {
         QByteArray body;
         try {
             auto fut = httpGet(QUrl(url));
@@ -620,6 +619,10 @@ FiberPool* Instance::Fibers()
 Instance::~Instance()
 {
     d->shutdownHandlers.clear();
+    // queued entries (e.g. spawn) hold Lua handles and promises that settle into
+    // Lua when they are destroyed; Qt would drop them after lua_close, so drop
+    // them here while the state and the fiber pool are still alive
+    QCoreApplication::removePostedEvents(this);
     auto temp = d->workers; // modified due to deletion of each entry
     qDeleteAll(temp);
     luaL_unref(d->L, LUA_REGISTRYINDEX, d->luaLogHandler);

@@ -55,7 +55,7 @@ void radapter::Parse(QUuid &out, const QVariant &conf, const TraceFrame &frame) 
 
 void radapter::CheckCanConvert(int targetTypeId, const QVariant &from, const TraceFrame &frame)
 {
-    if (!from.canConvert(targetTypeId)) {
+    if (!from.canConvert(QMetaType(targetTypeId))) {
         Raise("{}: Could not convert to '{}' from '{}'", frame, QMetaType(targetTypeId).name(), TypeNameOf(from));
     }
 }

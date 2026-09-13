@@ -15,10 +15,10 @@ namespace radapter
 using namespace fut;
 
 template<typename T>
-void ResolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
+void ResolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func, std::string ctx = {}) {
     // QPointer: the future may resolve as/after the worker is destroyed (e.g.
     // Worker::shutdown resolves on destroyed), so never deref a dead worker.
-    fut.AtLastSync([worker = QPointer(worker), cb = std::move(func)](Result<T> res) mutable noexcept {
+    fut.AtLastSync([worker = QPointer(worker), cb = std::move(func), ctx = std::move(ctx)](Result<T> res) mutable noexcept {
         if (!cb) {
             if (!res && worker) worker->Error("Unhandled error (invalid callback): {}");
             return;
@@ -29,11 +29,17 @@ void ResolveLuaCallback(Worker* worker, Future<T>& fut, LuaFunction& func) {
         } catch (std::exception& e) {
             args = {QVariant{}, e.what()};
         }
-        cb.CallNoWait(std::move(args), "worker callback: " + (worker ? worker->_Origin : "<dead>"));
+        if (ctx.empty()) {
+            ctx = "worker callback: " + (worker ? worker->_Origin : "<dead>");
+        }
+        cb.CallNoWait(std::move(args), std::move(ctx));
     });
 }
 
 QVariant RADAPTER_API MakeLuaPromise(Worker* worker, Future<QVariant>& future);
+
+/// Same as above, for futures that belong to no worker (e.g. spawn).
+QVariant RADAPTER_API MakeLuaPromise(Instance* instance, Future<QVariant>& future);
 
 void RunOnLoop(QObject* ctx, fut::MoveFunc<void()> body);
 

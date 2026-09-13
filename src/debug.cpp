@@ -37,11 +37,11 @@ void radapter::Instance::DebuggerConnect(DebuggerOpts opts)
     }
     lua_pop(L, 1);
     d->debuggerActive = opts.vscode ? 2 : 1;
-    d->onThread(L);
+    d->newThreadCreated(L);
 }
 
 
-void radapter::Instance::Impl::onThread(lua_State* T)
+void radapter::Instance::Impl::newThreadCreated(lua_State* T)
 {
     if (!debuggerActive)
         return;

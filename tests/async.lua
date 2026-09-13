@@ -31,12 +31,24 @@ local function async_simple (arg1, arg2)
     return A + B
 end
 
--- spawn: the promise settles with the function's return values (nil, err) on error
+-- spawn accepts any callable, like promise() does
+local callable = setmetatable({}, { __call = function (_, a) return a * 2 end })
+local doubled = spawn(callable, 21):await()
+if doubled ~= 42 then
+    log.error("spawn: callable target expected 42, got {}", tostring(doubled))
+    os.exit(1)
+end
+
+-- spawn: the promise settles with the result of the call (nil, err) on error
 local entry = spawn(async_simple, 23, 25)
 
 -- Subscription form instead of :await()
 entry(function (res, err)
     log("RES: {} ERR: {}", res, err)
+    if err ~= nil or res ~= 444 then
+        log.error("spawn: expected the call result 444, got {}", tostring(res))
+        os.exit(1)
+    end
     log "Entry done!"
     shutdown()
 end)

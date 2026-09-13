@@ -22,7 +22,7 @@ static void pushPipable(lua_State* L, LuaValue& listeners) {
 
 static void callListeners(Instance* inst, LuaValue& listeners, QVariant const& ev) {
     if (!listeners) return;
-    inst->Fibers()->run([inst, listeners, ev](Fiber* f) {
+    inst->Fibers()->Run([inst, listeners, ev](Fiber* f) {
         auto* T = f->LuaState();
         lua_pushcfunction(T, builtin::traceback);
         auto msgh = lua_gettop(T);
@@ -150,7 +150,7 @@ void TagRegistry::notifyTag(QString const& tagName, Tag const& tag) {
     ev["ts"] = tag.ts;
 
     for (auto& fn : tag.subscribers) {
-        fn.CallNoWait({ev}, fmt::format("tags/{}", tagName));
+        fn.CallNoWait({ev}, "tags");
     }
 
     QVariant evVar(ev);

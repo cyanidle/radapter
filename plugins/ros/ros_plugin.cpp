@@ -265,7 +265,7 @@ public:
                         members->fini_function(ros_msg);
                         QMetaObject::invokeMethod(this, [this, topic, var = std::move(var), h]{
                             if (h)
-                                h->CallNoWait({var}, ("ros/" + topic).toStdString());
+                                h->CallNoWait({var}, "ros");
                             emit SendMsgField(topic, var);
                         }, Qt::QueuedConnection);
                     } catch (std::exception& e) {

@@ -280,7 +280,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
         }
         lua_settop(T, msgh - 1);
     };
-    w->_Inst->Fibers()->run(std::move(notify));
+    w->_Inst->Fibers()->Run(std::move(notify));
 }
 
 static int worker_tostring(lua_State* L) {

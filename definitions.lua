@@ -288,11 +288,11 @@ promise = {
 function promise(executor) end
 
 ---Run `fn` detached from the current fiber (concurrent execution); returns a
----promise settling with fn's first two return values, or (nil, traceback) if
----fn raises. Plain calls already suspend only the calling chain - spawn only
+---promise settling with the result of the call, or (nil, traceback) if fn
+---raises. Plain calls already suspend only the calling chain - spawn only
 ---to gain parallelism.
 ---@generic T
----@param fn fun(...): T?, string?
+---@param fn fun(...): T?
 ---@return promise<T?>
 function spawn(fn, ...) end
 

@@ -20,7 +20,6 @@ namespace radapter
 template<typename Fn> struct defer {
     Fn f;
     defer(Fn f) : f(std::move(f)) {}
-    defer(defer &&) = delete;
     ~defer() noexcept(false) {f();}
 };
 template<typename T> defer(T) -> defer<T>;

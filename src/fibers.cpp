@@ -1,7 +1,14 @@
 #include "radapter/fibers.hpp"
 
-#include <boost/coroutine2/coroutine.hpp>
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
 #include <boost/context/protected_fixedsize_stack.hpp>
+#include <boost/coroutine2/coroutine.hpp>
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>
@@ -25,259 +32,213 @@
 #include "instance_impl.hpp"
 
 using namespace radapter;
-namespace coro = boost::coroutines2;
+
+using push_type = boost::coroutines2::coroutine<void>::push_type;
+using pull_type = boost::coroutines2::coroutine<void>::pull_type;
 
 thread_local Fiber* t_current = nullptr;
 
-struct CurrentGuard
-{
-    Fiber* was;
-
-    explicit CurrentGuard(Fiber* f)
-    {
-        was = std::exchange(t_current, f);
-    }
-
-    ~CurrentGuard()
-    {
-        t_current = was;
-    }
-};
-
 struct Fiber::Impl
 {
-    explicit Impl(FiberPool* pool) : pool(pool) {}
+    Fiber* self;
+    FiberPool* pool;
 
-    FiberPool* pool = nullptr;
-    lua_State* mainL = nullptr;
+    std::optional<pull_type> step;
+    push_type* yield = nullptr;
 
-    coro::coroutine<void>::push_type* yield = nullptr;
-    std::optional<coro::coroutine<void>::pull_type> step;
+    bool busy = true;
 
-    fut::MoveFunc<void(Fiber*)> closure;
-    std::exception_ptr pendingExc = nullptr;
+    std::exception_ptr unwind = nullptr;
     std::exception_ptr exc = nullptr;
-    std::atomic<bool> wake{false};
-    bool done = true;
-    size_t suspends = 0;
+    fut::MoveFunc<void(Fiber*)> closure;
+    size_t suspendCount = 0;
 
-    rc::Strong<Fiber> selfHold;
+    LuaValue thread;
 
-    lua_State* thread = nullptr;
-    int threadRef = LUA_NOREF;
-
-    void init(Fiber* self);
+    void afterStep();
+    void operator()(push_type& yield);
+    void await(fut::Future<void>& sig);
+    void resume(std::exception_ptr exc);
 };
 
 struct FiberPool::Impl
 {
+    FiberPool* self;
     Instance* inst;
     size_t pooledFibers;
     size_t stackSize;
 
     std::vector<rc::Strong<Fiber>> parked;
-    std::vector<Fiber*> flying;
-    std::vector<Fiber*> stack;
-    size_t noWaitFor = 0;
+    std::set<Fiber*> flying;
+    std::mutex stopMutex;
 
-    Impl(Instance* inst, size_t pooledFibers, size_t stackSize)
-        : inst(inst), pooledFibers(pooledFibers), stackSize(stackSize)
-    {
+    void returnFiber(Fiber* fib) {
+        if (parked.size() < pooledFibers)
+            parked.push_back(fib);
+        flying.erase(fib);
+        if (flying.empty())
+            emit self->idle();
     }
 };
 
-FiberPool::FiberPool(Instance* inst, size_t pooledFibers, size_t stackSize)
-    : d(inst, pooledFibers, stackSize)
+struct FiberPool::StepGuard
 {
+    Fiber* was;
+
+    explicit StepGuard(Fiber* f) {
+        was = std::exchange(t_current, f);
+    }
+
+    ~StepGuard() {
+        t_current = was;
+    }
+};
+
+Fiber::Fiber(FiberPool* pool) : d()
+{
+    d->pool = pool;
+    d->self = this;
+    d->step.emplace(boost::context::protected_fixedsize_stack{pool->d->stackSize}, std::ref(*d.data()));
+}
+
+void Fiber::Impl::operator()(push_type& yield)
+{
+    this->yield = &yield;
+    while (yield) {
+        yield();
+        busy = true;
+        Q_ASSERT(exc == nullptr);
+        Q_ASSERT(suspendCount == 0);
+        try {
+            closure(self);
+        } catch (ForcedShutdown const&) {
+            // pass
+        } catch (...) {
+            exc = std::current_exception();
+        }
+        busy = false;
+        if (unwind)
+            std::rethrow_exception(unwind);
+    }
+}
+
+FiberPool::FiberPool(Instance* inst, size_t pooledFibers, size_t stackSize)
+    : d()
+{
+    d->self = this;
+    d->inst = inst;
+    d->pooledFibers = pooledFibers;
+    d->stackSize = stackSize;
 }
 
 FiberPool::~FiberPool()
 {
-    unwindStragglers();
-    d->parked.clear();
+    Stop(1);
 }
 
-rc::Strong<Fiber> FiberPool::takeFiber()
-{
-    rc::Strong<Fiber> f;
-    if (!d->parked.empty()) {
-        f = std::move(d->parked.back());
-        d->parked.pop_back();
-    } else {
-        f = new Fiber(this);
-        f->d->init(f.get());
-    }
-    return f;
+void Fiber::Impl::afterStep() {
+    if (!busy)
+        pool->d->returnFiber(self);
+    if (unwind)
+        throw ForcedShutdown{};
 }
 
-void FiberPool::returnFiber(Fiber* f)
-{
-    auto* di = f->d.data();
-    if (di->thread) {
-        lua_settop(di->thread, 0);
-    }
-    d->flying.erase(std::find(d->flying.begin(), d->flying.end(), f));
-    if (d->flying.size() <= d->noWaitFor) {
-        emit idle();
-    }
-    auto hold = std::move(di->selfHold);
-    if (d->parked.size() < d->pooledFibers) {
-        d->parked.push_back(std::move(hold));
-    }
-}
-
-void FiberPool::run(fut::MoveFunc<void(Fiber*)> closure)
+void FiberPool::Run(fut::MoveFunc<void(Fiber*)> closure)
 {
     if (auto* current = t_current) {
         closure(current);
         return;
     }
-    auto f = takeFiber();
-    f->d->closure = std::move(closure);
-    f->d->done = false;
-    f->d->selfHold = f;
-    d->flying.push_back(f.get());
-    d->stack.push_back(f.get());
+    rc::Strong<Fiber> fiber;
+    if (d->parked.empty()) {
+        fiber = new Fiber(this);
+    } else {
+        fiber = std::move(d->parked.back());
+        d->parked.pop_back();
+    }
+    d->flying.insert(fiber.get());
+    fiber->d->closure = std::move(closure);
     {
-        CurrentGuard guard_(f.get());
-        (*f->d->step)();
+        StepGuard guard_(fiber.get());
+        fiber->d->step.value()();
     }
-    d->stack.pop_back();
-    bool completed = f->d->done;
-    auto exc = std::move(f->d->pendingExc);
-    if (completed) {
-        returnFiber(f.get());
-    }
-    if (exc) {
-        std::rethrow_exception(exc);
-    }
+    fiber->d->afterStep();
 }
 
-void FiberPool::stop(unsigned timeout)
+void FiberPool::Stop(unsigned timeout)
 {
-    d->noWaitFor = d->stack.size();
     QDeadlineTimer deadline(timeout);
-    while (d->flying.size() > d->noWaitFor && !deadline.hasExpired()) {
+    while (d->flying.size() && !deadline.hasExpired()) {
         QEventLoop loop;
         QTimer::singleShot(int(deadline.remainingTime()), &loop, &QEventLoop::quit);
         connect(this, &FiberPool::idle, &loop, &QEventLoop::quit);
         loop.exec();
     }
-    unwindStragglers();
-}
-
-void FiberPool::unwindStragglers()
-{
-    auto inFlight = std::move(d->flying);
-    d->flying.clear();
-    for (auto* f : inFlight) {
-        if (std::find(d->stack.begin(), d->stack.end(), f) != d->stack.end()) {
-            d->flying.push_back(f);
-        } else {
-            f->unwind();
-        }
+    QEventLoop loop;
+    connect(this, &FiberPool::idle, &loop, &QEventLoop::quit, Qt::QueuedConnection);
+    for (auto f: d->flying) {
+        f->d->step.reset();
     }
+    loop.exec();
 }
 
-void FiberPool::reportError(std::exception_ptr exc)
+void Fiber::Impl::await(fut::Future<void>& sig)
 {
+    if (unwind) {
+        throw ForcedShutdown{};
+    }
+    sig.AtLastSync([f = rc::Strong<Fiber>(self)](fut::Result<void> res) mutable {
+        QMetaObject::invokeMethod(f->d->pool->d->inst, [MV(f), exc = res.get_exception()]() mutable {
+            f->d->resume(std::move(exc));
+        }, Qt::QueuedConnection);
+    });
+    ++suspendCount;
     try {
-        std::rethrow_exception(exc);
-    } catch (std::exception& e) {
-        d->inst->Error("fibers", "Unhandled error in fiber: {}", e.what());
-    } catch (...) {
-        d->inst->Error("fibers", "Unhandled non-standard exception in fiber");
-    }
-}
-
-Fiber::Fiber(FiberPool* pool) : d(pool)
-{
-}
-
-void Fiber::run()
-{
-    auto* di = d.data();
-    di->suspends = 0;
-    di->pendingExc = nullptr;
-    auto closure = std::move(di->closure);
-    try {
-        closure(this);
-    } catch (boost::context::detail::forced_unwind const&) {
-        throw;
-    } catch (...) {
-        di->pendingExc = std::current_exception();
-    }
-    di->done = true;
-}
-
-void Fiber::resume()
-{
-    auto* pool = d->pool;
-    pool->d->stack.push_back(this);
-    {
-        CurrentGuard guard_(this);
-        (*d->step)();
-    }
-    pool->d->stack.pop_back();
-    bool completed = d->done;
-    auto exc = std::move(d->pendingExc);
-    if (completed) {
-        pool->returnFiber(this);
+        (*yield)();
+    } catch (boost::context::detail::forced_unwind&) {
+        unwind = std::current_exception();
+        throw ForcedShutdown{};
     }
     if (exc) {
-        pool->reportError(exc);
+        std::rethrow_exception(std::exchange(exc, nullptr));
     }
 }
 
-void Fiber::unwind()
+void Fiber::Impl::resume(std::exception_ptr exc)
 {
-    auto* di = d.data();
-    di->pool = nullptr;
-    di->step.reset();
-    di->yield = nullptr;
-    if (di->threadRef != LUA_NOREF) {
-        luaL_unref(di->mainL, LUA_REGISTRYINDEX, di->threadRef);
-        di->threadRef = LUA_NOREF;
-        di->thread = nullptr;
+    suspendCount--;
+    this->exc = std::move(exc);
+    {
+        FiberPool::StepGuard guard(self);
+        step.value()();
     }
-    di->mainL = nullptr;
-    di->selfHold = {};
+    afterStep();
 }
 
 Fiber::~Fiber()
 {
-    if (d->threadRef != LUA_NOREF && d->mainL) {
-        luaL_unref(d->mainL, LUA_REGISTRYINDEX, d->threadRef);
-    }
 }
 
 lua_State* Fiber::LuaState()
 {
-    if (!d->thread) {
-        d->thread = lua_newthread(d->mainL);
-        d->threadRef = luaL_ref(d->mainL, LUA_REGISTRYINDEX);
-        d->pool->d->inst->_GetPrivate()->onThread(d->thread);
+    Instance* inst = d->pool->d->inst;
+    auto* L = inst->LuaState();
+    lua_State* T;
+    if (d->thread) {
+        d->thread.Push(L);
+        T = lua_tothread(L, -1);
+        lua_pop(L, 1);
+    } else {
+        T = lua_newthread(L);
+        d->thread = {L, ConsumeTop};
+        inst->_GetPrivate()->newThreadCreated(T);
     }
-    return d->thread;
+    return T;
 }
 
-size_t Fiber::suspends() const
+size_t Fiber::SuspendCount() const
 {
-    return d->suspends;
-}
-
-void Fiber::Impl::init(Fiber* self)
-{
-    mainL = pool->d->inst->LuaState();
-    step.emplace(
-        boost::context::protected_fixedsize_stack{pool->d->stackSize},
-        [this, self](coro::coroutine<void>::push_type& yield) {
-            this->yield = &yield;
-            while (yield) {
-                yield();
-                self->run();
-            }
-        });
+    return d->suspendCount;
 }
 
 Fiber* Fiber::Current()
@@ -285,62 +246,37 @@ Fiber* Fiber::Current()
     return t_current;
 }
 
+static void awaitBlocking(fut::Future<void>& signal)
+{
+    auto* app = QCoreApplication::instance();
+    if (app && QThread::currentThread() == app->thread()) {
+        Raise("await() without a fiber on the event loop thread would deadlock");
+    }
+    std::mutex mx;
+    std::condition_variable cv;
+    bool settled = false;
+    std::exception_ptr exc = nullptr;
+    signal.AtLastSync([&](fut::Result<void> res) {
+        if (!res) {
+            exc = std::move(res).get_exception();
+        }
+        std::lock_guard lk(mx);
+        settled = true;
+        cv.notify_all();
+    });
+    std::unique_lock lk(mx);
+    cv.wait(lk, [&] { return settled; });
+    if (exc) {
+        std::rethrow_exception(exc);
+    }
+}
+
 void radapter::Await(fut::Future<void> signal)
 {
-    auto* f = t_current;
-    if (!f) {
-        struct Rendezvous
-        {
-            std::mutex mx;
-            std::condition_variable cv;
-            bool settled = false;
-            std::exception_ptr exc;
-        };
-        auto state = std::make_shared<Rendezvous>();
-        signal.AtLastSync([state](fut::Result<void> res) {
-            if (!res) {
-                state->exc = std::move(res).get_exception();
-            }
-            std::lock_guard lk(state->mx);
-            state->settled = true;
-            state->cv.notify_all();
-        });
-        std::unique_lock lk(state->mx);
-        auto* app = QCoreApplication::instance();
-        if (!state->settled && app && QThread::currentThread() == app->thread()) {
-            Raise("await() without a fiber on the event loop thread would deadlock");
-        }
-        state->cv.wait(lk, [&] { return state->settled; });
-        if (state->exc) {
-            std::rethrow_exception(state->exc);
-        }
-        return;
-    }
-    auto* di = f->d.data();
-    di->wake.store(false, std::memory_order_relaxed);
-    di->exc = nullptr;
-    signal.AtLastSync([f = rc::Strong<Fiber>(f)](fut::Result<void> res) {
-        auto* di = f->d.data();
-        auto* pool = di->pool;
-        if (!pool) {
-            return;
-        }
-        if (!res) {
-            di->exc = std::move(res).get_exception();
-        }
-        if (!di->wake.exchange(true, std::memory_order_acq_rel)) {
-            return;
-        }
-        f->resume();
-    });
-    if (!di->wake.exchange(true, std::memory_order_acq_rel)) {
-        ++di->suspends;
-        (*di->yield)();
-    }
-    if (di->exc) {
-        auto exc = std::move(di->exc);
-        di->exc = nullptr;
-        std::rethrow_exception(exc);
+    if (Fiber* fiber = t_current) {
+        fiber->d->await(signal);
+    } else {
+        awaitBlocking(signal);
     }
 }
 
@@ -383,16 +319,20 @@ int builtin::api::AwaitNative(lua_State* L)
     lua_pushvalue(L, 1);
     lua_insert(L, -2);
     lua_pcall(L, 1, 0, 0);
-    auto out = Await(std::move(fut));
+    AwaitRes out;
+    try {
+        out = Await(std::move(fut));
+    } catch (ForcedShutdown const&) {
+        return luaL_error(L, "Forced shutdown");
+    }
     glua::Push(L, out.res);
     glua::Push(L, out.err);
     return 2;
 }
 
-QVariant radapter::MakeLuaPromise(Worker* worker, Future<QVariant>& future)
+static QVariant makeLuaPromise(lua_State* L, QPointer<Worker> worker, std::string cbCtx, Future<QVariant>& future)
 {
     fut::MultiFuture<QVariant> multi{std::move(future)};
-    auto* L = worker->LuaState();
     lua_getfield(L, LUA_REGISTRYINDEX, "radapter_promise_mt");
     if (!lua_istable(L, -1)) {
         lua_pop(L, 1);
@@ -400,14 +340,14 @@ QVariant radapter::MakeLuaPromise(Worker* worker, Future<QVariant>& future)
     }
     lua_createtable(L, 0, 1);
     QVariant subscribe = MakeFunction(
-        [multi = std::move(multi), worker = QPointer(worker)](
+        [multi = std::move(multi), worker = std::move(worker), cbCtx = std::move(cbCtx)](
             Instance*, QVariantList const& args) mutable -> QVariant {
             auto cb = args.value(0).value<LuaFunction>();
             if (!cb) {
                 Raise("promise: expected a callback function");
             }
             auto fut = multi.GetFuture();
-            ResolveLuaCallback(worker.data(), fut, cb);
+            ResolveLuaCallback(worker.data(), fut, cb, cbCtx);
             return {};
         });
     glua::Push(L, subscribe);
@@ -416,4 +356,23 @@ QVariant radapter::MakeLuaPromise(Worker* worker, Future<QVariant>& future)
     lua_setmetatable(L, -2);
     lua_remove(L, -2);
     return QVariant::fromValue(LuaValue(L, ConsumeTop));
+}
+
+QVariant radapter::MakeLuaPromise(Worker* worker, Future<QVariant>& future)
+{
+    return makeLuaPromise(worker->LuaState(), QPointer(worker), {}, future);
+}
+
+QVariant radapter::MakeLuaPromise(Instance* instance, Future<QVariant>& future)
+{
+    return makeLuaPromise(instance->LuaState(), QPointer<Worker>{}, "spawn callback", future);
+}
+
+char const *radapter::ForcedShutdown::what() const noexcept {
+    return "Forced shutdown";
+}
+
+radapter::ForcedShutdown::ForcedShutdown()
+{
+
 }

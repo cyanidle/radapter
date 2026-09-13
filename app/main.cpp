@@ -421,7 +421,12 @@ int main (int argc, char **argv) try {
         watcher->watch();
     }
 
-    return g_exited ? 0 : app->exec();
+    int rc = g_exited ? 0 : app->exec();
+    // quit() returns from exec() before the final deleteLater (AppState ->
+    // Instance) is ever dispatched; flush it while the QCoreApplication is
+    // still alive or the whole instance graph is leaked at exit
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    return rc;
 } catch (std::exception& exc) {
     std::cerr << "Critical: " << exc.what() << std::endl;
     return 1;

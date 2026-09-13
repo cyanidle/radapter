@@ -3,6 +3,7 @@
 #include "future/future.hpp"
 #include "radapter/radapter.hpp"
 #include <forward_list>
+#include <map>
 
 class QtRedisAdapter;
 struct redisAsyncContext;
@@ -74,6 +75,9 @@ public:
     };
     using Subscriber = std::function<void(SubEvent)>;
     void PSubscribe(string_view glob, Subscriber sub);
+    // hiredis fires a subscription callback one last time with a null reply
+    // while freeing the context; that is the cue to release the Subscriber
+    void ForgetSubscription(Subscriber const* sub);
     fut::Future<QVariant> Execute(RedisCmd const& args) {
         return Execute(args.args.data(), args.args.size());
     }
@@ -83,6 +87,7 @@ signals:
 private:
     struct Impl;
     void doConnect();
+    std::map<std::string, Subscriber*> liveSubs;
 };
 
 }

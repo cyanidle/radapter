@@ -5,7 +5,7 @@
 --   * promise(executor) - wrap callback-style async: executor(done) runs
 --     immediately; the first done(res, err) settles the promise
 --   * spawn(fn, ...)   - run fn detached on its own fiber entry; the promise
---     settles with fn's return values, or (nil, traceback) if fn raises
+--     settles with the result of the call, or (nil, traceback) if fn raises
 --   * promisify(func)  - adapt a trailing-callback function to promises
 --   * gather{...}      - await a list of promises concurrently; resolves with
 --     a list of all results in the same order, rejects with the first error
@@ -85,23 +85,18 @@ function promise(executor)
 end
 
 ---Run `fn` detached from the current fiber, so it executes concurrently with
----the calling flow; returns a promise settling with fn's first two return
----values, or (nil, traceback) when fn raises. A plain call already suspends
----only the calling chain - spawn only to gain parallelism.
+---the calling flow; returns a promise settling with the result of the call, or
+---(nil, traceback) when fn raises. A plain call already suspends only the
+---calling chain - spawn only to gain parallelism. The native spawn returns that
+---promise itself; it is re-wrapped here so that a discarded failing spawn is
+---still reported (the native promise does not check for unhandled rejections).
 ---@generic T
----@param fn fun(...): T?, string?
+---@param fn fun(...): T?
 ---@return promise<T?>
 function spawn(fn, ...)
     local args = table.pack(...)
     return promise(function(done)
-        __spawn_native(function()
-            local res = table.pack(xpcall(fn, debug.traceback, table.unpack(args, 1, args.n)))
-            if res[1] then
-                done(res[2], res[3])
-            else
-                done(nil, res[2])
-            end
-        end)
+        __spawn_native(fn, table.unpack(args, 1, args.n))(done)
     end)
 end
 

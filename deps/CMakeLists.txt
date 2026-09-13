@@ -4,19 +4,19 @@ CPMAddPackage("gh:cyanidle/glua@2.1.1")
 CPMAddPackage("gh:fmtlib/fmt#11.0.2")
 CPMAddPackage("gh:SpartanJ/efsw#0c70ed2")
 
-# Static Boost for the fiber pool (Boost.Coroutine2 + its compiled Boost.Context).
-# On Windows use the winfib backend of Boost.Context (no assembler involved).
-# Set as plain variables (not CPM OPTIONS): the OPTIONS list mechanism re-splits
-# the BOOST_INCLUDE_LIBRARIES list at its semicolon and drops the tail.
+
 set(BOOST_ENABLE_CMAKE ON)
-set(BOOST_SKIP_INSTALL_RULES ON) # Set `OFF` for installation
+set(BOOST_SKIP_INSTALL_RULES ON)
 set(BUILD_SHARED_LIBS OFF)
 set(BOOST_INCLUDE_LIBRARIES context coroutine2)
 if (WIN32)
-    set(BOOST_CONTEXT_IMPLEMENTATION winfib)
+  set(BOOST_CONTEXT_IMPLEMENTATION winfib)
+elseif(CMAKE_CXX_FLAGS MATCHES "sanitize=address")
+  set(BOOST_CONTEXT_IMPLEMENTATION ucontext)
 endif()
+
 CPMAddPackage(NAME Boost
-    VERSION 1.92.0 # Versions less than 1.85.0 may need patches for installation targets.
+    VERSION 1.92.0
     URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
     URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
 )
@@ -74,14 +74,11 @@ else()
     URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
     VERSION 5.4.7
     DOWNLOAD_ONLY YES
-    PATCHES ./lua-cxx-exceptions.patch
   )
   set(lua_src_dir ${lua_SOURCE_DIR})
   file(GLOB LUA_SRC_FILES CONFIGURE_DEPENDS ${lua_src_dir}/src/*.c)
   list(REMOVE_ITEM LUA_SRC_FILES "${lua_src_dir}/src/lua.c" "${lua_src_dir}/src/luac.c")
   add_library(radapter-lua STATIC ${LUA_SRC_FILES})
-  target_link_libraries(radapter-lua PRIVATE Boost::context)
-  set_source_files_properties(${LUA_SRC_FILES} PROPERTIES LANGUAGE CXX)
   target_include_system_directories(radapter-lua PUBLIC ${lua_src_dir}/src)
   target_compile_definitions(radapter-lua PRIVATE LUA_USE_DLOPEN)
   if (WIN32)
@@ -94,7 +91,6 @@ else()
   endif()
   set(lua_luac ${lua_SOURCE_DIR}/src/luac.c)
   add_executable(radapter-luac EXCLUDE_FROM_ALL ${lua_luac})
-  set_source_files_properties(${lua_luac} PROPERTIES LANGUAGE CXX)
   set_target_properties(radapter-luac PROPERTIES LINKER_LANGUAGE CXX)
   target_link_libraries(radapter-luac PRIVATE radapter-lua)
 endif()

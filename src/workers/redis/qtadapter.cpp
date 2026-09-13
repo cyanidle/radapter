@@ -6,8 +6,9 @@ QtRedisAdapter::QtRedisAdapter(QObject* parent) :
     QObject{parent}
 {}
 
-// no destructor: the hiredis context is always freed first (Client::~Client
-// -> redisAsyncDisconnect -> ev.cleanup -> redisFree), so touching m_ctx here
+// no destructor: the hiredis context is always freed before this object is
+// deleted (hiredis frees it on error-disconnects from inside our own read/write
+// slots; Client::doConnect / ~Client free it otherwise), so touching m_ctx here
 // would be a use-after-free
 
 struct QtRedisAdapter::Impl

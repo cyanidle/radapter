@@ -5,7 +5,7 @@ project(radapter
     VERSION 3.0
 )
 
-include(cmake/CPM.cmake)
+include(cmake/get_cpm.cmake)
 include(cmake/warnings.cmake)
 include(cmake/Versioning.cmake)
 

@@ -47,6 +47,6 @@ struct radapter::Instance::Impl {
     static int log_handler(lua_State* L);
     static int onShutdown(lua_State* L);
 
-    void onThread(lua_State* T);
+    void newThreadCreated(lua_State* T);
 };
 
