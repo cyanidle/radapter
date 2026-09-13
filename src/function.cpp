@@ -1,6 +1,7 @@
 #include "radapter/function.hpp"
 #include "radapter/async_helpers.hpp"
 #include "builtin.hpp"
+#include "instance_impl.hpp"
 #include <QMetaObject>
 #include <QThread>
 
@@ -61,7 +62,7 @@ void LuaFunction::CallNoWait(QVariantList const& args, std::string ctx) const
         try {
             callOn(f->LuaState(), self, args, false);
         } catch (ForcedShutdown const&) {
-            // pass
+            throw;
         } catch (std::exception& e) {
             inst->Error(ctx.c_str(), "Uncaught error:\n\t{}", e.what());
         }
@@ -98,6 +99,8 @@ int builtin::api::SpawnNative(lua_State* L)
     fut::Promise<QVariant> promise;
     auto fut = promise.GetFuture();
     QMetaObject::invokeMethod(inst, [inst, fn, args = std::move(args), MV(promise)]() mutable {
+        if (inst->_GetPrivate()->shutdown)
+            return;
         inst->Fibers()->Run([fn, args = std::move(args), MV(promise)](Fiber* f) mutable {
             try {
                 promise(callOn(f->LuaState(), fn, args, true));

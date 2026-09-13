@@ -110,7 +110,8 @@ void Fiber::Impl::operator()(push_type& yield)
         Q_ASSERT(exc == nullptr);
         Q_ASSERT(suspendCount == 0);
         try {
-            closure(self);
+            auto entry = std::move(closure);
+            entry(self);
         } catch (ForcedShutdown const&) {
             // pass
         } catch (...) {
@@ -146,6 +147,8 @@ void Fiber::Impl::afterStep() {
 void FiberPool::Run(fut::MoveFunc<void(Fiber*)> closure)
 {
     if (auto* current = t_current) {
+        if (current->Unwinding())
+            return;
         closure(current);
         return;
     }
@@ -175,15 +178,13 @@ void FiberPool::Stop(unsigned timeout)
         connect(this, &FiberPool::idle, &loop, &QEventLoop::quit);
         loop.exec();
     }
-    // Force-kill any remaining
-    if (d->flying.size()) {
-        QEventLoop loop;
-        connect(this, &FiberPool::idle, &loop, &QEventLoop::quit, Qt::QueuedConnection);
-        for (auto f: d->flying) {
-            f->d->step.reset();
-            f->d->thread = {};
-        }
-        loop.exec();
+    auto stragglers = std::move(d->flying);
+    d->flying.clear();
+    for (auto* f: stragglers) {
+        f->d->pool = nullptr;
+        StepGuard guard_(f);
+        f->d->step.reset();
+        f->d->thread = {};
     }
 }
 
@@ -192,9 +193,11 @@ void Fiber::Impl::await(fut::Future<void>& sig)
     if (unwind) {
         throw ForcedShutdown{};
     }
-    sig.AtLastSync([f = rc::Strong<Fiber>(self)](fut::Result<void> res) mutable {
-        Instance* inst = f->d->pool->d->inst;
+    Instance* inst = pool->d->inst;
+    sig.AtLastSync([f = rc::Strong<Fiber>(self), inst](fut::Result<void> res) mutable {
         QMetaObject::invokeMethod(inst, [MV(f), exc = res.get_exception()]() mutable {
+            if (!f->d->pool)
+                return;
             f->d->resume(std::move(exc));
         }, Qt::QueuedConnection);
     });
