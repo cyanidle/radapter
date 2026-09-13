@@ -119,9 +119,11 @@ public:
 
     void label(std::string_view raw)
     {
+        auto text = trim(raw);
+        if (text.empty()) return;
         sep();
         out += kHeaderIndent;
-        put(trim(raw), kLabel);
+        put(text, kLabel);
     }
 
     void marker(std::string_view raw)
