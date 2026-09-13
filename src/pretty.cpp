@@ -134,15 +134,16 @@ public:
     // `errorLine` marks the message that opened the traceback (shown in red).
     void line(std::string_view raw, std::string_view indent, bool errorLine)
     {
-        sep();
-        out += indent;
         auto text = trim(raw);
         if (text.empty()) return;
+        sep();
+        out += indent;
 
         if (text.rfind("[C]", 0) == 0) {
             auto rest = trimFront(text.substr(3));
             if (!rest.empty() && rest[0] == ':') rest = trimFront(rest.substr(1));
             put("[C]", kCFrame);
+            out += ':';
             if (!rest.empty()) {
                 out += ' ';
                 put(rest, {});
