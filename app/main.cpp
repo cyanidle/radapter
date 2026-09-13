@@ -372,6 +372,11 @@ int main (int argc, char **argv) try {
         .scan<'u', uint16_t>()
         .default_value(uint16_t{8172})
         .help("Debugger listen port");
+    cli.add_epilog(
+        "Environment:\n"
+        "  NO_COLOR=<any>         Disable ANSI colors in log output\n"
+        "  CLICOLOR_FORCE=<any>   Force ANSI colors in log output even when stderr is\n"
+        "                         not a terminal; takes precedence over NO_COLOR\n");
     try {
         cli.parse_args(args);
     } catch (std::exception& e) {

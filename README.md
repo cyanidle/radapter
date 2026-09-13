@@ -138,6 +138,30 @@ Arguments after the script file are available in Lua as `args`:
 build/bin/radapter examples/serial/serial.lua /dev/ttyUSB0
 ```
 
+## Logging
+
+Logs go to stderr, one record per line — `<ISO timestamp>|<D|I|W|E>|<category>| <message>`:
+
+```
+2026-09-13T23:12:10.881|E|   TestWorker| Uncaught error:
+  src/scripts/async.lua:31: Forced shutdown
+  stack traceback:
+    [C]: in function '__await_native'
+    src/scripts/async.lua:31: in method 'await'
+    tests/fibers.lua:30: in upvalue 'await_forever'
+```
+
+The category column is padded to the widest category seen so far. Lua stack
+tracebacks are re-flowed and their source paths shortened relative to the
+working directory.
+
+Output is colored when stderr is a terminal. Two environment variables override
+that detection, `CLICOLOR_FORCE` taking precedence over `NO_COLOR`:
+
+- `CLICOLOR_FORCE` — any non-empty value other than `0` forces colors even when
+  stderr is redirected to a file or a pipe;
+- `NO_COLOR` — any non-empty value disables colors.
+
 ## Architecture
 
 radapter is a C++/Qt6 engine with a public SDK (`include/radapter/`). Three ways to extend it:

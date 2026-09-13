@@ -24,6 +24,7 @@ namespace {
 using fmt::emphasis;
 using fmt::terminal_color;
 
+constexpr fmt::text_style kMeta = emphasis::faint;
 constexpr fmt::text_style kLabel = emphasis::bold | fmt::fg(terminal_color::red);
 constexpr fmt::text_style kMessage = emphasis::bold | fmt::fg(terminal_color::red);
 constexpr fmt::text_style kMarker = emphasis::faint;
@@ -207,6 +208,24 @@ bool ColorizeLogs()
         return stderrIsTty();
     }();
     return enabled;
+}
+
+fmt::text_style MetadataStyle(bool color)
+{
+    return color ? kMeta : fmt::text_style{};
+}
+
+fmt::text_style LevelStyle(LogLevel lvl, bool color)
+{
+    if (!color) return {};
+    switch (lvl) {
+    case debug: return emphasis::faint;
+    case info: return fmt::fg(terminal_color::green);
+    case warn: return fmt::fg(terminal_color::yellow);
+    case error: return emphasis::bold | fmt::fg(terminal_color::red);
+    case disabled: break;
+    }
+    return {};
 }
 
 std::optional<std::string> PrettyTraceback(std::string_view msg, bool color)
