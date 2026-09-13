@@ -13,6 +13,7 @@
 #include "fmt/compile.h"
 #include "glua/glua.hpp"
 #include "instance_impl.hpp"
+#include "pretty.hpp"
 
 static void init_qrc() {
     Q_INIT_RESOURCE(radapter);
@@ -346,10 +347,17 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         d->logCatLen = unsigned(c.size());
     }
 
+    auto msg = fmt::vformat(fmt, args);
+    std::string_view shown = msg;
+    std::string pretty;
+    if (auto styled = PrettyTraceback(msg, ColorizeLogs())) {
+        pretty = std::move(*styled);
+        shown = pretty;
+    }
     fmt::print(stderr,
         FMT_COMPILE("{}.{:0>3}|{}|{:>{}}| {}\n"),
         dt.toString(Qt::DateFormat::ISODate), dt.time().msec(),
-        name, cat, d->logCatLen, fmt::vformat(fmt, args));
+        name, cat, d->logCatLen, shown);
     ::fflush(stderr);
 
     if (d->luaLogHandler != LUA_NOREF && !d->insideLogHandler) {
@@ -359,7 +367,7 @@ void Instance::Log(LogLevel lvl, const char *cat, fmt::string_view fmt, fmt::for
         QVariantMap record;
         record.insert("level", QString::fromUtf8(name.data(), int(name.size())));
         record.insert("timestamp", dt.toSecsSinceEpoch());
-        record.insert("msg", QString::fromUtf8(fmt::vformat(fmt, args).c_str()));
+        record.insert("msg", QString::fromUtf8(msg.c_str(), int(msg.size())));
         record.insert("category", QString::fromUtf8(cat));
         d->insideLogHandler = true;
         auto cleanup = [this]{
