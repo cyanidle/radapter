@@ -51,7 +51,6 @@ struct Fiber::Impl
     std::exception_ptr unwind = nullptr;
     std::exception_ptr exc = nullptr;
     fut::MoveFunc<void(Fiber*)> closure;
-    size_t suspendCount = 0;
 
     LuaValue thread;
 
@@ -108,7 +107,6 @@ void Fiber::Impl::operator()(push_type& yield)
         yield();
         busy = true;
         Q_ASSERT(exc == nullptr);
-        Q_ASSERT(suspendCount == 0);
         try {
             auto entry = std::move(closure);
             entry(self);
@@ -214,7 +212,6 @@ void Fiber::Impl::await(fut::Future<void>& sig)
             f->d->resume(std::move(exc));
         }, Qt::QueuedConnection);
     });
-    ++suspendCount;
     try {
         (*yield)();
     } catch (boost::context::detail::forced_unwind&) {
@@ -228,7 +225,6 @@ void Fiber::Impl::await(fut::Future<void>& sig)
 
 void Fiber::Impl::resume(std::exception_ptr exc)
 {
-    suspendCount--;
     this->exc = std::move(exc);
     {
         FiberPool::StepGuard guard(self);
