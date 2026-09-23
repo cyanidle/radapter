@@ -96,6 +96,12 @@ Set `CPM_SOURCE_CACHE=$HOME/.cache/CPM` to cache dependencies across builds.
 Two DEB packages are produced from separate build configurations — `radapter-headless`
 and `radapter-gui`. They conflict with each other: only one can be installed at a time.
 
+`-D RADAPTER_JIT=ON` swaps the embedded runtime to the system LuaJIT and renames the
+packages to `radapter-jit-headless` / `radapter-jit-gui`. Every variant owns
+`/usr/bin/radapter` and the same SDK path, so all four conflict with and replace each
+other and none provides another name: a LuaJIT engine and a PUC-Lua engine are not
+interchangeable. The cart stack ships the `-jit-` pair.
+
 ```bash
 # radapter-headless — no GUI dependencies
 cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=OFF \

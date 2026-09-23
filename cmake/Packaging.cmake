@@ -38,7 +38,15 @@ endif()
 
 # Common Qt6 C++ runtime libs (both variants)
 set(RADAPTER_DEB_COMMON_DEPS
-    "libqt6core6, libqt6network6, libqt6serialport6, libqt6serialbus6, libqt6sql6, libqt6websockets6")
+    "libc6, libstdc++6, libgcc-s1, libssl3, libqt6core6, libqt6network6, libqt6serialport6, libqt6serialbus6, libqt6sql6, libqt6websockets6, libqt6serialbus6-plugins")
+
+set(radapter_package_prefix "radapter")
+if(RADAPTER_JIT)
+    set(radapter_package_prefix "radapter-jit")
+    if(NOT RADAPTER_JIT_STATIC)
+        string(APPEND RADAPTER_DEB_COMMON_DEPS ", libluajit-5.1-2 | libluajit2-5.1-2")
+    endif()
+endif()
 
 # GUI C++ runtime libs
 set(RADAPTER_DEB_GUI_CPP_DEPS
@@ -49,19 +57,32 @@ set(RADAPTER_DEB_GUI_QML_DEPS
     "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtquick-dialogs, qml6-module-qtcharts")
 
 if(RADAPTER_GUI)
-    set(CPACK_PACKAGE_NAME "radapter-gui")
+    set(CPACK_PACKAGE_NAME "${radapter_package_prefix}-gui")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
         "${RADAPTER_DEB_COMMON_DEPS}, ${RADAPTER_DEB_GUI_CPP_DEPS}, ${RADAPTER_DEB_GUI_QML_DEPS}")
-    set(CPACK_DEBIAN_PACKAGE_CONFLICTS "radapter-headless")
 else()
-    set(CPACK_PACKAGE_NAME "radapter-headless")
+    set(CPACK_PACKAGE_NAME "${radapter_package_prefix}-headless")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "${RADAPTER_DEB_COMMON_DEPS}")
-    set(CPACK_DEBIAN_PACKAGE_CONFLICTS "radapter-gui")
 endif()
+
+# Every variant owns /usr/bin/radapter and the same SDK path, but LuaJIT and
+# Lua 5.4 plugins are not ABI-interchangeable. Do not provide the other flavor.
+set(radapter_variants radapter-headless radapter-gui radapter-jit-headless radapter-jit-gui)
+list(REMOVE_ITEM radapter_variants "${CPACK_PACKAGE_NAME}")
+list(JOIN radapter_variants ", " CPACK_DEBIAN_PACKAGE_CONFLICTS)
+set(CPACK_DEBIAN_PACKAGE_REPLACES "${CPACK_DEBIAN_PACKAGE_CONFLICTS}")
+set(CPACK_DEBIAN_PACKAGE_PROVIDES "")
 
 set(CPACK_DEBIAN_PACKAGE_NAME       "${CPACK_PACKAGE_NAME}")
 set(CPACK_PACKAGE_VERSION           "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME         "${CPACK_PACKAGE_NAME}")
+
+# Exclude dependency headers, static archives, and other Unspecified installs
+# pulled in by add_subdirectory(deps). radapter's own SDK headers are named
+# radapter_runtime, so they stay in the engine package.
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
+set(CPACK_COMPONENTS_ALL radapter_runtime)
 
 # ============================================================================
 # ROS2 plugin packaging: with RADAPTER_ROS2=ON, switch to component install —
@@ -82,10 +103,11 @@ if(RADAPTER_ROS2 AND NOT RADAPTER_SDK_ONLY AND NOT RADAPTER_STATIC AND TARGET ra
     # CPackDeb falls back to the engine-wide Conflicts (radapter-gui) when the
     # per-component variable is undefined — that would break the alternation below.
     set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_CONFLICTS "")
+    set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_REPLACES "")
     # The plugin links rclcpp and the introspection typesupport directly;
     # Qt and the rest of the ROS client stack arrive transitively.
     set(CPACK_DEBIAN_ROS_PLUGIN_PACKAGE_DEPENDS
-        "radapter-headless | radapter-gui, ros-jazzy-rclcpp, ros-jazzy-rosidl-typesupport-introspection-cpp")
+        "${radapter_package_prefix}-headless | ${radapter_package_prefix}-gui, ros-jazzy-rclcpp, ros-jazzy-rosidl-typesupport-introspection-cpp")
 endif()
 
 # Install prefix for Debian packaging

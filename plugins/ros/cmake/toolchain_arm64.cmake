@@ -33,3 +33,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 # find_package re-roots each entry against CMAKE_FIND_ROOT_PATH, so
 # /opt/ros/jazzy resolves to /sysroot/opt/ros/jazzy at search time.
 list(APPEND CMAKE_PREFIX_PATH /opt/ros/jazzy)
+
+# pkg-config does not inherit CMake's sysroot rules (LuaJIT uses its .pc file).
+set(ENV{PKG_CONFIG_SYSROOT_DIR} "${CMAKE_SYSROOT}")
+set(ENV{PKG_CONFIG_LIBDIR} "${CMAKE_SYSROOT}/usr/lib/aarch64-linux-gnu/pkgconfig:${CMAKE_SYSROOT}/usr/share/pkgconfig")

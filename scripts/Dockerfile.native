@@ -4,10 +4,12 @@
 # Extract headless .deb:
 #   docker build -f scripts/Dockerfile.native --target headless-pkg --output=out .
 #   ls out/radapter-headless_*.deb
+# Add --build-arg RADAPTER_JIT=ON to build radapter-jit-headless_*.deb instead.
 #
 # Extract GUI .deb:
 #   docker build -f scripts/Dockerfile.native --target gui-pkg --output=out .
 #   ls out/radapter-gui_*.deb
+# RADAPTER_JIT=ON applies to both targets and renames them radapter-jit-*.
 #
 # Build runner images:
 #   docker build -f scripts/Dockerfile.native --target headless-runner -t radapter-headless:qt6 .
@@ -19,14 +21,14 @@
 FROM debian:bookworm-slim AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt install -y \
-        git cmake ninja-build build-essential file \
+        git cmake ninja-build build-essential file pkg-config \
         qt6-base-dev qt6-base-dev-tools \
         qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
         qt6-declarative-dev qt6-declarative-dev-tools \
         qt6-charts-dev \
         libqt6sql6-sqlite \
         libgl1-mesa-dev libxkbcommon-dev \
-        libssl-dev \
+        libssl-dev libluajit-5.1-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY . /src
 WORKDIR /src
@@ -36,14 +38,18 @@ ENV CPM_SOURCE_CACHE=/cpm
 # Stage: headless-builder
 # ═══════════════════════════════════════════════════════════════════════
 FROM builder AS headless-builder
+ARG RADAPTER_JIT=OFF
+ARG BUILD_JOBS=4
 RUN --mount=type=cache,target=/cpm \
     cmake \
         -D CMAKE_BUILD_TYPE=Release \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_STATIC=OFF \
+        -D RADAPTER_JIT=${RADAPTER_JIT} \
+        -D RADAPTER_JIT_STATIC=OFF \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc)
+    && cmake --build /build -j${BUILD_JOBS}
 WORKDIR /build
 RUN cpack -G DEB
 
@@ -51,14 +57,18 @@ RUN cpack -G DEB
 # Stage: gui-builder
 # ═══════════════════════════════════════════════════════════════════════
 FROM builder AS gui-builder
+ARG RADAPTER_JIT=OFF
+ARG BUILD_JOBS=4
 RUN --mount=type=cache,target=/cpm \
     cmake \
         -D CMAKE_BUILD_TYPE=Release \
         -D RADAPTER_GUI=ON \
         -D RADAPTER_STATIC=OFF \
+        -D RADAPTER_JIT=${RADAPTER_JIT} \
+        -D RADAPTER_JIT_STATIC=OFF \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc)
+    && cmake --build /build -j${BUILD_JOBS}
 WORKDIR /build
 RUN cpack -G DEB
 
@@ -66,13 +76,13 @@ RUN cpack -G DEB
 # Stage: headless-pkg
 # ═══════════════════════════════════════════════════════════════════════
 FROM scratch AS headless-pkg
-COPY --from=headless-builder /build/radapter-headless_*.deb /
+COPY --from=headless-builder /build/radapter*headless_*.deb /
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: gui-pkg
 # ═══════════════════════════════════════════════════════════════════════
 FROM scratch AS gui-pkg
-COPY --from=gui-builder /build/radapter-gui_*.deb /
+COPY --from=gui-builder /build/radapter*gui_*.deb /
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: headless-runner

@@ -16,9 +16,14 @@
 #   docker build -f scripts/Dockerfile.ros --target native-deb-pkg --output=out .
 #   docker build -f scripts/Dockerfile.ros --target cross-deb-pkg --output=out .
 #   ls out/radapter-ros_*.deb
+#
+# RADAPTER_JIT selects the engine runtime this recipe builds alongside the
+# plugin. Keep it at the default so the plugin DEB depends on the same engine
+# package name the packages script ships.
 
 ARG TARGET_PLATFORM=arm64
 ARG TARGET_ARCH=aarch64
+ARG RADAPTER_JIT=ON
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: ros_sysroot — target-arch ROS2 + Qt6 dev stack
@@ -28,7 +33,7 @@ RUN apt-get update && apt-get install -y \
         qt6-base-dev \
         qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
         libqt6sql6-sqlite \
-        libssl-dev \
+        libssl-dev libluajit-5.1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -72,11 +77,11 @@ RUN apt-get update && apt-get upgrade -y && \
     ros-jazzy-turtlesim \
     ros-jazzy-rqt* \
     ros-jazzy-example-interfaces ros-jazzy-demo-nodes-cpp \
-    git cmake ninja-build build-essential \
+    git cmake ninja-build build-essential pkg-config \
     qt6-base-dev qt6-base-dev-tools \
     qt6-websockets-dev qt6-serialbus-dev qt6-serialport-dev \
     libqt6sql6-sqlite \
-    curl libssl-dev \
+    curl libssl-dev libluajit-5.1-dev \
     gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
     && rm -rf /var/lib/apt/lists/*
 
@@ -108,6 +113,8 @@ CMD ["/bin/bash"]
 # ═══════════════════════════════════════════════════════════════════════
 FROM dev AS cross-builder
 ARG TARGET_ARCH=aarch64
+ARG RADAPTER_JIT
+ARG BUILD_JOBS=4
 USER root
 COPY . /src
 WORKDIR /src
@@ -118,10 +125,12 @@ RUN --mount=type=cache,target=/cpm \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_ROS2=ON \
         -D RADAPTER_STATIC=OFF \
+        -D RADAPTER_JIT=${RADAPTER_JIT} \
+        -D RADAPTER_JIT_STATIC=OFF \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -D CMAKE_TOOLCHAIN_FILE=/opt/radapter/cmake/toolchain_arm64.cmake \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc) --target radapter_ros"
+    && cmake --build /build -j${BUILD_JOBS} --target radapter_ros"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: cross-deb — full build + CPack (engine and ros-plugin DEBs)
@@ -130,7 +139,7 @@ FROM cross-builder AS cross-deb
 WORKDIR /build
 RUN --mount=type=cache,target=/cpm \
     bash -c "source /opt/ros/jazzy/setup.bash && \
-        cmake --build /build -j$(nproc) && cpack -G DEB"
+        cmake --build /build -j${BUILD_JOBS} && cpack -G DEB"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: cross-deb-pkg — extract the radapter-ros DEB
@@ -149,6 +158,8 @@ COPY --from=cross-builder /build/bin/libradapter_ros.so /libradapter_ros_${TARGE
 # Stage: native-builder — native compile (CI / one-shot mode)
 # ═══════════════════════════════════════════════════════════════════════
 FROM dev AS native-builder
+ARG RADAPTER_JIT
+ARG BUILD_JOBS=4
 USER root
 COPY . /src
 WORKDIR /src
@@ -160,9 +171,11 @@ RUN --mount=type=cache,target=/cpm \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_ROS2=ON \
         -D RADAPTER_STATIC=OFF \
+        -D RADAPTER_JIT=${RADAPTER_JIT} \
+        -D RADAPTER_JIT_STATIC=OFF \
         -D CMAKE_INSTALL_PREFIX=/usr \
         -G Ninja -B /build \
-    && cmake --build /build -j$(nproc) --target radapter_ros"
+    && cmake --build /build -j${BUILD_JOBS} --target radapter_ros"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: native-deb — full build + CPack (engine and ros-plugin DEBs)
@@ -171,7 +184,7 @@ FROM native-builder AS native-deb
 WORKDIR /build
 RUN --mount=type=cache,target=/cpm \
     bash -c "source /opt/ros/jazzy/setup.bash && \
-        cmake --build /build -j$(nproc) && cpack -G DEB"
+        cmake --build /build -j${BUILD_JOBS} && cpack -G DEB"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Stage: native-deb-pkg — extract the radapter-ros DEB

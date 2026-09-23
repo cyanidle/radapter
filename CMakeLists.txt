@@ -168,8 +168,11 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 install(TARGETS radapter-sdk EXPORT radapter-config COMPONENT radapter_runtime)
-install(DIRECTORY include/radapter DESTINATION include)
-install(FILES ${CMAKE_BINARY_DIR}/_info/radapter_info.hpp DESTINATION include/radapter)
+# Component-install is on, so the SDK headers must be named explicitly or they
+# land in Unspecified and are dropped from the engine DEB.
+install(DIRECTORY include/radapter DESTINATION include COMPONENT radapter_runtime)
+install(FILES ${CMAKE_BINARY_DIR}/_info/radapter_info.hpp DESTINATION include/radapter
+    COMPONENT radapter_runtime)
 
 function(create_radapter_plugin name)
     set(options)

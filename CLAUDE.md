@@ -56,7 +56,10 @@ drivers, `qt6-declarative-dev qml6-module-qtquick-controls`). Full list in READM
 ### DEB packaging
 
 Two mutually-conflicting DEB packages (`radapter-gui` / `radapter-headless`) are built
-from separate configurations (`RADAPTER_GUI=ON` vs `OFF`) via CPack:
+from separate configurations (`RADAPTER_GUI=ON` vs `OFF`) via CPack. `-D RADAPTER_JIT=ON`
+swaps the embedded runtime to the system LuaJIT and renames them to
+`radapter-jit-gui` / `radapter-jit-headless`; all four variants conflict with and replace
+each other. The cart stack ships the `-jit-` pair:
 
 ```bash
 cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=OFF -D CMAKE_INSTALL_PREFIX=/usr -B build-headless
