@@ -8,7 +8,12 @@ CPMAddPackage("gh:SpartanJ/efsw#0c70ed2")
 set(BOOST_ENABLE_CMAKE ON)
 set(BOOST_SKIP_INSTALL_RULES ON)
 set(BUILD_SHARED_LIBS OFF)
-set(BOOST_INCLUDE_LIBRARIES context coroutine2)
+# Additive: an embedding project that needs more of Boost (the cart's slam
+# plugin wants serialization) sets BOOST_INCLUDE_LIBRARIES before adding us.
+# CPM ignores a second CPMAddPackage under the same name, so this list is the
+# only chance to pick the components up.
+set(BOOST_INCLUDE_LIBRARIES context coroutine2 ${BOOST_INCLUDE_LIBRARIES})
+list(REMOVE_DUPLICATES BOOST_INCLUDE_LIBRARIES)
 if (WIN32)
   set(BOOST_CONTEXT_IMPLEMENTATION winfib)
 elseif(CMAKE_CXX_FLAGS MATCHES "sanitize=address")
