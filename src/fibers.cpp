@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <utility>
 #include <vector>
 
