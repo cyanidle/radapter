@@ -91,6 +91,22 @@ build/bin/radapter tests/smoke.lua   # smoke test (self-checking, no hardware ne
 
 Set `CPM_SOURCE_CACHE=$HOME/.cache/CPM` to cache dependencies across builds.
 
+GUI support is detected, not assumed: `RADAPTER_GUI` defaults to `AUTO`, and the plain
+configure above builds with GUI when `qt6-base-dev` / `qt6-declarative-dev` are installed
+and headless otherwise. Every configure reports the outcome, e.g.
+
+```
+-- radapter: RADAPTER_GUI=AUTO -> GUI build (Qt GUI components found: Gui Qml Quick Widgets)
+-- radapter: RADAPTER_GUI=AUTO -> headless build (Qt GUI components found: Gui, missing: Qml Quick Widgets)
+```
+
+`-D RADAPTER_GUI=ON` requires the Qt GUI packages and fails the configure naming the
+missing components; `-D RADAPTER_GUI=OFF` forces a headless build even when they are
+present.
+
+The `--gui`, `--gui-no-auto-quit`, `--gui-record`, and `--gui-replay` flags are accepted
+by every build, but a headless one rejects them with an error saying so.
+
 ## Packaging (DEB)
 
 Two DEB packages are produced from separate build configurations — `radapter-headless`
@@ -103,7 +119,7 @@ other and none provides another name: a LuaJIT engine and a PUC-Lua engine are n
 interchangeable. The cart stack ships the `-jit-` pair.
 
 ```bash
-# radapter-headless — no GUI dependencies
+# radapter-headless — no GUI dependencies (RADAPTER_GUI=OFF also pins the DEB name)
 cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=OFF \
     -D CMAKE_INSTALL_PREFIX=/usr -B build-headless
 cmake --build build-headless -j $(nproc)
@@ -115,6 +131,9 @@ cmake -G Ninja -D CMAKE_BUILD_TYPE=Release -D RADAPTER_GUI=ON \
 cmake --build build-gui -j $(nproc)
 (cd build-gui && cpack -G DEB)
 ```
+
+Both configure lines set `RADAPTER_GUI` explicitly on purpose: the default `AUTO` picks
+the variant from whatever Qt is installed, and packaging must not.
 
 The packages install to `/usr/bin/radapter`, `/usr/lib/`, and `/usr/include/radapter/`.
 Shared library dependencies are auto-detected by `dpkg-shlibdeps`; QML module dependencies

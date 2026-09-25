@@ -325,18 +325,16 @@ int main (int argc, char **argv) try {
         .append()
         .store_into(exprs)
         .help("Execute expressions from cli");
-    if constexpr (radapter::GUI) {
-        cli.add_argument("--gui")
-            .flag()
-            .help("Enable native gui mode (quits when the last GUI window is closed)");
-        cli.add_argument("--gui-no-auto-quit")
-            .flag()
-            .help("Like --gui, but keep running after the last GUI window is closed");
-        cli.add_argument("--gui-record")
-            .help("Implies --gui. Record all GUI interactions to a JSON file for later replay");
-        cli.add_argument("--gui-replay")
-            .help("Implies --gui. Replay a recorded JSON file of GUI interactions, then exit");
-    }
+    cli.add_argument("--gui")
+        .flag()
+        .help("Enable native gui mode (quits when the last GUI window is closed)");
+    cli.add_argument("--gui-no-auto-quit")
+        .flag()
+        .help("Like --gui, but keep running after the last GUI window is closed");
+    cli.add_argument("--gui-record")
+        .help("Implies --gui. Record all GUI interactions to a JSON file for later replay");
+    cli.add_argument("--gui-replay")
+        .help("Implies --gui. Replay a recorded JSON file of GUI interactions, then exit");
     cli.add_argument("--watch-dir", "-w")
         .append()
         .store_into(watch_dirs)
@@ -372,17 +370,35 @@ int main (int argc, char **argv) try {
         .scan<'u', uint16_t>()
         .default_value(uint16_t{8172})
         .help("Debugger listen port");
-    cli.add_epilog(
+    std::string epilog =
         "Environment:\n"
         "  NO_COLOR=<any>         Disable ANSI colors in log output\n"
         "  CLICOLOR_FORCE=<any>   Force ANSI colors in log output even when stderr is\n"
-        "                         not a terminal; takes precedence over NO_COLOR\n");
+        "                         not a terminal; takes precedence over NO_COLOR\n";
+    if constexpr (!radapter::GUI) {
+        epilog += "\nThis is a headless build: the --gui, --gui-no-auto-quit, --gui-record,\n"
+                  "and --gui-replay flags are accepted but rejected at startup (RADAPTER_GUI\n"
+                  "was OFF, or the Qt GUI development packages were missing, at configure\n"
+                  "time).\n";
+    }
+    cli.add_epilog(epilog);
     try {
         cli.parse_args(args);
     } catch (std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         std::cerr << cli << std::endl;
         return 1;
+    }
+    if constexpr (!radapter::GUI) {
+        for (auto flag : {"gui", "gui-no-auto-quit", "gui-record", "gui-replay"}) {
+            if (cli.is_used(flag)) {
+                std::cerr << "Error: --" << flag << " is unavailable: this radapter build is "
+                          "headless (RADAPTER_GUI was OFF, or the Qt GUI development packages "
+                          "were missing, at configure time). Rebuild with -DRADAPTER_GUI=ON to "
+                          "require GUI support." << std::endl;
+                return 1;
+            }
+        }
     }
 #ifdef RADAPTER_GUI
         // auto-quit on last window close is the default for any --gui* mode;

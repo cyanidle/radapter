@@ -77,7 +77,13 @@ RADAPTER_DEB_GUI_QML_DEPS list.
 
 - `RADAPTER_JIT` / `RADAPTER_JIT_STATIC` — use LuaJit instead of PUC-Rio Lua 5.4. JIT mode
   is **Lua 5.1 only**; embedded scripts ship as source instead of precompiled bytecode.
-- `RADAPTER_GUI` (default ON) — enables Qt Gui/Qml/Quick and the `QML` worker.
+- `RADAPTER_GUI` (default `AUTO`) — enables Qt Gui/Qml/Quick/Widgets and the `QML`
+  worker. `AUTO` enables GUI when those dev packages are found at configure time and
+  builds headless otherwise; `ON` requires them and fails the configure (naming the
+  missing components) without them; `OFF` forces headless. Every configure prints the
+  resolved build kind, the setting, and the found/missing Qt GUI components. Package
+  builds always pass `ON`/`OFF` explicitly — `AUTO` would let the host's Qt decide the
+  DEB variant.
 - `RADAPTER_STATIC` — build the SDK static; **disables runtime plugins**.
 - `RADAPTER_ROS2` — also build the out-of-tree ROS2 plugin under `plugins/ros/`.
 
@@ -88,6 +94,9 @@ RADAPTER_DEB_GUI_QML_DEPS list.
 because `QGuiApplication` must be constructed before argparse touches `argc/argv`. All
 other flags must be added to the argparse parser and read after `cli.parse_args(args)` —
 do not add new flags to the pre-scan loop.
+
+The `--gui*` flags exist in every build (so scripts can pass them unconditionally); a
+headless build rejects them right after `parse_args` with an error instead of starting.
 
 ### Tests
 

@@ -21,7 +21,17 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 option(RADAPTER_JIT "Use LuaJIT runtime instead of PUC Rio LUA" OFF)
 option(RADAPTER_JIT_STATIC "Link LuaJIT statically if JIT is enabled" OFF)
-option(RADAPTER_GUI "Enable GUI capabilities" ON)
+# Default only: a RADAPTER_GUI supplied as a normal variable (toolchain file, embedding
+# project, conan toolchain) must win, as it did when this was an option().
+if (NOT DEFINED RADAPTER_GUI)
+    set(RADAPTER_GUI "AUTO" CACHE STRING
+        "GUI capabilities: AUTO (enable when the Qt GUI dev packages are found), ON, OFF")
+endif()
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND DEFINED CACHE{RADAPTER_GUI})
+    # Advertise AUTO only where it is meaningful: an embedding project may own this cache
+    # entry as a plain boolean of its own.
+    set_property(CACHE RADAPTER_GUI PROPERTY STRINGS AUTO ON OFF)
+endif()
 option(RADAPTER_STATIC "Compile SDK as static lib: disables plugins" OFF)
 option(RADAPTER_ROS2 "Develop ROS2 plugin" OFF)
 
@@ -41,9 +51,62 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core WebSockets Network SerialPort SerialBus Sql)
 
-if (RADAPTER_GUI)
-    find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick Widgets)
+# Probe the Qt GUI components once, then resolve RADAPTER_GUI to a plain ON/OFF that the
+# rest of the build (and Packaging.cmake) sees. Every configure reports the outcome.
+set(RADAPTER_GUI_COMPONENTS Gui Qml Quick Widgets)
+find_package(Qt6 QUIET COMPONENTS ${RADAPTER_GUI_COMPONENTS})
+set(RADAPTER_GUI_FOUND)
+set(RADAPTER_GUI_MISSING)
+foreach (component IN LISTS RADAPTER_GUI_COMPONENTS)
+    if (TARGET Qt6::${component})
+        list(APPEND RADAPTER_GUI_FOUND "${component}")
+    else()
+        list(APPEND RADAPTER_GUI_MISSING "${component}")
+    endif()
+endforeach()
+
+string(TOUPPER "${RADAPTER_GUI}" RADAPTER_GUI_SETTING)
+# AUTO is resolved here, in radapter's own directory scope, so an embedding project that
+# inspects RADAPTER_GUI itself (packaging, target selection) still sees the raw "AUTO".
+if (RADAPTER_GUI_SETTING STREQUAL "AUTO" AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    message(WARNING "RADAPTER_GUI=AUTO is resolved inside radapter and does not propagate "
+        "to the embedding project; pass ON or OFF explicitly if it inspects the value.")
 endif()
+string(REPLACE ";" " " RADAPTER_GUI_FOUND "${RADAPTER_GUI_FOUND}")
+if (NOT RADAPTER_GUI_FOUND)
+    set(RADAPTER_GUI_FOUND "none")
+endif()
+string(REPLACE ";" " " RADAPTER_GUI_MISSING "${RADAPTER_GUI_MISSING}")
+
+if (RADAPTER_GUI_SETTING STREQUAL "AUTO")
+    if (RADAPTER_GUI_MISSING)
+        set(RADAPTER_GUI OFF)
+    else()
+        set(RADAPTER_GUI ON)
+    endif()
+elseif (RADAPTER_GUI)
+    if (RADAPTER_GUI_MISSING)
+        message(FATAL_ERROR "RADAPTER_GUI=${RADAPTER_GUI_SETTING} requires the Qt GUI "
+            "development packages, but these components were not found: ${RADAPTER_GUI_MISSING}. "
+            "Install qt6-base-dev and qt6-declarative-dev, or use RADAPTER_GUI=AUTO/OFF.")
+    endif()
+    set(RADAPTER_GUI ON)
+else()
+    set(RADAPTER_GUI OFF)
+endif()
+
+set(RADAPTER_GUI_REPORT "radapter: RADAPTER_GUI=${RADAPTER_GUI_SETTING} -> ")
+if (RADAPTER_GUI)
+    string(APPEND RADAPTER_GUI_REPORT "GUI build")
+else()
+    string(APPEND RADAPTER_GUI_REPORT "headless build")
+endif()
+string(APPEND RADAPTER_GUI_REPORT " (Qt GUI components found: ${RADAPTER_GUI_FOUND}")
+if (RADAPTER_GUI_MISSING)
+    string(APPEND RADAPTER_GUI_REPORT ", missing: ${RADAPTER_GUI_MISSING}")
+endif()
+string(APPEND RADAPTER_GUI_REPORT ")")
+message(STATUS "${RADAPTER_GUI_REPORT}")
 
 add_subdirectory(deps)
 
