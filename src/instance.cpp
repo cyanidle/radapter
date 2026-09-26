@@ -185,6 +185,7 @@ Instance::Instance(QObject *parent) :
     d->fibers = std::make_unique<FiberPool>(this);
     lua_register(L, "__await_native", glua::protect<builtin::api::AwaitNative>);
     lua_register(L, "__spawn_native", glua::protect<builtin::api::SpawnNative>);
+    lua_register(L, "__async_sleep_native", glua::protect<builtin::api::AsyncSleepNative>);
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "reload", glua::Wrap<luaReload>);

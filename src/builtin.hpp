@@ -185,6 +185,7 @@ int After(lua_State* L);
 int LoadPlugin(lua_State* L);
 int AwaitNative(lua_State* L);
 int SpawnNative(lua_State* L);
+int AsyncSleepNative(lua_State* L);
 int json_decode(lua_State* L);
 int json_encode(lua_State* L);
 }

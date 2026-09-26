@@ -1,4 +1,5 @@
 #include "radapter/radapter.hpp"
+#include "radapter/async_helpers.hpp"
 #include "worker_impl.hpp"
 #include "instance_impl.hpp"
 #include "utils.hpp"
@@ -487,6 +488,21 @@ int builtin::api::Each(lua_State* L) {
 
 int builtin::api::After(lua_State* L) {
     return timer(L, true);
+}
+
+int builtin::api::AsyncSleepNative(lua_State* L) {
+    auto ms = luaL_checknumber(L, 1);
+    if (ms < 0) {
+        Raise("sleep(): negative time passed: {}", ms);
+    }
+    auto* inst = Instance::FromLua(L);
+    fut::SharedPromise<QVariant> promise;
+    auto fut = promise.GetFuture();
+    QTimer::singleShot(int(ms), inst, [promise] {
+        promise(QVariant{});
+    });
+    glua::Push(L, MakeLuaPromise(inst, fut));
+    return 1;
 }
 
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {

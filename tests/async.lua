@@ -1,10 +1,6 @@
 -- Demo of the promise/fiber API: any function may await directly; spawn()
 -- detaches a task onto its own fiber so it runs concurrently with the caller.
 
-local async_sleep = promisify(function (time, callback)
-    after(time, callback)
-end)
-
 local echo_in = promisify(function (time, arg, callback)
     after(time, function ()
         log ("Timer callback with: {}", arg)

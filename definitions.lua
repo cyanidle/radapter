@@ -318,6 +318,16 @@ function match_msg(source, filter) end
 ---@return fun(...): promise<any>
 function promisify(fn) end
 
+---Return a promise that settles after `ms` milliseconds.
+---@param ms number
+---@return promise<nil>
+function async_sleep(ms) end
+
+---Suspend the current fiber for `ms` milliseconds (returns nil, err like await).
+---Does not block the event loop.
+---@param ms number
+function sleep(ms) end
+
 ---@class logging
 ---@overload fun(msg: string)
 ---@overload fun(fmt: string, ...)

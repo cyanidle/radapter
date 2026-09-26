@@ -10,6 +10,7 @@
 --   * gather{...}      - await a list of promises concurrently; resolves with
 --     a list of all results in the same order, rejects with the first error
 --   * match_msg(src, f) - promise for the first pipe message matching f
+--   * async_sleep(ms)  - promise settling after ms; sleep(ms) awaits it
 -- A rejected promise with no subscriber is reported as an error one event
 -- loop turn later, so fire-and-forget can not swallow failures silently.
 
@@ -138,6 +139,20 @@ function promisify(func)
             func(table.unpack(args, 1, args.n))
         end)
     end
+end
+
+---Return a promise settling after `ms` milliseconds.
+---@param ms number
+---@return promise<nil>
+function async_sleep(ms)
+    return __async_sleep_native(ms)
+end
+
+---Suspend the current fiber for `ms` milliseconds (returns nil, err like await).
+---Does not block the event loop.
+---@param ms number
+function sleep(ms)
+    return __async_sleep_native(ms):await()
 end
 
 ---Wait for a message matching a filter from a pipe-able source. The promise
