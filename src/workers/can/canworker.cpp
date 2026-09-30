@@ -125,11 +125,10 @@ public:
         frame.setExtendedFrameFormat(msg.extended_id);
         frame.setFlexibleDataRateFormat(msg.can_fd);
         frame.setBitrateSwitch(msg.can_fd);
-        auto str = msg.frame_id.value<QString>();
         bool ok = false;
-        quint32 id;
-        if (!str.isEmpty()) {
-            id = str.toUInt(&ok, 16);
+        quint32 id = 0;
+        if (msg.frame_id.metaType().id() == QMetaType::QString) {
+            id = msg.frame_id.toString().toUInt(&ok, 16);
         } else {
             id = msg.frame_id.toUInt(&ok);
         }
