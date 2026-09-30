@@ -973,7 +973,7 @@ function STDIO(params) end
 
 ---@class CanFilter
 ---@field match ("both" | "normal" | "extended")?
----@field type ("remote" | "data" | "error")?
+---@field type ("data" | "request" | "error")?
 ---@field id number
 ---@field mask number
 
@@ -986,13 +986,16 @@ function STDIO(params) end
 ---@field data_bitrate number?
 
 
+---A CAN frame. `frame_id` is a number, or a string parsed as base-16. `payload`
+---takes a string, [Bytes], a single byte value (0-255) or an array of byte values;
+---anything else raises. Omitted/`nil` sends an empty frame.
 ---@class CanFrame
 ---@field frame_id string | number
----@field payload string | number
+---@field payload string | number | Bytes | integer[]?
 ---@field extended_id boolean?
 ---@field can_fd boolean?
 
----@class CanWorker : Worker
+---@class CanWorker : Worker<CanFrame, CanFrame>
 ---@overload fun(frame: CanFrame, source: Worker)
 
 ---@return CanWorker

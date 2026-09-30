@@ -20,6 +20,44 @@ struct fmt::formatter<QCanBusDeviceInfo> : fmt::formatter<QString>
 namespace radapter::can
 {
 
+static int payloadByte(QVariant const& value)
+{
+    bool ok = false;
+    uint num = value.toUInt(&ok);
+    if (!ok || num > 0xff) {
+        Raise("CAN payload byte must be an integer in 0-255, got '{}'", value.toString().toStdString());
+    }
+    return int(num);
+}
+
+static QByteArray payloadBytes(QVariant const& value)
+{
+    if (!value.isValid()) {
+        return {};
+    }
+    switch (value.metaType().id()) {
+    case QMetaType::QByteArray:
+    case QMetaType::QString:
+        return value.toByteArray();
+    case QMetaType::QVariantList: {
+        QByteArray bytes;
+        for (auto const& item: value.toList()) {
+            bytes.append(static_cast<char>(payloadByte(item)));
+        }
+        return bytes;
+    }
+    case QMetaType::Int:
+    case QMetaType::UInt:
+    case QMetaType::LongLong:
+    case QMetaType::ULongLong:
+    case QMetaType::Double:
+        return QByteArray(1, static_cast<char>(payloadByte(value)));
+    default:
+        Raise("CAN payload must be a string, bytes, a byte value (0-255) or an array of byte values, got {}",
+            value.metaType().name());
+    }
+}
+
 class CanWorker final : public ICanWorker
 {
     Q_OBJECT
@@ -100,7 +138,7 @@ public:
         }
         frame.setFrameId(id);
         frame.setFrameType(QCanBusFrame::DataFrame);
-        frame.setPayload(msg.payload.value<QByteArray>());
+        frame.setPayload(payloadBytes(msg.payload));
         if (!device->writeFrame(frame)) {
             Raise("Could not write frame: {}", device->errorString());
         }
