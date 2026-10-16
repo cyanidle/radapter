@@ -165,5 +165,9 @@ end)
 assert(called[1] == 1 and called[2] == 2 and called[3] == 3,
     "Call must invoke the function with (1, 2, 3)")
 
+pipe(test, log)
+
+sleep(500)
+
 log "Basic test OK"
 shutdown()

@@ -125,7 +125,9 @@ function pipe(first, ...)
         elseif t ~= "table" and t ~= "userdata" then
             error("function, table or userdata expected at arg "..i)
         end
-        if not v:get_listeners() then
+        if not v.get_listeners then
+            v = wrap_func(v)
+        elseif not v:get_listeners() then
             error("Pipe target #"..i.." is not Pipable")
         end
         if curr ~= nil then
