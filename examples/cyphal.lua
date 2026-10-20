@@ -1,7 +1,8 @@
 Cyphal {
     can = CAN {
         plugin = "socketcan",
-        device = "vcan0"
+        device = "vcan0",
+        can_fd = true
     },
     node_id = 93,
     services = {
@@ -21,7 +22,8 @@ Cyphal {
 local node2 = Cyphal {
     can = CAN {
         plugin = "socketcan",
-        device = "vcan0"
+        device = "vcan0",
+        can_fd = true
     },
     node_id = 94,
 }

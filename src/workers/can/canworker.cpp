@@ -36,6 +36,14 @@ static QByteArray payloadBytes(QVariant const& value)
         return {};
     }
     switch (value.metaType().id()) {
+    case QMetaType::QVariantMap: {
+        auto map = value.toMap();
+        if (map.isEmpty()) {
+            return {};
+        }
+        Raise("CAN payload must be a string, bytes, a byte value (0-255) or an array of byte values, got a map with keys [{}]",
+            map.keys().join(", ").toStdString());
+    }
     case QMetaType::QByteArray:
     case QMetaType::QString:
         return value.toByteArray();
@@ -64,6 +72,7 @@ class CanWorker final : public ICanWorker
 
     CanConfig config;
     QCanBusDevice *device = nullptr;
+    qint64 pendingSinceFlush = 0;
 public:
     CanWorker(CanConfig conf, radapter::Instance* inst) :
         ICanWorker(inst, EnsureName(conf, QString("%1:%2").arg(conf.plugin, conf.device)), "can")
@@ -122,9 +131,15 @@ public:
         QCanBusFrame frame;
         CanFrame msg;
         Parse(msg, _msg);
+        if (msg.bitrate_switch && !msg.can_fd) {
+            Raise("CAN bitrate_switch requires can_fd on the same frame");
+        }
+        if (msg.can_fd && !device->configurationParameter(QCanBusDevice::CanFdKey).toBool()) {
+            Raise("CAN FD frames require the worker to be opened with can_fd = true");
+        }
         frame.setExtendedFrameFormat(msg.extended_id);
         frame.setFlexibleDataRateFormat(msg.can_fd);
-        frame.setBitrateSwitch(msg.can_fd);
+        frame.setBitrateSwitch(msg.bitrate_switch);
         bool ok = false;
         quint32 id = 0;
         if (msg.frame_id.metaType().id() == QMetaType::QString) {
@@ -136,17 +151,36 @@ public:
             Raise("frame_id should be a string (hex base16) or number");
         }
         frame.setFrameId(id);
-        frame.setFrameType(QCanBusFrame::DataFrame);
+        auto frame_type = static_cast<QCanBusFrame::FrameType>(msg.frame_type.value);
+        if (frame_type != QCanBusFrame::DataFrame && frame_type != QCanBusFrame::RemoteRequestFrame) {
+            QVariant name;
+            Dump(msg.frame_type.value, name);
+            Raise("CAN frame_type '{}' cannot be sent: only 'data' and 'request' frames are writable",
+                name.toString().toStdString());
+        }
+        frame.setFrameType(frame_type);
         frame.setPayload(payloadBytes(msg.payload));
         if (!device->writeFrame(frame)) {
             Raise("Could not write frame: {}", device->errorString());
         }
+        ++pendingSinceFlush;
+        emitFlushedIfDrained();
     }
 private:
+    void emitFlushedIfDrained(bool force = false)
+    {
+        if (!pendingSinceFlush || (!force && device->framesToWrite() != 0)) {
+            return;
+        }
+        pendingSinceFlush = 0;
+        emit SendEventField("flushed", true);
+    }
+
     void on_errorOccurred(QCanBusDevice::CanBusError err)
     {
         Error("Error: {} -> {}", QMetaEnum::fromType<QCanBusDevice::CanBusError>().valueToKey(err), device->errorString());
         emit SendEventField("error", device->errorString());
+        emitFlushedIfDrained();
     }
 
     void on_framesReceived()
@@ -157,6 +191,10 @@ private:
             QVariantMap msg;
             msg["extended_id"] = frame.hasExtendedFrameFormat();
             msg["can_fd"] = frame.hasFlexibleDataRateFormat();
+            msg["bitrate_switch"] = frame.hasBitrateSwitch();
+            QVariant frame_type;
+            Dump(static_cast<CanRxFrameType>(frame.frameType()), frame_type);
+            msg["frame_type"] = frame_type;
             msg["frame_id"] = frame.frameId();
             msg["payload"] = frame.payload();
             emit SendMsg(msg);
@@ -166,6 +204,7 @@ private:
     void on_framesWritten(qint64 framesCount)
     {
         emit SendEventField("written", framesCount);
+        emitFlushedIfDrained();
     }
 
     void on_stateChanged(QCanBusDevice::CanBusDeviceState state)
@@ -173,6 +212,9 @@ private:
         auto state_name = QMetaEnum::fromType<QCanBusDevice::CanBusDeviceState>().valueToKey(state);
         Info("State changed: {}", state_name);
         emit SendEventField("state", state_name);
+        if (state == QCanBusDevice::UnconnectedState) {
+            emitFlushedIfDrained(true);
+        }
     }
 };
 

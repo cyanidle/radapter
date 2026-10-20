@@ -10,7 +10,7 @@
 --   * gather{...}      - await a list of promises concurrently; resolves with
 --     a list of all results in the same order, rejects with the first error
 --   * match_msg(src, f) - promise for the first pipe message matching f
---   * async_sleep(ms)  - promise settling after ms; sleep(ms) awaits it
+--   * sleep(ms)       - suspend the current fiber without blocking the loop
 -- A rejected promise with no subscriber is reported as an error one event
 -- loop turn later, so fire-and-forget can not swallow failures silently.
 
@@ -141,19 +141,64 @@ function promisify(func)
     end
 end
 
----Return a promise settling after `ms` milliseconds.
----@param ms number
----@return promise<nil>
-function async_sleep(ms)
-    return __async_sleep_native(ms)
-end
+local shutting_down = false
+local sleepers = {}
 
----Suspend the current fiber for `ms` milliseconds (returns nil, err like await).
----Does not block the event loop.
+-- Shutdown runs this before it stops the instance's timers, so a fiber parked in sleep()
+-- is woken (and unwound) instead of holding teardown hostage for the rest of its nap.
+on_shutdown(function ()
+    shutting_down = true
+    local pending = sleepers
+    sleepers = {}
+    for _, entry in pairs(pending) do
+        entry.done(true)
+    end
+end)
+
+---Suspend the current fiber for `ms` milliseconds without blocking the event loop.
+---An instance shutdown interrupts the sleep and unwinds the caller like os.exit().
 ---@param ms number
 function sleep(ms)
-    return __async_sleep_native(ms):await()
+    if type(ms) ~= "number" then
+        error("sleep(): number expected, got " .. type(ms), 2)
+    end
+    if ms < 0 then
+        error("sleep(): negative time passed: " .. tostring(ms), 2)
+    end
+    if shutting_down then
+        error(__exit_marker, 0)
+    end
+    local interrupted = promise(function (done)
+        local entry = { done = done }
+        sleepers[entry] = entry
+        after(ms, function ()
+            sleepers[entry] = nil
+            done(false)
+        end)
+    end):await()
+    if interrupted then
+        error(__exit_marker, 0)
+    end
 end
+
+-- The stock os.exit() leaves the VM immediately, skipping worker teardown (open ports,
+-- sockets, QSettings writes, on_shutdown handlers) and dropping the exit code.
+local function exit(code, close)
+    if code == true then
+        code = 0
+    elseif code == false then
+        code = 1
+    elseif code == nil then
+        code = 0
+    elseif type(code) ~= "number" then
+        error("os.exit(): number or boolean expected, got " .. type(code), 2)
+    elseif code ~= code or code == math.huge or code == -math.huge or code ~= math.floor(code) then
+        error("os.exit(): integer code expected, got " .. tostring(code), 2)
+    end
+    __exit_native(code)
+end
+
+os.exit = exit
 
 ---Wait for a message matching a filter from a pipe-able source. The promise
 ---resolves with the first message for which `filter(msg)` returns true, then

@@ -35,6 +35,15 @@ function on_shutdown(handler) end
 ---@param timeout number?
 function shutdown(timeout) end
 
+---Gracefully shut the instance down and exit the process with `code`.
+---Overrides the stock `os.exit`: the shutdown starts immediately and the exit code reaches
+---the host. The current call chain is unwound, so code that `pcall`s it keeps running, but
+---the process still exits. `close` is accepted for compatibility and ignored - teardown
+---always closes everything it owns.
+---@param code number|boolean? exit status: a number, `true` for 0, `false` for 1, `nil` for 0
+---@param close boolean? accepted and ignored
+function os.exit(code, close) end
+
 ---Hot-reload the current instance, exactly as the `-w`/`--watch-dir` file watcher does
 ---(re-runs any `--pre-script` and the main script). Deferred: the current call returns
 ---first. A no-op when run without a host that acts on it.
@@ -318,13 +327,9 @@ function match_msg(source, filter) end
 ---@return fun(...): promise<any>
 function promisify(fn) end
 
----Return a promise that settles after `ms` milliseconds.
----@param ms number
----@return promise<nil>
-function async_sleep(ms) end
-
----Suspend the current fiber for `ms` milliseconds (returns nil, err like await).
----Does not block the event loop.
+---Suspend the current fiber for `ms` milliseconds without blocking the event loop.
+---Raises on a non-number or negative period, and unwinds the caller the same way
+---`os.exit` does when an instance shutdown interrupts the sleep.
 ---@param ms number
 function sleep(ms) end
 
@@ -977,8 +982,13 @@ function STDIO(params) end
 ---@field id number
 ---@field mask number
 
+---Any installed QCanBus plugin key: `"socketcan"`, `"virtualcan"`, `"vectorcan"`,
+---`"tinycan"`, `"peakcan"`, `"systeccan"`, `"passthrucan"`, or an out-of-tree plugin
+---such as `"serialcan-weact"`. `can_fd` (default false) enables CAN FD on the device and
+---is required in addition to the per-frame `can_fd`/`bitrate_switch`; `data_bitrate` is
+---programmed at connect time.
 ---@class CanParams
----@field plugin "socketcan" | "virtualcan" | "vectorcan" | "tinycan" | "peakcan" | "systeccan" | "passthrucan"
+---@field plugin string
 ---@field device string
 ---@field filters CanFilter[]?
 ---@field bitrate number?
@@ -987,14 +997,26 @@ function STDIO(params) end
 
 
 ---A CAN frame. `frame_id` is a number, or a string parsed as base-16. `payload`
----takes a string, [Bytes], a single byte value (0-255) or an array of byte values;
----anything else raises. Omitted/`nil` sends an empty frame.
+---takes a string, [Bytes], a single byte value (0-255) or an array of byte values
+---(an empty array/map is an empty payload); anything else raises.
+---`bitrate_switch` is the CAN FD bit-rate switch: a frame with the switch set is an FD
+---frame, so the device has to be opened with `can_fd = true`; FD frames without it
+---transmit their data phase at the nominal bit rate. On send only `data` and `request`
+---frame types are writable; on receive `frame_type` may also be `unknown` or `invalid`.
 ---@class CanFrame
 ---@field frame_id string | number
 ---@field payload string | number | Bytes | integer[]?
 ---@field extended_id boolean?
 ---@field can_fd boolean?
+---@field bitrate_switch boolean?
+---@field frame_type ("data" | "request" | "error" | "unknown" | "invalid")?
 
+---`can.events` emits `{state = "<state>"}`, `{written = <n>}` (`n` frames acknowledged in
+---one batch), `{error = "<message>"}` on failures, and `{flushed = true}` once everything
+---written since the previous `flushed` was acknowledged, failed, or dropped by a
+---disconnect (a device that acknowledges synchronously emits it for every frame). `flushed`
+---is edge-triggered, so subscribe before writing: await the end of a burst with
+---`match_msg(can.events, function(msg) return msg.flushed or msg.error end)`.
 ---@class CanWorker : Worker<CanFrame, CanFrame>
 ---@overload fun(frame: CanFrame, source: Worker)
 

@@ -12,6 +12,7 @@ struct WorkerImpl {
     QPointer<radapter::Worker> self{};
     std::array<QMetaObject::Connection, 2> conns{};
     QVariant currentSender = {};
+    bool dropLogged = false;
     LuaValue listeners = {};
     LuaValue evListeners = {};
 

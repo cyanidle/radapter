@@ -40,7 +40,7 @@ TagRegistry::TagRegistry(Instance* inst) : QObject(inst), _inst(inst) {
     changedObj.Push(L);
     lua_newtable(L);
     lua_pushlightuserdata(L, this);
-    lua_pushcclosure(L, glua::protect<changed_index>, 1);
+    lua_pushcclosure(L, builtin::protect<changed_index>, 1);
     lua_setfield(L, -2, "__index");
     lua_setmetatable(L, -2);
     lua_pop(L, 1);
@@ -239,15 +239,15 @@ void Instance::EnableTags() {
     lua_newtable(L); // the `tags` global
 
     lua_pushlightuserdata(L, reg);
-    lua_pushcclosure(L, glua::protect<tags_subscribe>, 1);
+    lua_pushcclosure(L, builtin::protect<tags_subscribe>, 1);
     lua_setfield(L, -2, "subscribe");
 
     lua_pushlightuserdata(L, reg);
-    lua_pushcclosure(L, glua::protect<tags_get>, 1);
+    lua_pushcclosure(L, builtin::protect<tags_get>, 1);
     lua_setfield(L, -2, "get");
 
     lua_pushlightuserdata(L, reg);
-    lua_pushcclosure(L, glua::protect<tags_source>, 1);
+    lua_pushcclosure(L, builtin::protect<tags_source>, 1);
     lua_setfield(L, -2, "source");
 
     reg->changedObj.Push(L);

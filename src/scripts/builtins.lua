@@ -75,6 +75,9 @@ local function connect(target, ipipe)
     local listener = function(msg, sender)
         local ok, err = xpcall(ipipe.call, debug.traceback, ipipe, msg, sender)
         if not ok then
+            if err == __exit_marker then
+                return
+            end
             log.error("In (Pipe): {}", err)
         end
     end

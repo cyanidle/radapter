@@ -27,6 +27,7 @@ struct radapter::Instance::Impl {
     bool shutdownDone = false;
     bool shutdownIdleArmed = false;
     unsigned shutdownTimeout = 5000; // Shutdown()'s default budget
+    int exitCode = 0;
     int debuggerActive = 0; // 1 normal, 2 vscode
     int insideLogHandler = false;
     int luaLogHandler = LUA_NOREF;

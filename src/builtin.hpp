@@ -171,8 +171,25 @@ QVariant toQVar(lua_State* L, int idx = -1);
 QVariant toStrOrBinary(lua_State* L, int idx = -1);
 string_view toSV(lua_State* L, int idx = -1) noexcept;
 QVariantList toArgs(lua_State* L, int from);
+bool isExitMarker(lua_State* L, int idx);
+void pushExitMarker(lua_State* L);
 void pushBytes(lua_State* L, QByteArray bytes);
 QByteArray* testBytes(lua_State* L, int idx);
+}
+
+// Use this instead of glua::protect for every Lua-facing registration: a ForcedShutdown
+// escaping a C function is an exit request, and stringifying it would lose the exit marker.
+template<auto f>
+int protect(lua_State* L) {
+    try {
+        return f(L);
+    } catch (ForcedShutdown const&) {
+        help::pushExitMarker(L);
+    } catch (std::exception& e) {
+        lua_pushstring(L, e.what());
+    }
+    lua_error(L);
+    std::abort();
 }
 
 namespace api {
@@ -185,7 +202,7 @@ int After(lua_State* L);
 int LoadPlugin(lua_State* L);
 int AwaitNative(lua_State* L);
 int SpawnNative(lua_State* L);
-int AsyncSleepNative(lua_State* L);
+int ExitNative(lua_State* L);
 int json_decode(lua_State* L);
 int json_encode(lua_State* L);
 }

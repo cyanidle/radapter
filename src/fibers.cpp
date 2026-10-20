@@ -334,7 +334,7 @@ int builtin::api::AwaitNative(lua_State* L)
         lua_setfield(L, -2, "__gc");
     }
     lua_setmetatable(L, -2);
-    lua_pushcclosure(L, glua::protect<awaitSettleTrampoline>, 1);
+    lua_pushcclosure(L, builtin::protect<awaitSettleTrampoline>, 1);
     lua_pushvalue(L, 1);
     lua_insert(L, -2);
     lua_pcall(L, 1, 0, 0);

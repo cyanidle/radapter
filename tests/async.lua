@@ -22,7 +22,7 @@ local function async_simple (arg1, arg2)
 
     log("a: {}, b: {}", A, B)
 
-    async_sleep(1000):await()
+    sleep(1000)
 
     return A + B
 end
@@ -33,6 +33,14 @@ local doubled = spawn(callable, 21):await()
 if doubled ~= 42 then
     log.error("spawn: callable target expected 42, got {}", tostring(doubled))
     os.exit(1)
+end
+
+-- sleep() validates its argument
+do
+    local ok, err = pcall(sleep, "100")
+    assert(not ok and tostring(err):find("number expected"), "sleep('100') must raise: " .. tostring(err))
+    ok, err = pcall(sleep, -1)
+    assert(not ok and tostring(err):find("negative"), "sleep(-1) must raise: " .. tostring(err))
 end
 
 -- spawn: the promise settles with the result of the call (nil, err) on error

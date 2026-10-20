@@ -253,7 +253,10 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     if (!msg.isValid()) return;
     auto* w = impl->self.data();
     if (!w) {
-        Raise("worker not usable");
+        if (!std::exchange(impl->dropLogged, true)) {
+            Instance::FromLua(impl->L)->Warn("worker", "Dropped a notification for an already destroyed worker");
+        }
+        return;
     }
     if (auto* reg = w->_Inst->_GetPrivate()->tagRegistry.get()) {
         if (is_event) reg->onWorkerEvent(w, msg);
@@ -261,12 +264,19 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     }
     auto listeners = is_event ? impl->evListeners : impl->listeners;
     LuaValue workerObj(listeners._L, RegistryRef, workerSelfRef);
-    LuaFunction::Global(w->_Inst->LuaState(), "call_all")
-        .CallOnFiber({QVariant::fromValue(listeners), msg, QVariant::fromValue(workerObj)},
-            [w = QPointer(w)](std::string_view err) {
-                if (w)
-                    w->Error("Could not notify listeners: {}", err);
-            });
+    try {
+        LuaFunction::Global(w->_Inst->LuaState(), "call_all")
+            .CallOnFiber({QVariant::fromValue(listeners), msg, QVariant::fromValue(workerObj)},
+                [w = QPointer(w)](std::string_view err) {
+                    if (w)
+                        w->Error("Could not notify listeners: {}", err);
+                });
+    } catch (ForcedShutdown const&) {
+        // a listener may request exit; teardown unwinds still have to propagate
+        auto* fiber = Fiber::Current();
+        if (!fiber || fiber->Unwinding())
+            throw;
+    }
 }
 
 static int worker_tostring(lua_State* L) {
@@ -325,19 +335,19 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
         lua_setfield(L, -2, "__tostring");
 
         lua_pushvalue(L, clsIdx);
-        lua_pushcclosure(L, glua::protect<worker_destroy>, 1);
+        lua_pushcclosure(L, builtin::protect<worker_destroy>, 1);
         lua_setfield(L, -2, "destroy");
 
         lua_pushvalue(L, clsIdx);
-        lua_pushcclosure(L, glua::protect<worker_shutdown>, 1);
+        lua_pushcclosure(L, builtin::protect<worker_shutdown>, 1);
         lua_setfield(L, -2, "shutdown");
 
         lua_pushvalue(L, clsIdx);
-        lua_pushcclosure(L, glua::protect<get_listeners>, 1);
+        lua_pushcclosure(L, builtin::protect<get_listeners>, 1);
         lua_setfield(L, -2, "get_listeners");
 
         lua_pushvalue(L, clsIdx);
-        lua_pushcclosure(L, glua::protect<worker_call>, 1);
+        lua_pushcclosure(L, builtin::protect<worker_call>, 1);
         lua_pushvalue(L, -1);
         lua_setfield(L, -3, "__call");
         lua_setfield(L, -2, "call");
@@ -349,14 +359,14 @@ static void push_worker(lua_State* L, Instance* inst, const char* clsname, Worke
             static_assert(sizeof(void*) >= sizeof(method));
             lua_pushvalue(L, clsIdx);
             lua_pushlightuserdata(L, reinterpret_cast<void*>(method));
-            lua_pushcclosure(L, glua::protect<call_extra>, 2);
+            lua_pushcclosure(L, builtin::protect<call_extra>, 2);
             lua_settable(L, -3);
         }
 
         lua_pushcfunction(L, glua::dtor_for<WorkerImpl>);
         lua_setfield(L, -2, "__gc");
         lua_pushvalue(L, -1);
-        lua_pushcclosure(L, glua::protect<worker_index>, 1);
+        lua_pushcclosure(L, builtin::protect<worker_index>, 1);
         lua_setfield(L, -2, "__index");
     }
     lua_setmetatable(L, -2);
@@ -383,7 +393,7 @@ void Instance::RegisterWorker(const char* name, Factory factory, ExtraMethods co
 {
     auto L = d->L;
     glua::Push(L, FactoryContext{name, factory, extra});
-    lua_pushcclosure(L, glua::protect<workerFactory>, 1);
+    lua_pushcclosure(L, builtin::protect<workerFactory>, 1);
     lua_setglobal(L, name);
 }
 

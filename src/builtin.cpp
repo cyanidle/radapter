@@ -12,6 +12,7 @@
 #include "QPointer"
 #include "builtin.hpp"
 #include "glua/glua.hpp"
+#include <QMetaObject>
 #include <QPluginLoader>
 #include <QCoreApplication>
 #include <QDir>
@@ -194,23 +195,23 @@ void builtin::help::pushBytes(lua_State* L, QByteArray bytes) {
     new (ud) QByteArray(std::move(bytes));
     if (luaL_newmetatable(L, BytesMeta)) {
         luaL_Reg methods[] = {
-            {"str", glua::protect<bytesStr>},
-            {"hex", glua::protect<bytesHex>},
-            {"size", glua::protect<bytesSize>},
-            {"byte", glua::protect<bytesByte>},
-            {"sub", glua::protect<bytesSub>},
+            {"str", builtin::protect<bytesStr>},
+            {"hex", builtin::protect<bytesHex>},
+            {"size", builtin::protect<bytesSize>},
+            {"byte", builtin::protect<bytesByte>},
+            {"sub", builtin::protect<bytesSub>},
             {nullptr, nullptr},
         };
         lua_createtable(L, 0, 5);
         luaL_setfuncs(L, methods, 0);
         luaL_Reg meta[] = {
             {"__gc", glua::dtor_for<QByteArray>},
-            {"__tostring", glua::protect<bytesToString>},
-            {"__len", glua::protect<bytesSize>},
+            {"__tostring", builtin::protect<bytesToString>},
+            {"__len", builtin::protect<bytesSize>},
             {"__eq", bytesEq},
-            {"__concat", glua::protect<bytesConcat>},
+            {"__concat", builtin::protect<bytesConcat>},
             {"__newindex", bytesNewIndex},
-            {"__index", glua::protect<bytesIndex>},
+            {"__index", builtin::protect<bytesIndex>},
             {nullptr, nullptr},
         };
         luaL_setfuncs(L, meta, 1);
@@ -490,21 +491,6 @@ int builtin::api::After(lua_State* L) {
     return timer(L, true);
 }
 
-int builtin::api::AsyncSleepNative(lua_State* L) {
-    auto ms = luaL_checknumber(L, 1);
-    if (ms < 0) {
-        Raise("sleep(): negative time passed: {}", ms);
-    }
-    auto* inst = Instance::FromLua(L);
-    fut::SharedPromise<QVariant> promise;
-    auto fut = promise.GetFuture();
-    QTimer::singleShot(int(ms), inst, [promise] {
-        promise(QVariant{});
-    });
-    glua::Push(L, MakeLuaPromise(inst, fut));
-    return 1;
-}
-
 string_view builtin::help::toSV(lua_State* L, int idx) noexcept {
     size_t len;
     auto s = luaL_tolstring(L, idx, &len);
@@ -542,10 +528,36 @@ int builtin::api::json_encode(lua_State* L) {
     return 1;
 }
 
+static char exitMarker;
+
+bool builtin::help::isExitMarker(lua_State* L, int idx)
+{
+    return lua_type(L, idx) == LUA_TLIGHTUSERDATA && lua_touserdata(L, idx) == &exitMarker;
+}
+
+void builtin::help::pushExitMarker(lua_State* L)
+{
+    lua_pushlightuserdata(L, &exitMarker);
+}
+
 int builtin::traceback(lua_State* L) noexcept {
+    if (help::isExitMarker(L, 1)) {
+        lua_pushvalue(L, 1);
+        return 1;
+    }
     auto msg = std::string(help::toSV(L, 1));
     luaL_traceback(L, L, msg.c_str(), 1);
     return 1;
+}
+
+int builtin::api::ExitNative(lua_State* L) {
+    auto* inst = Instance::FromLua(L);
+    inst->SetExitCode(int(luaL_checkinteger(L, 1)));
+    QMetaObject::invokeMethod(inst, [inst]{
+        inst->Shutdown();
+    }, Qt::QueuedConnection);
+    help::pushExitMarker(L);
+    return lua_error(L);
 }
 
 template<typename Fn>
@@ -613,7 +625,7 @@ static void pushQObj(lua_State* L, QObject* q) {
     auto missing = lua_isnil(L, -1);
     lua_pop(L, 1);
     if (missing) {
-        lua_pushcfunction(L, glua::protect<qobjToString>);
+        lua_pushcfunction(L, builtin::protect<qobjToString>);
         lua_setfield(L, -2, "__tostring");
     }
     lua_pop(L, 1);
@@ -728,7 +740,7 @@ void glua::Push(lua_State* L, QVariant const& val) {
             f.Push(L);
         } else if (auto cf = val.value<ExtraFunctionPtr>()) {
             glua::Push(L, ExtraHelper{std::move(cf)});
-            lua_pushcclosure(L, glua::protect<wrapFunc>, 1);
+            lua_pushcclosure(L, builtin::protect<wrapFunc>, 1);
         } else if (auto v = val.value<LuaValue>()) {
             v.Push(L);
         } else if (auto q = val.value<QObject*>()) {

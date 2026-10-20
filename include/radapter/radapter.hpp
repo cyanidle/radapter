@@ -184,6 +184,10 @@ public:
     lua_State* LuaState();
     static Instance* FromLua(lua_State* L);
 
+    // Process exit code reported once Shutdown() completes; set by Lua's os.exit().
+    void SetExitCode(int code);
+    int ExitCode() const;
+
     Impl* _GetPrivate() {
         return d.get();
     }

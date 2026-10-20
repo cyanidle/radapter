@@ -35,6 +35,7 @@ static std::vector<std::string> g_argv;
 static bool g_reloading = false;
 
 static bool g_exited = false;
+static int g_exit_code = 0;
 
 // Replace the running process image with a fresh launch of the (possibly
 // rebuilt) executable. POSIX only; returns only on failure.
@@ -103,11 +104,12 @@ public:
 
         QObject::connect(inst, &radapter::Instance::ShutdownDone, this, &QObject::deleteLater);
 
-        QObject::connect(inst, &radapter::Instance::ShutdownDone, []{
+        QObject::connect(inst, &radapter::Instance::ShutdownDone, [inst=inst]{
             if (!g_reloading)
             {
                 g_exited = true;
-                qApp->quit();
+                g_exit_code = inst->ExitCode();
+                qApp->exit(g_exit_code);
             }
         });
 
@@ -442,7 +444,7 @@ int main (int argc, char **argv) try {
         watcher->watch();
     }
 
-    int rc = g_exited ? 0 : app->exec();
+    int rc = g_exited ? g_exit_code : app->exec();
     // quit() returns from exec() before the final deleteLater (AppState ->
     // Instance) is ever dispatched; flush it while the QCoreApplication is
     // still alive or the whole instance graph is leaked at exit

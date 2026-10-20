@@ -21,6 +21,10 @@ static QVariant callOn(lua_State* T, LuaFunction const& fn, QVariantList const& 
     }
     auto status = lua_pcall(T, int(args.size()), 1, msgh);
     if (status != LUA_OK) {
+        if (builtin::help::isExitMarker(T, -1)) {
+            lua_settop(T, base);
+            throw ForcedShutdown{};
+        }
         auto err = QString::fromUtf8(lua_tostring(T, -1));
         lua_settop(T, base);
         if (auto f = Fiber::Current(); f && f->Unwinding()) {

@@ -285,6 +285,14 @@ if (NOT RADAPTER_SDK_ONLY AND NOT RADAPTER_STATIC)
     set_tests_properties(plugin_search PROPERTIES TIMEOUT 30)
 endif()
 
+if (NOT RADAPTER_SDK_ONLY)
+    add_test(NAME exit_code
+        COMMAND ${CMAKE_COMMAND}
+            -DRADAPTER=$<TARGET_FILE:radapter>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/exit_code.cmake)
+    set_tests_properties(exit_code PROPERTIES TIMEOUT 120)
+endif()
+
 file(GLOB RADAPTER_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.lua")
 
 foreach(test_file ${RADAPTER_TESTS})
@@ -300,6 +308,10 @@ foreach(test_file ${RADAPTER_TESTS})
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests"
     )
     set_tests_properties("${test_name}" PROPERTIES TIMEOUT 10)
+    if(test_name MATCHES "^can")
+        # Qt's virtualcan bus is machine-wide, so these tests must not run concurrently
+        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 30 RESOURCE_LOCK can_virtual_bus)
+    endif()
 endforeach()
 
 

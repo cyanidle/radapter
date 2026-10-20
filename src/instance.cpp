@@ -154,54 +154,56 @@ Instance::Instance(QObject *parent) :
 
     lua_newtable(L);
     lua_pushinteger(L, debug);
-    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, builtin::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "debug");
     lua_pushinteger(L, info);
-    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, builtin::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "info");
     lua_pushinteger(L, warn);
-    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, builtin::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "warn");
     lua_pushinteger(L, error);
-    lua_pushcclosure(L, glua::protect<Impl::luaLog>, 1);
+    lua_pushcclosure(L, builtin::protect<Impl::luaLog>, 1);
     lua_setfield(L, -2, "error");
-    lua_pushcfunction(L, glua::protect<Impl::log_handler>);
+    lua_pushcfunction(L, builtin::protect<Impl::log_handler>);
     lua_setfield(L, -2, "set_handler");
-    lua_pushcfunction(L, glua::protect<Impl::log_level>);
+    lua_pushcfunction(L, builtin::protect<Impl::log_level>);
     lua_setfield(L, -2, "set_level");
 
     lua_newtable(L); //log. metatable
     lua_pushinteger(L, info);
-    lua_pushcclosure(L, glua::protect<Impl::log__call>, 1);
+    lua_pushcclosure(L, builtin::protect<Impl::log__call>, 1);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 
     lua_setglobal(L, "log");
 
     lua_register(L, "next_id", _gen_id);
-    lua_register(L, "json_decode", glua::protect<builtin::api::json_decode>);
-    lua_register(L, "json_encode", glua::protect<builtin::api::json_encode>);
+    lua_register(L, "json_decode", builtin::protect<builtin::api::json_decode>);
+    lua_register(L, "json_encode", builtin::protect<builtin::api::json_encode>);
 
     d->fibers = std::make_unique<FiberPool>(this);
-    lua_register(L, "__await_native", glua::protect<builtin::api::AwaitNative>);
-    lua_register(L, "__spawn_native", glua::protect<builtin::api::SpawnNative>);
-    lua_register(L, "__async_sleep_native", glua::protect<builtin::api::AsyncSleepNative>);
+    lua_register(L, "__await_native", builtin::protect<builtin::api::AwaitNative>);
+    lua_register(L, "__spawn_native", builtin::protect<builtin::api::SpawnNative>);
+    lua_register(L, "__exit_native", builtin::protect<builtin::api::ExitNative>);
+    builtin::help::pushExitMarker(L);
+    lua_setglobal(L, "__exit_marker");
 
     lua_register(L, "shutdown", glua::Wrap<luaShutdown>);
     lua_register(L, "reload", glua::Wrap<luaReload>);
-    lua_register(L, "on_shutdown", glua::protect<Impl::onShutdown>);
-    lua_register(L, "fmt", glua::protect<builtin::api::Format>);
-    lua_register(L, "bytes", glua::protect<builtin::api::Bytes>);
-    lua_register(L, "each", glua::protect<builtin::api::Each>);
-    lua_register(L, "after", glua::protect<builtin::api::After>);
-    lua_register(L, "get", glua::protect<builtin::api::Get>);
-    lua_register(L, "set", glua::protect<builtin::api::Set>);
-    lua_register(L, "schema", glua::protect<lua_schema>);
-    lua_register(L, "load_plugin", glua::protect<builtin::api::LoadPlugin>);
+    lua_register(L, "on_shutdown", builtin::protect<Impl::onShutdown>);
+    lua_register(L, "fmt", builtin::protect<builtin::api::Format>);
+    lua_register(L, "bytes", builtin::protect<builtin::api::Bytes>);
+    lua_register(L, "each", builtin::protect<builtin::api::Each>);
+    lua_register(L, "after", builtin::protect<builtin::api::After>);
+    lua_register(L, "get", builtin::protect<builtin::api::Get>);
+    lua_register(L, "set", builtin::protect<builtin::api::Set>);
+    lua_register(L, "schema", builtin::protect<lua_schema>);
+    lua_register(L, "load_plugin", builtin::protect<builtin::api::LoadPlugin>);
 
     lua_newtable(L);
     lua_newtable(L); // metatable
-    lua_pushcfunction(L, glua::protect<workers_index>);
+    lua_pushcfunction(L, builtin::protect<workers_index>);
     lua_setfield(L, -2, "__index");
     lua_setmetatable(L, -2);
     lua_setglobal(L, "workers");
@@ -212,7 +214,7 @@ Instance::Instance(QObject *parent) :
     LoadEmbeddedFile("async");
 
     set_preload(L, "socket.core", luaopen_socket_core);
-    set_preload(L, "socket", glua::protect<load_embedded_module>);
+    set_preload(L, "socket", builtin::protect<load_embedded_module>);
 
     connect(this, &Instance::WorkerCreated, this, [this](Worker* w){
         d->workers.insert(w);
@@ -223,7 +225,9 @@ Instance::Instance(QObject *parent) :
                 d->workers.erase(it);
             }
             if (d->workers.empty() && d->shutdown) {
-                emitDoneWhenIdle(this);
+                // deferred: the fiber pool must not be stopped inside ~QObject, while a
+                // half-destroyed worker may still receive signals from its children
+                QTimer::singleShot(0, this, [this]{ emitDoneWhenIdle(this); });
             }
         });
         connect(w, &Worker::ShutdownDone, w, &QObject::deleteLater);
@@ -274,7 +278,7 @@ static int load_embedded_module(lua_State* L) {
 
 void Instance::LoadEmbeddedFile(string name, int opts)
 {
-    compat::prequiref(d->L, name.c_str(), glua::protect<load_embedded_module>, opts & LoadEmbedGlobal ? 1 : 0);
+    compat::prequiref(d->L, name.c_str(), builtin::protect<load_embedded_module>, opts & LoadEmbedGlobal ? 1 : 0);
     if (!(opts & LoadEmbedNoPop)) {
         lua_pop(d->L, 1);
     }
@@ -586,7 +590,11 @@ void Instance::Shutdown(unsigned int timeout)
     d->shutdownTimeout = timeout;
     Warn("radapter", "Shutting down...");
     for (auto& fn : d->shutdownHandlers) {
-        fn.CallNoWait({}, "on_shutdown");
+        try {
+            fn.CallNoWait({}, "on_shutdown");
+        } catch (ForcedShutdown const&) {
+            // a handler may request exit (os.exit); the sequence still has to finish
+        }
     }
     d->shutdownHandlers.clear();
     for (auto* t : findChildren<QTimer*>(QString(), Qt::FindDirectChildrenOnly)) {
@@ -608,6 +616,16 @@ void Instance::Shutdown(unsigned int timeout)
 lua_State *Instance::LuaState()
 {
     return d->L;
+}
+
+void Instance::SetExitCode(int code)
+{
+    d->exitCode = code;
+}
+
+int Instance::ExitCode() const
+{
+    return d->exitCode;
 }
 
 FiberPool* Instance::Fibers()
