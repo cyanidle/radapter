@@ -251,8 +251,6 @@ static int worker_index(lua_State* L) {
     return 1;
 }
 
-// Containers cross into Lua as a lazy view: listeners read what they need and
-// forwarding returns the retained tree unchanged. Scalars stay scalars.
 static QVariant lazyMessage(QVariant const& msg) {
     auto type = msg.metaType().id();
     if (type == QMetaType::QVariantMap || type == QMetaType::QVariantList) {

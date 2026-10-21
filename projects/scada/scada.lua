@@ -279,12 +279,13 @@ local function mode_run_stdin()
             if built then
                 log.warn("runner: replacing the running config")
             end
-            built = build(msg.config)
+            local config = msg.config:materialize()
+            built = build(config)
             local n = 0
             for _ in pairs(built) do n = n + 1 end
             log.info("runner: built {} object(s) from received config", n)
 
-            local viz = msg.config.visualization
+            local viz = config.visualization
             if viz and viz.root and viz.root.children and #viz.root.children > 0 then
                 if msg.observe then
                     if tags then
@@ -449,7 +450,7 @@ local function configurator_gui(autostart_runner)
     pipe(view, function(msg)
         if msg.save_file then
             local path = msg.save_file
-            if msg.config then current_config = msg.config end
+            if msg.config then current_config = msg.config:materialize() end
             local ok, err = pcall(save_to, { path = path, config = current_config })
             if ok then
                 view { save_ok = path }
@@ -471,7 +472,7 @@ local function configurator_gui(autostart_runner)
                 log.error("Failed to open {}: {}", path, cfg)
             end
         elseif msg.config then
-            current_config = msg.config
+            current_config = msg.config:materialize()
         end
     end)
 

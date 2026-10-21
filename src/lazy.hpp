@@ -26,7 +26,8 @@ void Push(lua_State* L, QVariant const& v);
 void PushChild(lua_State* L, QVariant const& v);
 
 /// Replaces the view at `idx` with its plain Lua table (materialized on first
-/// use), so a table-only builtin mutates the view's own copy.
+/// use), so a table-only builtin mutates the view's own copy. Raises for a
+/// derived view: those are read-only, see `PushChild`.
 void MaterializeInPlace(lua_State* L, int idx);
 
 /// `get(view, "deep:nested:key"[, sep])` on a lazy node.

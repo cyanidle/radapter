@@ -173,7 +173,7 @@ return function(env)
                 sink(eager)
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "materialize (caches subtree)" .. label,
+        B.bench(lazy_section, "materialize (cached)        " .. label,
             function()
                 BENCH_SINK = view:materialize()
             end, {meta = {nodes = nodes}})

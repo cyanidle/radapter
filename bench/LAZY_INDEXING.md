@@ -64,12 +64,14 @@ end)
    Lua table stored in the userdata (user value on 5.4, environment on
    LuaJIT/5.1) and all metamethods prefer it afterwards — `msg.pong = 2` works
    and every later read, `pairs`, `tostring` and forward sees it. A view produced
-   by *indexing* (`msg.nested`) is a derived temporary that cannot propagate an
-   assignment to the message, so writing it raises instead of dropping the value
-   silently: `msg.nested.flag = 1` → *"cannot write to a nested lazy message
-   view; call materialize() on the message first or use set(msg, 'path',
-   value)"*. After `msg:materialize()` (or a write to the message itself) the
-   nested values are plain tables and nested assignment works normally.
+   by *indexing* (`msg.nested`, a `get()` result, a `pairs` value) is a derived
+   temporary that cannot propagate an assignment to the message, so it is
+   **read-only**: `msg.nested.flag = 1` raises *"nested lazy views are read-only:
+   materialize() one and edit the returned table, or set() the field on the
+   message"*. That holds even after the derived view was materialized — the table
+   `x:materialize()` returns is an ordinary table and is what you edit. After
+   `msg:materialize()` (or a write to the message itself) the nested values *are*
+   plain tables, so nested assignment works normally.
 4. **`__len`** is the retained list's length (`0` for maps, as in Lua).
 5. **`pairs` / `ipairs`** iterate the retained `QVariant` with an engine iterator
    (`next()`-style, O(1) per step), yielding scalars and child views. IPC maps are
@@ -90,7 +92,8 @@ end)
    materializes the view **in place** — the view's own copy becomes a plain
    table, the assignment lands in it, and the returned table *is* that copy — so
    `set(msg, "a:b", 1)` is visible to later `msg.a.b` reads and to a forwarded
-   `msg`, exactly like `set(table, …)` on a table you own.
+   `msg`, exactly like `set(table, …)` on a table you own. It obeys the write
+   rule of rule 3: `set` on a derived view raises instead of writing a temporary.
 9. **`json_encode`** goes through `toQVar`, so it serializes the retained tree
    without building a Lua table. `fmt`/`log` interpolate a view through
    `__tostring`, i.e. as its JSON.
@@ -130,11 +133,17 @@ semantics `pipe`/`on`/`unpack` already provide.
   message in a hot path.
 - **Writing to a message view materializes that level**, so a mutation loop over
   a big message converts it; from then on the view *is* that plain table and the
-  retained tree is no longer shared. **Nested views cannot take writes** (rule 3)
-  — materialize the message, or use `set(msg, "path", value)`.
+  retained tree is no longer shared. **Derived views are read-only** (rule 3),
+  even after their own `materialize()`: edit the message (`set(msg, "path", v)`)
+  or the table `x:materialize()` returns.
 - **`set(view, path, value)` mutates the view's copy**; the retained tree of the
   sender is never modified, so a handler that edits and forwards sends a fresh
-  tree.
+  tree. On a derived (child) view it raises, like `__newindex`.
+- **Table-only code needs `materialize()`.** A subtree taken off a message is a
+  view, so anything that asserts `type(x) == "table"`, uses `table.*`, or walks
+  the tree with its own helpers must be handed `x:materialize()`. `projects/scada`
+  materializes the config it receives before `build()`/`save_to()`, and
+  `tests/scada_runner.lua` guards that path.
 - **QVariant types without a Lua equivalent** are converted exactly as before at
   the leaf; a view never changes leaf representation.
 - Every entry into Lua already runs on a fiber with its own Lua thread, so views
@@ -147,9 +156,14 @@ semantics `pipe`/`on`/`unpack` already provide.
   `materialize()` and after a write), JSON `tostring`, `json_encode`, `get`
   (including list path segments and misses), `materialize` (cached, same table),
   a root write (visible to reads, `pairs`, `tostring` and the forwarded copy),
-  the nested-write error, `set` (in-place, visible to the view), `wrap`/`unwrap`
-  and forwarding a view to a worker that sends it back.
-- Full `ctest` passes in both `build` (PUC 5.4) and `build-jit` (LuaJIT), 17/17,
+  the nested-write error (also after the child view itself was materialized),
+  `set` (in-place, visible to the view; rejected on a child view),
+  `wrap`/`unwrap`, forwarding a view to a worker that sends it back,
+  and a message whose **root is a list** (`#`, indices, `ipairs`, `pairs`, `get`,
+  `tostring`, forwarding).
+- `tests/scada_runner.lua` spawns `projects/scada/scada.lua run-stdin` and
+  asserts it builds the config it receives (the table-only-code path above).
+- Full `ctest` passes in both `build` (PUC 5.4) and `build-jit` (LuaJIT), 18/18,
   including `tests/stdio.lua`, whose handler mutates the message.
 - Memory: 300 000 notified messages, each read with `pairs`, mutated and
   `tostring`-ed, keep RSS flat (39 MB PUC / 26 MB JIT; Lua heap returns to

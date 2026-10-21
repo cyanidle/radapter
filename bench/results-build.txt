@@ -101,7 +101,7 @@
   pairs over root             depth=1 width=1 nodes=2       1.05 us
   forward view to worker      depth=1 width=1 nodes=2      386.9 ns
   forward eager table         depth=1 width=1 nodes=2       1.23 us
-  materialize (caches subtree)depth=1 width=1 nodes=2      323.5 ns
+  materialize (cached)        depth=1 width=1 nodes=2      323.5 ns
   eager convert, no read      depth=2 width=1 nodes=3       2.06 us
   lazy notify, no read        depth=2 width=1 nodes=3       4.13 us
   lazy notify + read leaf     depth=2 width=1 nodes=3       6.29 us
@@ -111,7 +111,7 @@
   pairs over root             depth=2 width=1 nodes=3       1.04 us
   forward view to worker      depth=2 width=1 nodes=3      372.2 ns
   forward eager table         depth=2 width=1 nodes=3       1.86 us
-  materialize (caches subtree)depth=2 width=1 nodes=3      323.4 ns
+  materialize (cached)        depth=2 width=1 nodes=3      323.4 ns
   eager convert, no read      depth=3 width=1 nodes=4       2.60 us
   lazy notify, no read        depth=3 width=1 nodes=4       4.03 us
   lazy notify + read leaf     depth=3 width=1 nodes=4       6.96 us
@@ -121,7 +121,7 @@
   pairs over root             depth=3 width=1 nodes=4       1.08 us
   forward view to worker      depth=3 width=1 nodes=4      377.6 ns
   forward eager table         depth=3 width=1 nodes=4       2.53 us
-  materialize (caches subtree)depth=3 width=1 nodes=4      325.5 ns
+  materialize (cached)        depth=3 width=1 nodes=4      325.5 ns
   eager convert, no read      depth=4 width=1 nodes=5       3.15 us
   lazy notify, no read        depth=4 width=1 nodes=5       3.99 us
   lazy notify + read leaf     depth=4 width=1 nodes=5       8.05 us
@@ -131,7 +131,7 @@
   pairs over root             depth=4 width=1 nodes=5       1.09 us
   forward view to worker      depth=4 width=1 nodes=5      381.9 ns
   forward eager table         depth=4 width=1 nodes=5       3.19 us
-  materialize (caches subtree)depth=4 width=1 nodes=5      325.4 ns
+  materialize (cached)        depth=4 width=1 nodes=5      325.4 ns
   eager convert, no read      depth=6 width=1 nodes=7       4.31 us
   lazy notify, no read        depth=6 width=1 nodes=7       4.01 us
   lazy notify + read leaf     depth=6 width=1 nodes=7       9.47 us
@@ -141,7 +141,7 @@
   pairs over root             depth=6 width=1 nodes=7       1.05 us
   forward view to worker      depth=6 width=1 nodes=7      373.3 ns
   forward eager table         depth=6 width=1 nodes=7       4.46 us
-  materialize (caches subtree)depth=6 width=1 nodes=7      321.9 ns
+  materialize (cached)        depth=6 width=1 nodes=7      321.9 ns
   eager convert, no read      depth=1 width=8 nodes=16      3.77 us
   lazy notify, no read        depth=1 width=8 nodes=16      4.03 us
   lazy notify + read leaf     depth=1 width=8 nodes=16      5.52 us
@@ -151,7 +151,7 @@
   pairs over root             depth=1 width=8 nodes=16      4.57 us
   forward view to worker      depth=1 width=8 nodes=16     378.3 ns
   forward eager table         depth=1 width=8 nodes=16      8.23 us
-  materialize (caches subtree)depth=1 width=8 nodes=16     324.3 ns
+  materialize (cached)        depth=1 width=8 nodes=16     324.3 ns
   eager convert, no read      depth=2 width=8 nodes=24      6.33 us
   lazy notify, no read        depth=2 width=8 nodes=24      4.01 us
   lazy notify + read leaf     depth=2 width=8 nodes=24      6.34 us
@@ -161,7 +161,7 @@
   pairs over root             depth=2 width=8 nodes=24      4.48 us
   forward view to worker      depth=2 width=8 nodes=24     374.7 ns
   forward eager table         depth=2 width=8 nodes=24     14.40 us
-  materialize (caches subtree)depth=2 width=8 nodes=24     326.8 ns
+  materialize (cached)        depth=2 width=8 nodes=24     326.8 ns
   eager convert, no read      depth=1 width=64 nodes=128     21.94 us
   lazy notify, no read        depth=1 width=64 nodes=128      4.03 us
   lazy notify + read leaf     depth=1 width=64 nodes=128      5.71 us
@@ -171,7 +171,7 @@
   pairs over root             depth=1 width=64 nodes=128     39.52 us
   forward view to worker      depth=1 width=64 nodes=128     377.9 ns
   forward eager table         depth=1 width=64 nodes=128     67.19 us
-  materialize (caches subtree)depth=1 width=64 nodes=128     325.2 ns
+  materialize (cached)        depth=1 width=64 nodes=128     325.2 ns
   eager convert, no read      depth=2 width=32 nodes=96     20.13 us
   lazy notify, no read        depth=2 width=32 nodes=96      3.98 us
   lazy notify + read leaf     depth=2 width=32 nodes=96      6.50 us
@@ -181,7 +181,7 @@
   pairs over root             depth=2 width=32 nodes=96     18.65 us
   forward view to worker      depth=2 width=32 nodes=96     375.4 ns
   forward eager table         depth=2 width=32 nodes=96     61.41 us
-  materialize (caches subtree)depth=2 width=32 nodes=96     325.1 ns
+  materialize (cached)        depth=2 width=32 nodes=96     325.1 ns
   eager convert, no read      depth=3 width=16 nodes=64     16.08 us
   lazy notify, no read        depth=3 width=16 nodes=64      4.01 us
   lazy notify + read leaf     depth=3 width=16 nodes=64      7.72 us
@@ -191,6 +191,6 @@
   pairs over root             depth=3 width=16 nodes=64      8.91 us
   forward view to worker      depth=3 width=16 nodes=64     373.1 ns
   forward eager table         depth=3 width=16 nodes=64     42.58 us
-  materialize (caches subtree)depth=3 width=16 nodes=64     325.1 ns
+  materialize (cached)        depth=3 width=16 nodes=64     325.1 ns
 
 ================================================================================================

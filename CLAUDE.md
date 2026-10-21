@@ -109,8 +109,8 @@ cmake --build build --target bench            # same, via the bench target
 
 `bench/README.md` documents the methodology and the `Bench` plugin worker
 (`bench/bench_plugin.cpp`, built next to the executable). Reference numbers and
-derived per-node costs are in `bench/RESULTS.md`; `bench/LAZY_INDEXING.md` is
-the lazy message-view proposal those numbers justify.
+derived per-node costs are in `bench/RESULTS.md`; `bench/LAZY_INDEXING.md`
+documents the lazy message views those numbers justify.
 
 ### Tests
 
@@ -380,6 +380,16 @@ outbound signals:
 Messages are `QVariant` trees (maps/lists/scalars/`QByteArray`) — the same shape as JSON.
 `src/builtin.hpp` defines `jv::Convert<QVariant>` bridging QVariant ↔ the `json_view`
 representation used by binary protocols.
+
+**A message reaches a Lua listener as a lazy view, not a table** (`src/lazy.cpp`,
+`include/radapter/lazy.hpp`): a container becomes a `LazyNode` userdata over the retained
+`QVariant`, so `type(msg) == "userdata"`. Indexing converts only the addressed subtree,
+`pairs`/`ipairs`/`#` walk it, `tostring` is exact JSON, forwarding it to another worker
+returns the retained tree (zero-copy). Writing a message view is copy-on-write; writing a
+*derived* child view (`msg.a.b = 1`) raises by design. Code that needs a real table (passing
+a subtree to `table.*` or to a function asserting `type(x) == "table"`) must call
+`x:materialize()`; `get`/`set` accept views. Semantics, costs and `set`/write rules are in
+`bench/LAZY_INDEXING.md`.
 
 **Pipelines are pure Lua** (`src/scripts/builtins.lua`):
 - `pipe(a, b, c)` subscribes each target to the previous one's listener list and returns

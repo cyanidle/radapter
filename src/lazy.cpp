@@ -12,9 +12,7 @@ constexpr const char* LazyMeta = "radapter.LazyNode";
 
 struct LazyUserData {
     LazyNode node;
-    // Only a message handed to a listener may take writes; a view produced by
-    // indexing cannot propagate them to the message it came from.
-    bool root;
+    bool root; // a message handed to a listener; derived views are not writable
 };
 
 LazyUserData* TestLazy(lua_State* L, int idx) {
@@ -29,13 +27,22 @@ LazyUserData& CheckLazy(lua_State* L, int idx) {
     return *ud;
 }
 
+// A derived view (children, get() results) is a temporary over the sender's
+// tree: an assignment through it cannot reach the message, so it is an error
+// rather than a silently dropped write -- even once it was materialized.
+void RequireWritable(LazyUserData const& ud) {
+    if (!ud.root) {
+        Raise("nested lazy views are read-only: materialize() one and edit the returned "
+              "table, or set() the field on the message");
+    }
+}
+
 // A view that was written to keeps a plain table in its user value (environment
 // on Lua 5.1): the retained tree is only the immutable source, copy-on-write.
 constexpr const char* MaterializedKey = "__materialized";
 
-// Pushes the user value / environment table, creating it on first use. A fresh
-// LuaJIT userdata inherits the globals as its environment, so PushNode installs
-// an empty table there instead.
+// A fresh LuaJIT userdata inherits the globals as its environment, so PushNode
+// installs an empty table there instead.
 void PushEnvTable(lua_State* L, int idx) {
     idx = compat::lua_absindex(L, idx);
 #ifdef RADAPTER_JIT
@@ -100,16 +107,22 @@ void PushNode(lua_State* L, QVariant const& v, bool root) {
     lua_setmetatable(L, -2);
 }
 
-void PushChild(lua_State* L, QVariant const& v) {
+// A view only makes sense over a container; everything else is pushed as the
+// value it is (the container-body accessors assume a map or a list).
+void PushAny(lua_State* L, QVariant const& v, bool root) {
     switch (v.metaType().id()) {
     case QMetaType::QVariantMap:
     case QMetaType::QVariantList:
-        PushNode(L, v, false);
+        PushNode(L, v, root);
         break;
     default:
         glua::Push(L, v);
         break;
     }
+}
+
+void PushChild(lua_State* L, QVariant const& v) {
+    PushAny(L, v, false);
 }
 
 int NodeGc(lua_State* L) {
@@ -208,12 +221,8 @@ int NodeIndex(lua_State* L) {
 
 int NodeNewIndex(lua_State* L) {
     auto& ud = CheckLazy(L, 1);
-    bool materialized = PushMaterialized(L, 1);
-    if (!materialized && !ud.root) {
-        Raise("cannot write to a nested lazy message view; call materialize() on the "
-              "message first or use set(msg, 'path', value)");
-    }
-    if (!materialized) {
+    RequireWritable(ud);
+    if (!PushMaterialized(L, 1)) {
         glua::Push(L, ud.node.value);
         StoreMaterialized(L, 1);
     }
@@ -384,7 +393,7 @@ bool ToQVariant(lua_State* L, int idx, QVariant& out) {
 }
 
 void Push(lua_State* L, QVariant const& v) {
-    PushNode(L, v, true);
+    PushAny(L, v, true);
 }
 
 void PushChild(lua_State* L, QVariant const& v) {
@@ -393,7 +402,14 @@ void PushChild(lua_State* L, QVariant const& v) {
 
 void MaterializeInPlace(lua_State* L, int idx) {
     idx = compat::lua_absindex(L, idx);
-    PushMaterializedOrCreate(L, idx);
+    auto& ud = CheckLazy(L, idx);
+    RequireWritable(ud);
+    if (PushMaterialized(L, idx)) {
+        lua_replace(L, idx);
+        return;
+    }
+    glua::Push(L, ud.node.value);
+    StoreMaterialized(L, idx);
     lua_replace(L, idx);
 }
 
