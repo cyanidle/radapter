@@ -136,8 +136,8 @@ void PushNode(lua_State* L, QVariant const& v, bool root) {
     lua_setmetatable(L, -2);
 }
 
-// A view only makes sense over a container; everything else is pushed as the
-// value it is (the container-body accessors assume a map or a list).
+// The container accessors cast unconditionally, so a non-container is pushed as
+// the value it is.
 void PushAny(lua_State* L, QVariant const& v, bool root) {
     switch (v.metaType().id()) {
     case QMetaType::QVariantMap:
@@ -261,9 +261,8 @@ int NodeNewIndex(lua_State* L) {
     return 0;
 }
 
-// next()-style iterator: the control value is the previous key, so `pairs`
-// walks the retained tree without materializing it, yielding scalars eagerly
-// and children as views.
+// next()-style: the control value is the previous key, so no position list is
+// built and a step stays O(1).
 int NextPair(lua_State* L) {
     auto& ud = CheckLazy(L, lua_upvalueindex(1));
     bool first = lua_isnoneornil(L, 2);

@@ -96,7 +96,7 @@ pipe(client, function(msg)
         end
         assert(values[2] == "b", "ipairs after materialize")
 
-        -- A write to the message root materializes that level; it is visible to
+        -- A write to the message root materializes the message; it is visible to
         -- every later read and to a forwarded copy.
         msg.added = true
         assert(msg.added == true, "root write")

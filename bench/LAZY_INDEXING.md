@@ -61,9 +61,10 @@ end)
    access is cheap enough at ~0.6 µs/level (PUC); a handler that reads the same
    subtree repeatedly calls `materialize()` once.
 3. **Copy-on-write (`__newindex`).** A view is only the immutable source of
-   truth. The first write to a **message view** converts that level into a plain
-   Lua table stored in the userdata (user value on 5.4, environment on
-   LuaJIT/5.1) and all metamethods prefer it afterwards — `msg.pong = 2` works
+   truth. The first write to a **message view** converts its whole subtree into
+   plain Lua tables (one deep conversion, exactly what `materialize()` returns),
+   stores them in the userdata (user value on 5.4, environment on LuaJIT/5.1) and
+   all metamethods prefer them afterwards — `msg.pong = 2` works
    and every later read, `pairs`, `tostring` and forward sees it. A view produced
    by *indexing* (`msg.nested`, a `get()` result, a `pairs` value) is a derived
    temporary that cannot propagate an assignment to the message, so it is
@@ -137,7 +138,7 @@ semantics `pipe`/`on`/`unpack` already provide.
   value (40.1 µs for 64 keys; `RESULTS.md` §5). Reading known fields is O(1).
 - **`tostring` is a full serialization** — cheap to call once, expensive per
   message in a hot path.
-- **Writing to a message view materializes that level**, so a mutation loop over
+- **Writing to a message view materializes its whole subtree**, so a mutation loop over
   a big message converts it; from then on the view *is* that plain table and the
   retained tree is no longer shared. **Derived views are read-only** (rule 3),
   even after their own `materialize()`: edit the message (`set(msg, "path", v)`)
