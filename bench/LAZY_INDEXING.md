@@ -146,6 +146,11 @@ semantics `pipe`/`on`/`unpack` already provide.
 - **`set(view, path, value)` mutates the view's copy**; the retained tree of the
   sender is never modified, so a handler that edits and forwards sends a fresh
   tree. On a derived (child) view it raises, like `__newindex`.
+- **`get(view, "")` returns a derived view**, where `get(table, "")` returns the
+  table itself — use the message view directly if you want to write to it.
+- **A child view captured before a write keeps the old data**: the retained tree
+  is immutable, so `local sub = msg.nested; msg.x = 1` leaves `sub` reading the
+  message as it arrived — re-read it from the message (`msg.nested`).
 - **Table-only code needs `materialize()`.** A subtree taken off a message is a
   view, so anything that asserts `type(x) == "table"`, uses `table.*`, or walks
   the tree with its own helpers must be handed `x:materialize()`. `projects/scada`
