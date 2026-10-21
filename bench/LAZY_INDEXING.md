@@ -1,8 +1,9 @@
 # Lazy message indexing in Lua
 
 Status: **implemented** (2026-10-21). Grounded in [`RESULTS.md`](RESULTS.md);
-code in [`src/lazy.cpp`](../src/lazy.cpp), [`include/radapter/lazy.hpp`](../include/radapter/lazy.hpp),
-tested by [`tests/lazy.lua`](../tests/lazy.lua).
+code in [`src/lazy.cpp`](../src/lazy.cpp), [`src/lazy.hpp`](../src/lazy.hpp),
+tested by [`tests/lazy.lua`](../tests/lazy.lua) and
+[`tests/scada_runner.lua`](../tests/scada_runner.lua).
 
 ## Problem
 
@@ -20,13 +21,13 @@ on PUC Lua 5.4 (`RESULTS.md` §2, §3):
 
 | cost | depth 1 | depth 8 | 128 nodes |
 |---|---:|---:|---:|
-| `QVariant` -> Lua table | 1.4 µs | 4.3 µs | 21.9 µs |
-| Lua table -> `QVariant` | 1.8 µs | 5.1 µs | 67.1 µs |
+| `QVariant` -> Lua table | 1.5 µs | 4.5 µs | 24.4 µs |
+| Lua table -> `QVariant` | 1.9 µs | 5.3 µs | 74.3 µs |
 | one C++ worker hop before lazy views | 6.1 µs | 15.0 µs | — |
-| pure Lua hop (for reference) | 0.70 µs | 0.70 µs | 0.70 µs |
+| pure Lua hop (for reference) | 0.64 µs | 0.64 µs | 0.64 µs |
 
-Marginal per-node conversion is **~0.58 µs/node Lua -> QVariant** and
-**~0.18 µs/node QVariant -> Lua**. The conversion was paid *even when nothing
+Marginal per-node conversion is **~0.62 µs/node Lua -> QVariant** and
+**~0.19 µs/node QVariant -> Lua**. The conversion was paid *even when nothing
 read the message* — exactly what `pipe(ingest, decode, logic)` does at every hop.
 
 ## What ships
@@ -57,7 +58,7 @@ end)
 2. **No child cache.** The prototype cached converted children per node; the
    engine does not, because a child never outlives the access unless the script
    keeps it, and a Lua table per node would cost memory in every message. Repeated
-   access is cheap enough at ~0.8 µs/level (PUC); a handler that reads the same
+   access is cheap enough at ~0.6 µs/level (PUC); a handler that reads the same
    subtree repeatedly calls `materialize()` once.
 3. **Copy-on-write (`__newindex`).** A view is only the immutable source of
    truth. The first write to a **message view** converts that level into a plain
@@ -72,7 +73,8 @@ end)
    `x:materialize()` returns is an ordinary table and is what you edit. After
    `msg:materialize()` (or a write to the message itself) the nested values *are*
    plain tables, so nested assignment works normally.
-4. **`__len`** is the retained list's length (`0` for maps, as in Lua).
+4. **`__len`** is the retained list's length (`0` for maps, as in Lua) — or the
+   length of the materialized table once the view was written to.
 5. **`pairs` / `ipairs`** iterate the retained `QVariant` with an engine iterator
    (`next()`-style, O(1) per step), yielding scalars and child views. IPC maps are
    `QVariantMap`, i.e. key-sorted; `ipairs` over a map is empty, as usual. Lua 5.4
@@ -99,14 +101,18 @@ end)
    `__tostring`, i.e. as its JSON.
 10. Lifetime: the userdata owns one `QVariant` copy (implicitly shared with the
     signal argument) and releases it in `__gc`. Child views share the same tree;
-    nothing is copied until `materialize`/a write.
+    nothing is copied until `materialize`/a write, and nothing is materialized
+    merely by reading (a read of a pristine view allocates no Lua table).
+11. **Tag events** reach their listeners the same way (`tags.changed` and
+    `tags.changed["name"]`), so the same rules apply to `ev.name`, `ev.value`,
+    `ev.quality` and `ev.ts`.
 
 ### Rejected in review: a native worker -> worker pipe fast path
 
 An earlier proposal (option A) suggested teaching `pipe(a, b)` to connect two
 workers without a Lua closure. It is not implemented and is **not needed**: the
 pipe stays pure Lua, and the zero-copy `toQVar` already makes a forwarded hop
-cost the Lua call plus a reference copy (~375 ns vs up to 67 µs, `RESULTS.md`
+cost the Lua call plus a reference copy (~315 ns vs up to 71 µs, `RESULTS.md`
 §5). Adding a second, parallel way to connect workers would duplicate the
 semantics `pipe`/`on`/`unpack` already provide.
 
@@ -128,7 +134,7 @@ semantics `pipe`/`on`/`unpack` already provide.
 - **Equality** is identity (no `__eq`): a view is never structurally equal to a
   table. Compare materialized values.
 - **Iterating a wide root with `pairs` is O(width)** and creates a view per
-  value (39.5 µs for 64 keys; `RESULTS.md` §5). Reading known fields is O(1).
+  value (40.1 µs for 64 keys; `RESULTS.md` §5). Reading known fields is O(1).
 - **`tostring` is a full serialization** — cheap to call once, expensive per
   message in a hot path.
 - **Writing to a message view materializes that level**, so a mutation loop over
@@ -144,6 +150,10 @@ semantics `pipe`/`on`/`unpack` already provide.
   the tree with its own helpers must be handed `x:materialize()`. `projects/scada`
   materializes the config it receives before `build()`/`save_to()`, and
   `tests/scada_runner.lua` guards that path.
+- **A self-referential view raises.** `msg.self = msg` (or any cycle through a
+  materialized view) makes conversion report *"lazy view conversion nests too
+  deeply (does a message refer to itself?)"* instead of recursing into the C
+  stack; the message stays readable afterwards.
 - **QVariant types without a Lua equivalent** are converted exactly as before at
   the leaf; a view never changes leaf representation.
 - Every entry into Lua already runs on a fiber with its own Lua thread, so views
@@ -155,9 +165,10 @@ semantics `pipe`/`on`/`unpack` already provide.
   list indexing, `#`, `pairs`/`ipairs` (on a pristine view **and** after
   `materialize()` and after a write), JSON `tostring`, `json_encode`, `get`
   (including list path segments and misses), `materialize` (cached, same table),
-  a root write (visible to reads, `pairs`, `tostring` and the forwarded copy),
-  the nested-write error (also after the child view itself was materialized),
-  `set` (in-place, visible to the view; rejected on a child view),
+  a root write (visible to reads, `pairs`, `tostring`, `#` and the forwarded
+  copy), the nested-write error (also after the child view itself was materialized),
+  a self-referential view (`tostring`/`json_encode`/forwarding raise, the message
+  stays readable), `set` (in-place, visible to the view; rejected on a child view),
   `wrap`/`unwrap`, forwarding a view to a worker that sends it back,
   and a message whose **root is a list** (`#`, indices, `ipairs`, `pairs`, `get`,
   `tostring`, forwarding).
@@ -178,11 +189,11 @@ From `RESULTS.md`, PUC Lua 5.4:
 | case | before (eager) | with the lazy view | |
 |---|---:|---:|---|
 | 1 worker hop, depth 1 | 6.1 µs | 5.6 µs | — |
-| 1 worker hop, depth 8 | 15.0 µs | 10.8 µs | 1.4x |
-| marginal hop, depth 1 -> 8 | 6.4 -> 15.7 µs | 5.2 -> 5.0 µs | flat |
-| 3 hops, depth 8 | 46 µs | 20.8 µs | 2.2x |
-| forward one 128-node message | 67 µs | 0.38 µs | ~180x |
-| notify + read one leaf, 128 nodes | ~26 µs | 5.7 µs | ~4.5x |
-| notify + read one leaf, 2 nodes | ~5.4 µs | 5.5 µs | parity |
-| `tostring` (JSON) of 128 nodes | — | 34.8 µs | exact, not free |
-| `pairs` over a 64-key root | — | 39.5 µs | O(width) |
+| 1 worker hop, depth 8 | 15.0 µs | 11.2 µs | 1.3x |
+| marginal hop, depth 1 -> 8 | 6.4 -> 15.7 µs | 4.9 -> 4.7 µs | flat |
+| 3 hops, depth 8 | 46 µs | 20.5 µs | 2.2x |
+| forward one 128-node message | 71 µs | 0.31 µs | ~230x |
+| notify + read one leaf, 128 nodes | ~28 µs | 5.5 µs | ~5x |
+| notify + read one leaf, 2 nodes | ~5.5 µs | 5.2 µs | parity |
+| `tostring` (JSON) of 128 nodes | — | 35.2 µs | exact, not free |
+| `pairs` over a 64-key root | — | 40.1 µs | O(width) |

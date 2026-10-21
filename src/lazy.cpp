@@ -37,25 +37,36 @@ void RequireWritable(LazyUserData const& ud) {
     }
 }
 
+// A materialized view can hold a reference back to itself (`msg.self = msg`), so
+// converting one re-enters ToQVariant: bound that with a Lua error instead of
+// letting the C stack overflow.
+constexpr int MaxConvertDepth = 32;
+
+int convertDepth = 0;
+
+struct ConvertDepth {
+    ConvertDepth() {
+        if (convertDepth >= MaxConvertDepth) {
+            Raise("lazy view conversion nests too deeply (does a message refer to itself?)");
+        }
+        ++convertDepth;
+    }
+    ~ConvertDepth() { --convertDepth; }
+};
+
 // A view that was written to keeps a plain table in its user value (environment
 // on Lua 5.1): the retained tree is only the immutable source, copy-on-write.
 constexpr const char* MaterializedKey = "__materialized";
 
-// A fresh LuaJIT userdata inherits the globals as its environment, so PushNode
-// installs an empty table there instead.
-void PushEnvTable(lua_State* L, int idx) {
-    idx = compat::lua_absindex(L, idx);
+void PushUserValue(lua_State* L, int idx) {
 #ifdef RADAPTER_JIT
     lua_getfenv(L, idx);
 #else
     lua_getiuservalue(L, idx, 1);
 #endif
-    if (lua_istable(L, -1)) {
-        return;
-    }
-    lua_pop(L, 1);
-    lua_newtable(L);
-    lua_pushvalue(L, -1);
+}
+
+void SetUserValue(lua_State* L, int idx) {
 #ifdef RADAPTER_JIT
     lua_setfenv(L, idx);
 #else
@@ -63,9 +74,27 @@ void PushEnvTable(lua_State* L, int idx) {
 #endif
 }
 
+// A fresh LuaJIT userdata inherits the globals as its environment, so PushNode
+// installs an empty table there instead.
+void PushEnvTable(lua_State* L, int idx) {
+    idx = compat::lua_absindex(L, idx);
+    PushUserValue(L, idx);
+    if (lua_istable(L, -1)) {
+        return;
+    }
+    lua_pop(L, 1);
+    lua_newtable(L);
+    lua_pushvalue(L, -1);
+    SetUserValue(L, idx);
+}
+
 bool PushMaterialized(lua_State* L, int idx) {
     idx = compat::lua_absindex(L, idx);
-    PushEnvTable(L, idx);
+    PushUserValue(L, idx);
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        return false;
+    }
     lua_getfield(L, -1, MaterializedKey);
     lua_remove(L, -2);
     if (lua_istable(L, -1)) {
@@ -153,11 +182,12 @@ int NodeLen(lua_State* L) {
     CheckLazy(L, 1);
     if (PushMaterialized(L, 1)) {
 #ifdef RADAPTER_JIT
-        lua_pushinteger(L, lua_Integer(lua_objlen(L, -1)));
+        auto len = lua_Integer(lua_objlen(L, -1));
 #else
-        lua_pushinteger(L, lua_Integer(lua_rawlen(L, -1)));
+        auto len = lua_Integer(lua_rawlen(L, -1));
 #endif
         lua_pop(L, 1);
+        lua_pushinteger(L, len);
         return 1;
     }
     auto& ud = CheckLazy(L, 1);
@@ -382,6 +412,7 @@ bool ToQVariant(lua_State* L, int idx, QVariant& out) {
     if (!ud) {
         return false;
     }
+    ConvertDepth depth;
     idx = compat::lua_absindex(L, idx);
     if (PushMaterialized(L, idx)) {
         out = builtin::help::toQVar(L, -1);

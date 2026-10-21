@@ -101,6 +101,7 @@ pipe(client, function(msg)
         msg.added = true
         assert(msg.added == true, "root write")
         assert(#sorted_keys(msg) == 4, "pairs after a root write")
+        assert(#msg == 0, "# on a map message after a write")
         assert(json_decode(tostring(msg)).added == true, "root write is serialized")
 
         local changed = set(msg, "extra", 7)
@@ -117,6 +118,12 @@ pipe(client, function(msg)
     elseif stage == 2 then
         assert(type(msg) == "userdata" and msg.nested.flag == true, "forwarded message")
         assert(msg.extra == 7 and msg.added == true, "forwarded message carries the writes")
+        -- a view that refers to itself must fail the conversion, not take the process down
+        msg.self = msg
+        local ok, err = pcall(tostring, msg)
+        assert(not ok, "tostring of a cyclic view must raise")
+        assert(tostring(err):find("nests too deeply", 1, true), "cyclic view: " .. tostring(err))
+        assert(msg.nested.flag == true, "the message is still readable after a cyclic tostring")
         client {10, 20, 30}
         stage = 3
     elseif stage == 3 then
@@ -136,6 +143,8 @@ pipe(client, function(msg)
         assert(get(msg, "[2]") == 20, "get on a list message")
         assert(get(msg, "missing") == nil, "get miss on a list message")
         assert(tostring(msg) == "[10,20,30]", "tostring of a list message: " .. tostring(msg))
+        msg.tag = "x"
+        assert(#msg == 3 and msg[3] == 30, "# and index on a list message after a write")
         server(msg)
         stage = 4
     else

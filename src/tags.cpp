@@ -1,5 +1,6 @@
 #include "tags.hpp"
 #include "glua/glua.hpp"
+#include "lazy.hpp"
 #include "instance_impl.hpp"
 
 namespace radapter {
@@ -139,11 +140,11 @@ void TagRegistry::notifyTag(QString const& tagName, Tag const& tag) {
     ev["quality"] = QString(qualityStr(tag.quality));
     ev["ts"] = tag.ts;
 
+    QVariant evVar = QVariant::fromValue(LazyNode{ev});
     for (auto& fn : tag.subscribers) {
-        fn.CallNoWait({ev}, "tags");
+        fn.CallNoWait({evVar}, "tags");
     }
 
-    QVariant evVar(ev);
     callListeners(_inst, changedListeners, evVar);       // tags.changed
     auto it = _perTag.find(tagName);
     if (it != _perTag.end()) {

@@ -5,7 +5,6 @@
 #include "glua/glua.hpp"
 #include "worker_impl.hpp"
 #include "lazy.hpp"
-#include "radapter/lazy.hpp"
 #include "tags.hpp"
 
 namespace radapter

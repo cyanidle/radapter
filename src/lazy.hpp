@@ -1,9 +1,22 @@
 #pragma once
 
 #include "radapter/common.hpp"
-#include "radapter/lazy.hpp"
+#include <QVariant>
 
 struct lua_State;
+
+namespace radapter {
+
+/// A message tree kept as QVariant until Lua actually reads it. `glua::Push`
+/// turns it into a lazy view userdata instead of materializing tables; `toQVar`
+/// returns the retained tree unchanged, so forwarding a message is free.
+struct LazyNode {
+    QVariant value;
+};
+
+}
+
+Q_DECLARE_METATYPE(radapter::LazyNode)
 
 namespace radapter::lazy {
 

@@ -12,13 +12,13 @@
 #include "QPointer"
 #include "builtin.hpp"
 #include "lazy.hpp"
-#include "radapter/lazy.hpp"
 #include "glua/glua.hpp"
 #include <QMetaObject>
 #include <QPluginLoader>
 #include <QCoreApplication>
 #include <QDir>
 #include <QStringDecoder>
+#include <exception>
 
 using namespace radapter;
 using namespace glua;
@@ -776,7 +776,10 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
 #ifndef NDEBUG
     auto was = lua_gettop(L);
     defer check([&]{
-        assert(lua_gettop(L) == was && "toQVar unbalanced stack!");
+        // an exception unwinds past this point with the stack abandoned, and the
+        // Lua error it turns into discards that stack anyway
+        assert((std::uncaught_exceptions() > 0 || lua_gettop(L) == was)
+            && "toQVar unbalanced stack!");
     });
 #endif
     int t = lua_type(L, idx);

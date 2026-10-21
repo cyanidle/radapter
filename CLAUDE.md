@@ -382,13 +382,14 @@ Messages are `QVariant` trees (maps/lists/scalars/`QByteArray`) — the same sha
 representation used by binary protocols.
 
 **A message reaches a Lua listener as a lazy view, not a table** (`src/lazy.cpp`,
-`include/radapter/lazy.hpp`): a container becomes a `LazyNode` userdata over the retained
+`src/lazy.hpp`): a container becomes a `LazyNode` userdata over the retained
 `QVariant`, so `type(msg) == "userdata"`. Indexing converts only the addressed subtree,
 `pairs`/`ipairs`/`#` walk it, `tostring` is exact JSON, forwarding it to another worker
-returns the retained tree (zero-copy). Writing a message view is copy-on-write; writing a
-*derived* child view (`msg.a.b = 1`) raises by design. Code that needs a real table (passing
-a subtree to `table.*` or to a function asserting `type(x) == "table"`) must call
-`x:materialize()`; `get`/`set` accept views. Semantics, costs and `set`/write rules are in
+returns the retained tree (zero-copy). Tag events (`tags.changed`) arrive the same way.
+Writing a message view is copy-on-write; a *derived* view (`msg.a.b = 1`, a `get()`
+result) is read-only and raises. Code that needs a real table (passing a subtree to
+`table.*` or to a function asserting `type(x) == "table"`) must call `x:materialize()`;
+`get`/`set` accept views. Semantics, costs and `set`/write rules are in
 `bench/LAZY_INDEXING.md`.
 
 **Pipelines are pure Lua** (`src/scripts/builtins.lua`):

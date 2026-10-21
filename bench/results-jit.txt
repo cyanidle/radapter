@@ -1,197 +1,196 @@
 ================================================================================================
 
 [pipeline (Lua)]
-  stamp chain depth=1 hops=1                               148.2 ns
-  stamp chain depth=1 hops=3                               332.1 ns
-  stamp chain depth=1 hops=5                               598.1 ns
-  stamp chain depth=2 hops=1                               178.5 ns
-  stamp chain depth=2 hops=3                               382.6 ns
-  stamp chain depth=2 hops=5                               606.6 ns
-  stamp chain depth=4 hops=1                               176.5 ns
-  stamp chain depth=4 hops=3                               386.5 ns
-  stamp chain depth=4 hops=5                               603.8 ns
-  stamp chain depth=8 hops=1                               177.8 ns
-  stamp chain depth=8 hops=3                               379.0 ns
-  stamp chain depth=8 hops=5                               598.5 ns
-  unwrap/wrap hop depth=1                                  701.2 ns
-  wrap only depth=1                                        267.9 ns
-  unwrap only depth=1                                      200.7 ns
-  unwrap/wrap hop depth=4                                  712.9 ns
-  wrap only depth=4                                        267.3 ns
-  unwrap only depth=4                                      199.5 ns
-  filter() path depth=1                                    299.8 ns
-  filter() path depth=2                                    428.6 ns
-  filter() path depth=4                                    750.2 ns
-  filter() path depth=8                                     1.35 us
+  stamp chain depth=1 hops=1                               154.0 ns
+  stamp chain depth=1 hops=3                               337.5 ns
+  stamp chain depth=1 hops=5                               621.7 ns
+  stamp chain depth=2 hops=1                               173.3 ns
+  stamp chain depth=2 hops=3                               394.9 ns
+  stamp chain depth=2 hops=5                               625.2 ns
+  stamp chain depth=4 hops=1                               174.2 ns
+  stamp chain depth=4 hops=3                               388.7 ns
+  stamp chain depth=4 hops=5                               622.8 ns
+  stamp chain depth=8 hops=1                               176.5 ns
+  stamp chain depth=8 hops=3                               390.5 ns
+  stamp chain depth=8 hops=5                               638.1 ns
+  unwrap/wrap hop depth=1                                  677.9 ns
+  wrap only depth=1                                        263.9 ns
+  unwrap only depth=1                                      210.3 ns
+  unwrap/wrap hop depth=4                                  715.4 ns
+  wrap only depth=4                                        267.0 ns
+  unwrap only depth=4                                      219.4 ns
+  filter() path depth=1                                    302.4 ns
+  filter() path depth=2                                    437.4 ns
+  filter() path depth=4                                    762.7 ns
+  filter() path depth=8                                     1.36 us
 
 [conversion (C++<->Lua)]
-  extra-method call floor (Noop)                           363.6 ns
-  Lua table -> QVariant   depth=1 width=1 nodes=2           1.49 us
-  QVariant -> Lua table   depth=1 width=1 nodes=2          980.4 ns
-  roundtrip (both ways)   depth=1 width=1 nodes=2           2.10 us
-  Lua table -> QVariant   depth=2 width=1 nodes=3           2.10 us
-  QVariant -> Lua table   depth=2 width=1 nodes=3           1.48 us
-  roundtrip (both ways)   depth=2 width=1 nodes=3           3.22 us
-  Lua table -> QVariant   depth=3 width=1 nodes=4           2.66 us
-  QVariant -> Lua table   depth=3 width=1 nodes=4           2.01 us
-  roundtrip (both ways)   depth=3 width=1 nodes=4           4.39 us
-  Lua table -> QVariant   depth=4 width=1 nodes=5           3.31 us
-  QVariant -> Lua table   depth=4 width=1 nodes=5           2.46 us
-  roundtrip (both ways)   depth=4 width=1 nodes=5           5.40 us
-  Lua table -> QVariant   depth=6 width=1 nodes=7           4.27 us
-  QVariant -> Lua table   depth=6 width=1 nodes=7           3.40 us
-  roundtrip (both ways)   depth=6 width=1 nodes=7           7.39 us
-  Lua table -> QVariant   depth=1 width=8 nodes=16          7.37 us
-  QVariant -> Lua table   depth=1 width=8 nodes=16          3.24 us
-  roundtrip (both ways)   depth=1 width=8 nodes=16         10.24 us
-  Lua table -> QVariant   depth=2 width=8 nodes=24         12.75 us
-  QVariant -> Lua table   depth=2 width=8 nodes=24          5.67 us
-  roundtrip (both ways)   depth=2 width=8 nodes=24         18.35 us
-  Lua table -> QVariant   depth=1 width=64 nodes=128       63.63 us
-  QVariant -> Lua table   depth=1 width=64 nodes=128       19.76 us
-  roundtrip (both ways)   depth=1 width=64 nodes=128       86.94 us
-  Lua table -> QVariant   depth=2 width=32 nodes=96        58.55 us
-  QVariant -> Lua table   depth=2 width=32 nodes=96        19.86 us
-  roundtrip (both ways)   depth=2 width=32 nodes=96        78.20 us
-  Lua table -> QVariant   depth=3 width=16 nodes=64        40.08 us
-  QVariant -> Lua table   depth=3 width=16 nodes=64        15.08 us
-  roundtrip (both ways)   depth=3 width=16 nodes=64        55.31 us
-  echo table (Lua->QV + lazy notify) depth=2 width=4        9.22 us
-  forward view 1 hop (zero copy)                            9.32 us
-  forward 1 hop, materialized (converts)                   19.13 us
-  forward view 2 hops (zero copy)                           9.51 us
+  extra-method call floor (Noop)                           373.0 ns
+  Lua table -> QVariant   depth=1 width=1 nodes=2           1.54 us
+  QVariant -> Lua table   depth=1 width=1 nodes=2           1.03 us
+  roundtrip (both ways)   depth=1 width=1 nodes=2           2.19 us
+  Lua table -> QVariant   depth=2 width=1 nodes=3           2.14 us
+  QVariant -> Lua table   depth=2 width=1 nodes=3           1.58 us
+  roundtrip (both ways)   depth=2 width=1 nodes=3           3.24 us
+  Lua table -> QVariant   depth=3 width=1 nodes=4           2.70 us
+  QVariant -> Lua table   depth=3 width=1 nodes=4           2.02 us
+  roundtrip (both ways)   depth=3 width=1 nodes=4           4.56 us
+  Lua table -> QVariant   depth=4 width=1 nodes=5           3.20 us
+  QVariant -> Lua table   depth=4 width=1 nodes=5           2.58 us
+  roundtrip (both ways)   depth=4 width=1 nodes=5           5.48 us
+  Lua table -> QVariant   depth=6 width=1 nodes=7           4.31 us
+  QVariant -> Lua table   depth=6 width=1 nodes=7           3.51 us
+  roundtrip (both ways)   depth=6 width=1 nodes=7           7.55 us
+  Lua table -> QVariant   depth=1 width=8 nodes=16          7.58 us
+  QVariant -> Lua table   depth=1 width=8 nodes=16          3.19 us
+  roundtrip (both ways)   depth=1 width=8 nodes=16         10.35 us
+  Lua table -> QVariant   depth=2 width=8 nodes=24         13.06 us
+  QVariant -> Lua table   depth=2 width=8 nodes=24          5.57 us
+  roundtrip (both ways)   depth=2 width=8 nodes=24         18.52 us
+  Lua table -> QVariant   depth=1 width=64 nodes=128       63.45 us
+  QVariant -> Lua table   depth=1 width=64 nodes=128       19.53 us
+  roundtrip (both ways)   depth=1 width=64 nodes=128       84.40 us
+  Lua table -> QVariant   depth=2 width=32 nodes=96        59.67 us
+  QVariant -> Lua table   depth=2 width=32 nodes=96        19.13 us
+  roundtrip (both ways)   depth=2 width=32 nodes=96        79.73 us
+  Lua table -> QVariant   depth=3 width=16 nodes=64        39.77 us
+  QVariant -> Lua table   depth=3 width=16 nodes=64        14.42 us
+  roundtrip (both ways)   depth=3 width=16 nodes=64        53.12 us
+  echo table (Lua->QV + lazy notify) depth=2 width=4        9.56 us
+  forward view 1 hop (zero copy)                            9.73 us
+  forward 1 hop, materialized (converts)                   19.92 us
+  forward view 2 hops (zero copy)                          10.16 us
 
 [pipeline (C++ hops)]
-  depth=1 hops=1                                            3.63 us
-  depth=1 hops=2                                            6.48 us
-  depth=1 hops=3                                            9.27 us
-  depth=2 hops=1                                            4.29 us
-  depth=2 hops=2                                            7.10 us
-  depth=2 hops=3                                            9.91 us
-  depth=4 hops=1                                            5.48 us
-  depth=4 hops=2                                            8.29 us
-  depth=4 hops=3                                           11.25 us
-  depth=8 hops=1                                            8.06 us
-  depth=8 hops=2                                           10.73 us
-  depth=8 hops=3                                           13.47 us
+  depth=1 hops=1                                            3.79 us
+  depth=1 hops=2                                            6.78 us
+  depth=1 hops=3                                            9.68 us
+  depth=2 hops=1                                            4.39 us
+  depth=2 hops=2                                            7.41 us
+  depth=2 hops=3                                           10.39 us
+  depth=4 hops=1                                            5.63 us
+  depth=4 hops=2                                            8.62 us
+  depth=4 hops=3                                           11.64 us
+  depth=8 hops=1                                            8.17 us
+  depth=8 hops=2                                           11.32 us
+  depth=8 hops=3                                           14.57 us
 
 [indexing (Lua)]
-  direct index depth=1                                      15.6 ns
-  get() path depth=1                                       164.1 ns
-  filter() path depth=1                                    319.5 ns
-  direct index depth=2                                      13.7 ns
-  get() path depth=2                                       202.7 ns
-  filter() path depth=2                                    470.4 ns
-  direct index depth=4                                      18.3 ns
-  get() path depth=4                                       299.9 ns
-  filter() path depth=4                                    780.4 ns
-  direct index depth=8                                      25.4 ns
-  get() path depth=8                                       455.1 ns
-  filter() path depth=8                                     1.39 us
-  wrap('payload') depth=4                                  274.2 ns
-  unwrap('payload') depth=4                                208.1 ns
+  direct index depth=1                                      16.1 ns
+  get() path depth=1                                       180.2 ns
+  filter() path depth=1                                    300.2 ns
+  direct index depth=2                                      13.9 ns
+  get() path depth=2                                       218.1 ns
+  filter() path depth=2                                    448.2 ns
+  direct index depth=4                                      18.7 ns
+  get() path depth=4                                       316.0 ns
+  filter() path depth=4                                    779.9 ns
+  direct index depth=8                                      26.1 ns
+  get() path depth=8                                       481.9 ns
+  filter() path depth=8                                     1.42 us
+  wrap('payload') depth=4                                  265.7 ns
+  unwrap('payload') depth=4                                217.7 ns
 
 [lazy view]
-  eager convert, no read      depth=1 width=1 nodes=2      993.4 ns
-  lazy notify, no read        depth=1 width=1 nodes=2       2.41 us
-  lazy notify + read leaf     depth=1 width=1 nodes=2       3.10 us
-  eager convert + read leaf   depth=1 width=1 nodes=2       1.01 us
-  read leaf (view, no notify) depth=1 width=1 nodes=2      603.2 ns
-  tostring (JSON, eager)      depth=1 width=1 nodes=2       1.51 us
-  pairs over root             depth=1 width=1 nodes=2      993.3 ns
-  forward view to worker      depth=1 width=1 nodes=2      167.4 ns
-  forward eager table         depth=1 width=1 nodes=2      940.0 ns
-  materialize (cached)        depth=1 width=1 nodes=2      104.6 ns
-  eager convert, no read      depth=2 width=1 nodes=3       1.46 us
-  lazy notify, no read        depth=2 width=1 nodes=3       2.35 us
-  lazy notify + read leaf     depth=2 width=1 nodes=3       3.56 us
-  eager convert + read leaf   depth=2 width=1 nodes=3       1.49 us
-  read leaf (view, no notify) depth=2 width=1 nodes=3       1.07 us
-  tostring (JSON, eager)      depth=2 width=1 nodes=3       2.22 us
-  pairs over root             depth=2 width=1 nodes=3       1.02 us
-  forward view to worker      depth=2 width=1 nodes=3      168.3 ns
-  forward eager table         depth=2 width=1 nodes=3       1.53 us
-  materialize (cached)        depth=2 width=1 nodes=3      106.5 ns
-  eager convert, no read      depth=3 width=1 nodes=4       1.98 us
-  lazy notify, no read        depth=3 width=1 nodes=4       2.40 us
-  lazy notify + read leaf     depth=3 width=1 nodes=4       4.10 us
-  eager convert + read leaf   depth=3 width=1 nodes=4       1.96 us
-  read leaf (view, no notify) depth=3 width=1 nodes=4       1.41 us
-  tostring (JSON, eager)      depth=3 width=1 nodes=4       2.83 us
-  pairs over root             depth=3 width=1 nodes=4       1.02 us
-  forward view to worker      depth=3 width=1 nodes=4      169.2 ns
-  forward eager table         depth=3 width=1 nodes=4       2.10 us
-  materialize (cached)        depth=3 width=1 nodes=4      107.7 ns
-  eager convert, no read      depth=4 width=1 nodes=5       2.46 us
-  lazy notify, no read        depth=4 width=1 nodes=5       2.33 us
-  lazy notify + read leaf     depth=4 width=1 nodes=5       4.58 us
-  eager convert + read leaf   depth=4 width=1 nodes=5       2.43 us
-  read leaf (view, no notify) depth=4 width=1 nodes=5       1.84 us
-  tostring (JSON, eager)      depth=4 width=1 nodes=5       3.47 us
+  eager convert, no read      depth=1 width=1 nodes=2      997.7 ns
+  lazy notify, no read        depth=1 width=1 nodes=2       2.47 us
+  lazy notify + read leaf     depth=1 width=1 nodes=2       3.20 us
+  eager convert + read leaf   depth=1 width=1 nodes=2       1.02 us
+  read leaf (view, no notify) depth=1 width=1 nodes=2      657.4 ns
+  tostring (JSON, eager)      depth=1 width=1 nodes=2       1.55 us
+  pairs over root             depth=1 width=1 nodes=2       1.04 us
+  forward view to worker      depth=1 width=1 nodes=2      180.0 ns
+  forward eager table         depth=1 width=1 nodes=2      995.6 ns
+  materialize (cached)        depth=1 width=1 nodes=2      111.5 ns
+  eager convert, no read      depth=2 width=1 nodes=3       1.54 us
+  lazy notify, no read        depth=2 width=1 nodes=3       2.49 us
+  lazy notify + read leaf     depth=2 width=1 nodes=3       3.73 us
+  eager convert + read leaf   depth=2 width=1 nodes=3       1.53 us
+  read leaf (view, no notify) depth=2 width=1 nodes=3       1.15 us
+  tostring (JSON, eager)      depth=2 width=1 nodes=3       2.20 us
+  pairs over root             depth=2 width=1 nodes=3       1.04 us
+  forward view to worker      depth=2 width=1 nodes=3      172.8 ns
+  forward eager table         depth=2 width=1 nodes=3       1.57 us
+  materialize (cached)        depth=2 width=1 nodes=3      108.6 ns
+  eager convert, no read      depth=3 width=1 nodes=4       2.01 us
+  lazy notify, no read        depth=3 width=1 nodes=4       2.47 us
+  lazy notify + read leaf     depth=3 width=1 nodes=4       4.22 us
+  eager convert + read leaf   depth=3 width=1 nodes=4       2.02 us
+  read leaf (view, no notify) depth=3 width=1 nodes=4       1.63 us
+  tostring (JSON, eager)      depth=3 width=1 nodes=4       2.68 us
+  pairs over root             depth=3 width=1 nodes=4       1.04 us
+  forward view to worker      depth=3 width=1 nodes=4      173.4 ns
+  forward eager table         depth=3 width=1 nodes=4       2.14 us
+  materialize (cached)        depth=3 width=1 nodes=4      109.4 ns
+  eager convert, no read      depth=4 width=1 nodes=5       2.50 us
+  lazy notify, no read        depth=4 width=1 nodes=5       2.49 us
+  lazy notify + read leaf     depth=4 width=1 nodes=5       4.76 us
+  eager convert + read leaf   depth=4 width=1 nodes=5       2.50 us
+  read leaf (view, no notify) depth=4 width=1 nodes=5       2.18 us
+  tostring (JSON, eager)      depth=4 width=1 nodes=5       3.40 us
   pairs over root             depth=4 width=1 nodes=5       1.03 us
-  forward view to worker      depth=4 width=1 nodes=5      164.2 ns
-  forward eager table         depth=4 width=1 nodes=5       2.61 us
-  materialize (cached)        depth=4 width=1 nodes=5      105.3 ns
-  eager convert, no read      depth=6 width=1 nodes=7       3.41 us
-  lazy notify, no read        depth=6 width=1 nodes=7       2.34 us
-  lazy notify + read leaf     depth=6 width=1 nodes=7       5.53 us
-  eager convert + read leaf   depth=6 width=1 nodes=7       3.49 us
-  read leaf (view, no notify) depth=6 width=1 nodes=7       2.78 us
-  tostring (JSON, eager)      depth=6 width=1 nodes=7       4.74 us
+  forward view to worker      depth=4 width=1 nodes=5      175.0 ns
+  forward eager table         depth=4 width=1 nodes=5       2.75 us
+  materialize (cached)        depth=4 width=1 nodes=5      111.5 ns
+  eager convert, no read      depth=6 width=1 nodes=7       3.49 us
+  lazy notify, no read        depth=6 width=1 nodes=7       2.48 us
+  lazy notify + read leaf     depth=6 width=1 nodes=7       5.71 us
+  eager convert + read leaf   depth=6 width=1 nodes=7       3.50 us
+  read leaf (view, no notify) depth=6 width=1 nodes=7       3.06 us
+  tostring (JSON, eager)      depth=6 width=1 nodes=7       4.61 us
   pairs over root             depth=6 width=1 nodes=7       1.03 us
-  forward view to worker      depth=6 width=1 nodes=7      168.6 ns
-  forward eager table         depth=6 width=1 nodes=7       3.75 us
-  materialize (cached)        depth=6 width=1 nodes=7      106.7 ns
-  eager convert, no read      depth=1 width=8 nodes=16      3.29 us
-  lazy notify, no read        depth=1 width=8 nodes=16      2.42 us
-  lazy notify + read leaf     depth=1 width=8 nodes=16      3.20 us
-  eager convert + read leaf   depth=1 width=8 nodes=16      3.17 us
-  read leaf (view, no notify) depth=1 width=8 nodes=16     671.1 ns
-  tostring (JSON, eager)      depth=1 width=8 nodes=16      5.48 us
-  pairs over root             depth=1 width=8 nodes=16      4.74 us
-  forward view to worker      depth=1 width=8 nodes=16     167.3 ns
-  forward eager table         depth=1 width=8 nodes=16      6.93 us
-  materialize (cached)        depth=1 width=8 nodes=16     107.4 ns
-  eager convert, no read      depth=2 width=8 nodes=24      5.55 us
-  lazy notify, no read        depth=2 width=8 nodes=24      2.39 us
-  lazy notify + read leaf     depth=2 width=8 nodes=24      3.78 us
-  eager convert + read leaf   depth=2 width=8 nodes=24      5.56 us
-  read leaf (view, no notify) depth=2 width=8 nodes=24      1.19 us
-  tostring (JSON, eager)      depth=2 width=8 nodes=24      8.88 us
-  pairs over root             depth=2 width=8 nodes=24      4.69 us
-  forward view to worker      depth=2 width=8 nodes=24     167.9 ns
-  forward eager table         depth=2 width=8 nodes=24     12.31 us
-  materialize (cached)        depth=2 width=8 nodes=24     109.3 ns
-  eager convert, no read      depth=1 width=64 nodes=128     19.74 us
-  lazy notify, no read        depth=1 width=64 nodes=128      2.36 us
-  lazy notify + read leaf     depth=1 width=64 nodes=128      3.25 us
-  eager convert + read leaf   depth=1 width=64 nodes=128     19.66 us
-  read leaf (view, no notify) depth=1 width=64 nodes=128     717.8 ns
-  tostring (JSON, eager)      depth=1 width=64 nodes=128     33.50 us
-  pairs over root             depth=1 width=64 nodes=128     40.97 us
-  forward view to worker      depth=1 width=64 nodes=128     170.6 ns
-  forward eager table         depth=1 width=64 nodes=128     64.08 us
-  materialize (cached)        depth=1 width=64 nodes=128     106.8 ns
-  eager convert, no read      depth=2 width=32 nodes=96     19.14 us
-  lazy notify, no read        depth=2 width=32 nodes=96      2.38 us
-  lazy notify + read leaf     depth=2 width=32 nodes=96      3.86 us
-  eager convert + read leaf   depth=2 width=32 nodes=96     19.18 us
-  read leaf (view, no notify) depth=2 width=32 nodes=96      1.24 us
-  tostring (JSON, eager)      depth=2 width=32 nodes=96     29.66 us
-  pairs over root             depth=2 width=32 nodes=96     19.64 us
-  forward view to worker      depth=2 width=32 nodes=96     167.6 ns
-  forward eager table         depth=2 width=32 nodes=96     56.63 us
-  materialize (cached)        depth=2 width=32 nodes=96     108.3 ns
-  eager convert, no read      depth=3 width=16 nodes=64     14.64 us
-  lazy notify, no read        depth=3 width=16 nodes=64  2026-10-21T20:39:02.412|W|              radapter| Shutting down...
-    2.43 us
-  lazy notify + read leaf     depth=3 width=16 nodes=64      4.44 us
-  eager convert + read leaf   depth=3 width=16 nodes=64     15.07 us
-  read leaf (view, no notify) depth=3 width=16 nodes=64      1.74 us
-  tostring (JSON, eager)      depth=3 width=16 nodes=64     22.71 us
-  pairs over root             depth=3 width=16 nodes=64      9.50 us
-  forward view to worker      depth=3 width=16 nodes=64     169.1 ns
-  forward eager table         depth=3 width=16 nodes=64     39.30 us
-  materialize (cached)        depth=3 width=16 nodes=64     104.3 ns
+  forward view to worker      depth=6 width=1 nodes=7      170.9 ns
+  forward eager table         depth=6 width=1 nodes=7       3.76 us
+  materialize (cached)        depth=6 width=1 nodes=7      108.2 ns
+  eager convert, no read      depth=1 width=8 nodes=16      3.16 us
+  lazy notify, no read        depth=1 width=8 nodes=16      2.49 us
+  lazy notify + read leaf     depth=1 width=8 nodes=16      3.32 us
+  eager convert + read leaf   depth=1 width=8 nodes=16      3.20 us
+  read leaf (view, no notify) depth=1 width=8 nodes=16     726.4 ns
+  tostring (JSON, eager)      depth=1 width=8 nodes=16      5.64 us
+  pairs over root             depth=1 width=8 nodes=16      4.82 us
+  forward view to worker      depth=1 width=8 nodes=16     172.7 ns
+  forward eager table         depth=1 width=8 nodes=16      7.22 us
+  materialize (cached)        depth=1 width=8 nodes=16     108.6 ns
+  eager convert, no read      depth=2 width=8 nodes=24      5.51 us
+  lazy notify, no read        depth=2 width=8 nodes=24      2.47 us
+  lazy notify + read leaf     depth=2 width=8 nodes=24      3.92 us
+  eager convert + read leaf   depth=2 width=8 nodes=24      5.50 us
+  read leaf (view, no notify) depth=2 width=8 nodes=24      1.29 us
+  tostring (JSON, eager)      depth=2 width=8 nodes=24      9.30 us
+  pairs over root             depth=2 width=8 nodes=24      4.99 us
+  forward view to worker      depth=2 width=8 nodes=24     175.2 ns
+  forward eager table         depth=2 width=8 nodes=24     12.94 us
+  materialize (cached)        depth=2 width=8 nodes=24     111.3 ns
+  eager convert, no read      depth=1 width=64 nodes=128     19.35 us
+  lazy notify, no read        depth=1 width=64 nodes=128      2.47 us
+  lazy notify + read leaf     depth=1 width=64 nodes=128      3.40 us
+  eager convert + read leaf   depth=1 width=64 nodes=128     19.21 us
+  read leaf (view, no notify) depth=1 width=64 nodes=128     803.0 ns
+  tostring (JSON, eager)      depth=1 width=64 nodes=128     35.48 us
+  pairs over root             depth=1 width=64 nodes=128     43.15 us
+  forward view to worker      depth=1 width=64 nodes=128     174.6 ns
+  forward eager table         depth=1 width=64 nodes=128     63.49 us
+  materialize (cached)        depth=1 width=64 nodes=128     108.0 ns
+  eager convert, no read      depth=2 width=32 nodes=96     18.86 us
+  lazy notify, no read        depth=2 width=32 nodes=96      2.49 us
+  lazy notify + read leaf     depth=2 width=32 nodes=96      4.09 us
+  eager convert + read leaf   depth=2 width=32 nodes=96     19.40 us
+  read leaf (view, no notify) depth=2 width=32 nodes=96      1.40 us
+  tostring (JSON, eager)      depth=2 width=32 nodes=96     32.73 us
+  pairs over root             depth=2 width=32 nodes=96     20.52 us
+  forward view to worker      depth=2 width=32 nodes=96     177.8 ns
+  forward eager table         depth=2 width=32 nodes=96     56.73 us
+  materialize (cached)        depth=2 width=32 nodes=96     109.1 ns
+  eager convert, no read      depth=3 width=16 nodes=64     14.41 us
+  lazy notify, no read        depth=3 width=16 nodes=64      2.49 us
+  lazy notify + read leaf     depth=3 width=16 nodes=64      4.73 us
+  eager convert + read leaf   depth=3 width=16 nodes=64     14.55 us
+  read leaf (view, no notify) depth=3 width=16 nodes=64      1.97 us
+  tostring (JSON, eager)      depth=3 width=16 nodes=64     23.62 us
+  pairs over root             depth=3 width=16 nodes=64      9.85 us
+  forward view to worker      depth=3 width=16 nodes=64     176.3 ns
+  forward eager table         depth=3 width=16 nodes=64     39.67 us
+  materialize (cached)        depth=3 width=16 nodes=64     110.0 ns
 
 ================================================================================================
