@@ -4,6 +4,8 @@
 #include "instance_impl.hpp"
 #include "glua/glua.hpp"
 #include "worker_impl.hpp"
+#include "lazy.hpp"
+#include "radapter/lazy.hpp"
 #include "tags.hpp"
 
 namespace radapter
@@ -249,6 +251,16 @@ static int worker_index(lua_State* L) {
     return 1;
 }
 
+// Containers cross into Lua as a lazy view: listeners read what they need and
+// forwarding returns the retained tree unchanged. Scalars stay scalars.
+static QVariant lazyMessage(QVariant const& msg) {
+    auto type = msg.metaType().id();
+    if (type == QMetaType::QVariantMap || type == QMetaType::QVariantList) {
+        return QVariant::fromValue(LazyNode{msg});
+    }
+    return msg;
+}
+
 static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfRef, bool is_event) {
     if (!msg.isValid()) return;
     auto* w = impl->self.data();
@@ -266,7 +278,7 @@ static void worker_notify(WorkerImpl* impl, QVariant const& msg, int workerSelfR
     LuaValue workerObj(listeners._L, RegistryRef, workerSelfRef);
     try {
         LuaFunction::Global(w->_Inst->LuaState(), "call_all")
-            .CallOnFiber({QVariant::fromValue(listeners), msg, QVariant::fromValue(workerObj)},
+            .CallOnFiber({QVariant::fromValue(listeners), lazyMessage(msg), QVariant::fromValue(workerObj)},
                 [w = QPointer(w)](std::string_view err) {
                     if (w)
                         w->Error("Could not notify listeners: {}", err);

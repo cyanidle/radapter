@@ -3,8 +3,8 @@
 --   * Sink     - incoming QVariantList: full Lua table -> QVariant tree (one way)
 --   * Deep     - returns a QVariant tree: full QVariant -> Lua table (other way)
 --   * Roundtrip- returns its first argument: both directions in one call
---   * Echo     - emits the message back to its Lua listeners: QVariant -> Lua
---                plus the real worker notification path (fiber entry, call_all)
+--   * Echo     - emits the message back to its Lua listeners through the real
+--                notification path, which hands them a lazy view
 
 local B = require "bench_lib"
 
@@ -59,46 +59,56 @@ return function(env)
             end, {meta = {nodes = nodes, depth = depth, width = width}})
     end
 
-    -- Echo: the same QVariant->Lua conversion, but through the worker
-    -- notification path (a new fiber entry + call_all over the listener list).
+    -- Echo: Lua table -> QVariant (argument), then the engine's lazy
+    -- notification path (view creation, no table build).
     local depth, width = 2, 4
-    local msg = bench:Deep(depth, width)
+    bench:Prepare(depth, width)
+    local msg = bench:DeepCached()
     local received = 0
     local cancel_echo = pipe(bench, function()
         received = received + 1
     end)
-    B.bench(section, "worker echo (notify + convert) depth=2 width=4",
+    B.bench(section, "echo table (Lua->QV + lazy notify) depth=2 width=4",
         function()
             bench:Echo(msg)
         end, {meta = {depth = depth, width = width, received = received}})
     cancel_echo()
 
-    -- Forwarding: a message reaching a Lua handler and being handed to the next
-    -- C++ worker costs one full conversion pair per hop. Chain length 1 vs 2
-    -- gives the marginal cost.
+    -- Forwarding a received view returns the retained tree (toQVar fast path),
+    -- so a hop costs no conversion at all; materializing first reproduces the
+    -- old eager behaviour.
     local sink = Bench {name = "bench_sink"}
     local sink2 = Bench {name = "bench_sink2"}
     local cancel_one = pipe(bench, function(m)
         sink(m)
     end)
-    B.bench(section, "forward 1 hop (convert both ways)",
+    B.bench(section, "forward view 1 hop (zero copy)",
         function()
             bench:Echo(msg)
         end, {meta = {depth = depth, width = width}})
     cancel_one()
 
+    local cancel_one_eager = pipe(bench, function(m)
+        sink(m:materialize())
+    end)
+    B.bench(section, "forward 1 hop, materialized (converts)",
+        function()
+            bench:Echo(msg)
+        end, {meta = {depth = depth, width = width}})
+    cancel_one_eager()
+
     local cancel_two = pipe(bench, function(m)
         sink2(m)
         sink(m)
     end)
-    B.bench(section, "forward 2 hops (convert both ways twice)",
+    B.bench(section, "forward view 2 hops (zero copy)",
         function()
             bench:Echo(msg)
         end, {meta = {depth = depth, width = width}})
     cancel_two()
 
-    -- Full pipeline across C++ worker boundaries: every hop is
-    -- QVariant -> Lua (notification) + Lua table -> QVariant (next worker call).
+    -- Full pipeline across C++ worker boundaries: each hop is a lazy view plus
+    -- the toQVar fast path (no conversion while nobody materializes).
     print("\n[pipeline across C++ workers]")
     local pipe_section = "pipeline (C++ hops)"
     local chain_id = 0
@@ -122,7 +132,8 @@ return function(env)
     end
 
     for _, depth in ipairs {1, 2, 4, 8} do
-        local msg = bench:Deep(depth, 1)
+        bench:Prepare(depth, 1)
+        local msg = bench:DeepCached()
         for _, hops in ipairs {1, 2, 3} do
             local head = build_chain(hops)
             B.bench(pipe_section, string.format("depth=%d hops=%d", depth, hops),

@@ -14,13 +14,14 @@ function load_plugin(path, ...) end
 ---@return table
 function schema(...) end
 
----@param table table
+---@param table table|LazyNode<any>
 ---@param key string
 ---@param sep string?
 ---@return any
 function get(table, key, sep) end
 
----@param table table
+---Materializes a view first, then assigns into the table it now holds.
+---@param table table|LazyNode<any>
 ---@param key string
 ---@param value any
 ---@param sep string?
@@ -358,6 +359,16 @@ log = {
 ---@alias MsgHandler fun(msg: T, source: Worker<any, T>): any
 ---@generic T
 ---@alias MsgHandlerEx fun(self: Worker<T, any>, msg: T, source: Worker<any, T>): any
+
+---A message delivered to a Lua listener is a lazy view over the QVariant tree:
+---indexing a field converts only that subtree, `pairs`/`ipairs`/`#` iterate it
+---and `tostring` serializes it as JSON. Writing a field materializes the view
+---(copy-on-write); a nested view (`msg.a.b = x`) cannot take writes -- materialize
+---the message first or use set(). Forwarding a view to a worker passes the
+---retained tree unchanged.
+---@class LazyNode<T>
+---@overload fun(key: string|integer): any
+---@field materialize fun(self: LazyNode<T>): T -- plain Lua table with the whole message
 
 ---@generic T
 ---@class Events<T>

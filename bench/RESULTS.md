@@ -16,6 +16,10 @@ Raw output: [`results-build.txt`](results-build.txt), [`results-jit.txt`](result
 `nodes` below is the number of tables in the message (`depth * width + width`).
 `ns`/`µs` are CPU time per message, median of 5 samples.
 
+All tables come from one run. Re-measuring the same code on this machine reproduces the
+µs-range rows within ±5%; sub-microsecond rows (pure-Lua dispatch, `forward view`) move by up
+to ~15% with CPU frequency, so treat small deltas there as noise.
+
 ## 1. Pipeline dispatch (pure Lua)
 
 One `pipe()` hop is a Lua function call through `call_all`/`xpcall`; message
@@ -24,173 +28,230 @@ stamps a field costs ~60% more than the pure dispatch floor.
 
 | case | PUC Lua 5.4 | LuaJIT |
 |---|---:|---:|
-| stamp chain depth=1 hops=1 | 1.06 µs | 0.9 ns |
-| stamp chain depth=1 hops=3 | 2.33 µs | 196.0 ns |
-| stamp chain depth=1 hops=5 | 3.59 µs | 568.2 ns |
-| stamp chain depth=2 hops=1 | 1.04 µs | 176.1 ns |
-| stamp chain depth=2 hops=3 | 2.28 µs | 371.5 ns |
-| stamp chain depth=2 hops=5 | 3.67 µs | 547.8 ns |
-| stamp chain depth=4 hops=1 | 1.05 µs | 174.1 ns |
-| stamp chain depth=4 hops=3 | 2.33 µs | 391.8 ns |
-| stamp chain depth=4 hops=5 | 3.58 µs | 580.7 ns |
-| stamp chain depth=8 hops=1 | 1.05 µs | 182.3 ns |
-| stamp chain depth=8 hops=3 | 2.32 µs | 380.9 ns |
-| stamp chain depth=8 hops=5 | 3.66 µs | 555.8 ns |
-| unwrap/wrap hop depth=1 | 2.99 µs | 577.5 ns |
-| wrap only depth=1 | 761.2 ns | 263.8 ns |
-| unwrap only depth=1 | 595.0 ns | 197.2 ns |
-| unwrap/wrap hop depth=4 | 3.00 µs | 630.6 ns |
-| wrap only depth=4 | 775.4 ns | 263.6 ns |
-| unwrap only depth=4 | 597.8 ns | 204.8 ns |
-| filter() path depth=1 | 716.9 ns | 278.7 ns |
-| filter() path depth=2 | 1.09 µs | 424.4 ns |
-| filter() path depth=4 | 1.80 µs | 731.7 ns |
-| filter() path depth=8 | 3.17 µs | 1.29 µs |
+| stamp chain depth=1 hops=1 | 1.24 µs | 148.2 ns |
+| stamp chain depth=1 hops=3 | 2.54 µs | 332.1 ns |
+| stamp chain depth=1 hops=5 | 3.95 µs | 598.1 ns |
+| stamp chain depth=2 hops=1 | 1.20 µs | 178.5 ns |
+| stamp chain depth=2 hops=3 | 2.61 µs | 382.6 ns |
+| stamp chain depth=2 hops=5 | 3.96 µs | 606.6 ns |
+| stamp chain depth=4 hops=1 | 1.20 µs | 176.5 ns |
+| stamp chain depth=4 hops=3 | 2.61 µs | 386.5 ns |
+| stamp chain depth=4 hops=5 | 4.11 µs | 603.8 ns |
+| stamp chain depth=8 hops=1 | 1.22 µs | 177.8 ns |
+| stamp chain depth=8 hops=3 | 2.61 µs | 379.0 ns |
+| stamp chain depth=8 hops=5 | 4.02 µs | 598.5 ns |
+| unwrap/wrap hop depth=1 | 3.32 µs | 701.2 ns |
+| wrap only depth=1 | 783.5 ns | 267.9 ns |
+| unwrap only depth=1 | 617.8 ns | 200.7 ns |
+| unwrap/wrap hop depth=4 | 3.27 µs | 712.9 ns |
+| wrap only depth=4 | 774.7 ns | 267.3 ns |
+| unwrap only depth=4 | 608.4 ns | 199.5 ns |
+| filter() path depth=1 | 739.4 ns | 299.8 ns |
+| filter() path depth=2 | 1.11 µs | 428.6 ns |
+| filter() path depth=4 | 1.83 µs | 750.2 ns |
+| filter() path depth=8 | 3.15 µs | 1.35 µs |
 
-PUC: marginal dispatch is **~0.63 µs per hop**, independent of depth
-(`hops=5 − hops=1` = 2.53 µs / 4). `wrap`/`unwrap` are O(1) (`set`/`get` on one
+PUC: marginal dispatch is **~0.70 µs per hop**, independent of depth
+(`hops=5 − hops=1` = 2.71 µs / 4). `wrap`/`unwrap` are O(1) (`set`/`get` on one
 key), `filter()` is O(path depth) because it rebuilds the path.
 
-> LuaJIT: the first `hops=1` row is trace-inlined to sub-nanosecond speed; later
-> bytecode-identical benchmarks fall back to the interpreter (~175 ns). Do not
-> compare LuaJIT rows of this section to each other; the PUC column is the
-> stable reference.
+> LuaJIT: rows still deviate from each other by ~20% depending on which trace
+> got compiled, and the first `hops=1` row is the fastest of its family. Do not
+> read small differences between LuaJIT rows; the PUC column is the stable
+> reference.
 
 ## 2. C++ <-> Lua message conversion
 
 `Lua -> QVariant` is `toQVar()` (recursive Lua table walk), `QVariant -> Lua`
 is `glua::Push(QVariant)` (recursive table build). Both are eager and touch
-every node of the message.
+every node of the message. They still run whenever a *script* builds a message
+or asks for a plain table; a worker message no longer pays for them (see §5).
 
 | case | Lua -> QVariant | QVariant -> Lua | roundtrip |
 |---|---:|---:|---:|
-| depth=1 width=1 nodes=2 | 1.82 µs | 1.38 µs | 2.75 µs |
-| depth=2 width=1 nodes=3 | 2.53 µs | 1.97 µs | 4.02 µs |
-| depth=3 width=1 nodes=4 | 3.13 µs | 2.50 µs | 5.35 µs |
-| depth=4 width=1 nodes=5 | 3.93 µs | 3.22 µs | 6.66 µs |
-| depth=6 width=1 nodes=7 | 5.05 µs | 4.48 µs | 9.02 µs |
-| depth=1 width=8 nodes=16 | 9.10 µs | 3.95 µs | 12.62 µs |
-| depth=2 width=8 nodes=24 | 15.57 µs | 6.57 µs | 21.15 µs |
-| depth=1 width=64 nodes=128 | 68.30 µs | 22.35 µs | 93.22 µs |
-| depth=2 width=32 nodes=96 | 63.92 µs | 21.36 µs | 83.90 µs |
-| depth=3 width=16 nodes=64 | 44.09 µs | 16.72 µs | 60.21 µs |
+| depth=1 width=1 nodes=2 | 1.82 µs | 1.37 µs | 2.70 µs |
+| depth=2 width=1 nodes=3 | 2.54 µs | 1.99 µs | 4.00 µs |
+| depth=3 width=1 nodes=4 | 3.22 µs | 2.62 µs | 5.28 µs |
+| depth=4 width=1 nodes=5 | 3.90 µs | 3.08 µs | 6.58 µs |
+| depth=6 width=1 nodes=7 | 5.09 µs | 4.30 µs | 9.09 µs |
+| depth=1 width=8 nodes=16 | 8.53 µs | 3.72 µs | 11.73 µs |
+| depth=2 width=8 nodes=24 | 14.63 µs | 6.22 µs | 20.69 µs |
+| depth=1 width=64 nodes=128 | 67.07 µs | 21.92 µs | 93.31 µs |
+| depth=2 width=32 nodes=96 | 64.31 µs | 21.04 µs | 84.40 µs |
+| depth=3 width=16 nodes=64 | 44.61 µs | 15.86 µs | 60.01 µs |
 
-Least-squares fit over all cases (PUC):
+LuaJIT, same cases:
 
-| direction | fixed cost | per node |
-|---|---:|---:|
-| Lua -> QVariant | 1.49 µs | 0.58 µs |
-| QVariant -> Lua | 2.17 µs | 0.18 µs |
-| roundtrip | 2.93 µs | 0.77 µs |
+| case | Lua -> QVariant | QVariant -> Lua | roundtrip |
+|---|---:|---:|---:|
+| nodes=2 | 1.49 µs | 980.4 ns | 2.10 µs |
+| nodes=3 | 2.10 µs | 1.48 µs | 3.22 µs |
+| nodes=4 | 2.66 µs | 2.01 µs | 4.39 µs |
+| nodes=5 | 3.31 µs | 2.46 µs | 5.40 µs |
+| nodes=7 | 4.27 µs | 3.40 µs | 7.39 µs |
+| nodes=16 | 7.37 µs | 3.24 µs | 10.24 µs |
+| nodes=24 | 12.75 µs | 5.67 µs | 18.35 µs |
+| nodes=128 | 63.63 µs | 19.76 µs | 86.94 µs |
+| nodes=96 | 58.55 µs | 19.86 µs | 78.20 µs |
+| nodes=64 | 40.08 µs | 15.08 µs | 55.31 µs |
+
+Least-squares fit over all cases:
+
+| direction | PUC fixed | PUC per node | JIT fixed | JIT per node |
+|---|---:|---:|---:|---:|
+| Lua -> QVariant | 1.42 µs | 0.58 µs | 0.76 µs | 0.54 µs |
+| QVariant -> Lua | 2.07 µs | 0.18 µs | 1.61 µs | 0.17 µs |
+| roundtrip | 2.71 µs | 0.78 µs | 1.78 µs | 0.73 µs |
 
 So a *single* deep message (depth 8, 9 nodes) costs **~10 µs** to cross one
 boundary and back; a 100-node message costs **~80 µs**. Conversion dominates
-everything else in a pipeline (a pure-Lua hop is 0.63 µs).
+everything else in a pipeline (a pure-Lua hop is 0.7 µs).
 
-The extra-method call floor on the same worker is **0.48 µs** — conversion of
-even a two-node message is already 3x that.
+The extra-method call floor on the same worker is **0.49 µs** (PUC) / **0.36 µs**
+(JIT) — conversion of even a two-node message is 3x that.
 
 ## 3. Pipeline across C++ worker boundaries
 
-Each hop is: notify Lua (QVariant -> Lua, full tree) + call the next worker
-(Lua -> QVariant, full tree).
+Each hop is a notification (message -> Lua listener, now a lazy view) plus a
+call of the next worker (a view converts back to the retained tree for free).
+Since neither direction walks the tree any more, a hop costs the same at every
+depth:
 
 | case | PUC Lua 5.4 | LuaJIT |
 |---|---:|---:|
-| depth=1 hops=1 | 6.08 µs | 4.01 µs |
-| depth=1 hops=2 | 12.47 µs | 7.90 µs |
-| depth=1 hops=3 | 18.96 µs | 12.24 µs |
-| depth=2 hops=1 | 7.43 µs | 5.18 µs |
-| depth=2 hops=2 | 15.13 µs | 10.10 µs |
-| depth=2 hops=3 | 22.27 µs | 15.69 µs |
-| depth=4 hops=1 | 9.96 µs | 7.35 µs |
-| depth=4 hops=2 | 19.91 µs | 14.55 µs |
-| depth=4 hops=3 | 30.21 µs | 22.04 µs |
-| depth=8 hops=1 | 15.01 µs | 11.43 µs |
-| depth=8 hops=2 | 29.92 µs | 22.28 µs |
-| depth=8 hops=3 | 46.25 µs | 34.42 µs |
+| depth=1 hops=1 | 5.61 µs | 3.63 µs |
+| depth=1 hops=2 | 10.82 µs | 6.48 µs |
+| depth=1 hops=3 | 15.32 µs | 9.27 µs |
+| depth=2 hops=1 | 6.29 µs | 4.29 µs |
+| depth=2 hops=2 | 11.37 µs | 7.10 µs |
+| depth=2 hops=3 | 16.26 µs | 9.91 µs |
+| depth=4 hops=1 | 7.92 µs | 5.48 µs |
+| depth=4 hops=2 | 12.72 µs | 8.29 µs |
+| depth=4 hops=3 | 17.90 µs | 11.25 µs |
+| depth=8 hops=1 | 10.75 µs | 8.06 µs |
+| depth=8 hops=2 | 15.57 µs | 10.73 µs |
+| depth=8 hops=3 | 20.83 µs | 13.47 µs |
 
-Marginal cost of one more hop: **6.4 µs at depth 1, 15.7 µs at depth 8** (PUC).
-Depth adds ~1.3 µs per level per hop, i.e. Lua->QVariant + QVariant->Lua + 0.63 µs
-of dispatch. Three hops at depth 8 cost 46 µs per message — 46 000 messages/s on
-one core, *before* the handler does any work.
+Marginal cost of one more hop is **~5.2 µs flat** (PUC) / **~2.7 µs** (JIT),
+whereas before the lazy view it grew with the message: 6.4 µs at depth 1 and
+15.7 µs at depth 8. Three hops at depth 8 cost 20.8 µs instead of 46 µs.
+
+What remains is fixed per hop: fiber dispatch, `call_all`, the Lua handler and
+the next worker call — not the message.
 
 ## 4. Path indexing in Lua
 
 | case | PUC Lua 5.4 | LuaJIT |
 |---|---:|---:|
-| direct index depth=1 | 139.9 ns | 13.4 ns |
-| get() path depth=1 | 350.0 ns | 157.3 ns |
-| filter() path depth=1 | 698.0 ns | 273.1 ns |
-| direct index depth=2 | 148.2 ns | 11.5 ns |
-| get() path depth=2 | 412.2 ns | 206.0 ns |
-| filter() path depth=2 | 1.05 µs | 412.7 ns |
-| direct index depth=4 | 171.0 ns | 21.7 ns |
-| get() path depth=4 | 565.2 ns | 279.6 ns |
-| filter() path depth=4 | 1.72 µs | 727.3 ns |
-| direct index depth=8 | 209.9 ns | 32.2 ns |
-| get() path depth=8 | 832.5 ns | 425.0 ns |
-| filter() path depth=8 | 3.13 µs | 1.29 µs |
-| wrap('payload') depth=4 | 793.5 ns | 261.0 ns |
-| unwrap('payload') depth=4 | 595.0 ns | 203.4 ns |
+| direct index depth=1 | 140.0 ns | 15.6 ns |
+| get() path depth=1 | 395.1 ns | 164.1 ns |
+| filter() path depth=1 | 789.5 ns | 319.5 ns |
+| direct index depth=2 | 153.1 ns | 13.7 ns |
+| get() path depth=2 | 446.3 ns | 202.7 ns |
+| filter() path depth=2 | 1.13 µs | 470.4 ns |
+| direct index depth=4 | 170.3 ns | 18.3 ns |
+| get() path depth=4 | 588.5 ns | 299.9 ns |
+| filter() path depth=4 | 1.82 µs | 780.4 ns |
+| direct index depth=8 | 209.9 ns | 25.4 ns |
+| get() path depth=8 | 864.1 ns | 455.1 ns |
+| filter() path depth=8 | 3.25 µs | 1.39 µs |
+| wrap('payload') depth=4 | 833.9 ns | 274.2 ns |
+| unwrap('payload') depth=4 | 648.4 ns | 208.1 ns |
 
-`get()` on an already-converted table costs ~0.11 µs per path segment plus
-~0.24 µs fixed (PUC); direct indexing is ~20 ns/segment. Both are negligible
-compared to converting the tree — reading one field out of a 100-node message
-costs 0.5-1 µs, while converting that message costs 20-80 µs.
+`get()` on an already-converted table costs ~0.1 µs per path segment plus
+~0.25 µs fixed (PUC); direct indexing is ~20 ns/segment. Both are negligible
+compared to converting the tree, which is why the lazy view replaces the
+conversion rather than the indexing helper.
 
-## 5. Lazy message view (prototype)
+## 5. Lazy message view (engine implementation)
 
-`eager convert` = full `QVariant -> Lua`; `lazy view` = create the view (no
-conversion); `read leaf` = walk `a.a...a[1]`; `cached` = the same walk with
-converted children cached in each node. Depth-1 `read` includes the leaf list
-index. All numbers include the 0.48 µs extra-method call floor.
+A message that reaches a Lua listener is a `LazyNode` userdata over the retained
+`QVariant`; nothing is converted until a field is read. Columns:
 
-| case | eager convert | lazy view | eager + read | lazy + read | read eager | read lazy | read cached | materialize |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| depth=1 width=1 nodes=2 | 1.39 µs | 1.12 µs | 1.44 µs | 1.98 µs | 137.4 ns | 814.0 ns | 512.0 ns | 792.6 ns |
-| depth=2 width=1 nodes=3 | 1.95 µs | 1.14 µs | 2.08 µs | 2.49 µs | 145.9 ns | 1.35 µs | 673.1 ns | 1.08 µs |
-| depth=3 width=1 nodes=4 | 2.61 µs | 1.12 µs | 2.75 µs | 3.07 µs | 158.2 ns | 1.95 µs | 849.9 ns | 1.39 µs |
-| depth=4 width=1 nodes=5 | 3.17 µs | 1.10 µs | 3.20 µs | 3.44 µs | 171.8 ns | 2.46 µs | 1.03 µs | 1.66 µs |
-| depth=6 width=1 nodes=7 | 4.50 µs | 1.11 µs | 4.56 µs | 4.54 µs | 195.7 ns | 3.26 µs | 1.37 µs | 2.21 µs |
-| depth=1 width=8 nodes=16 | 3.75 µs | 1.12 µs | 3.92 µs | 2.01 µs | 134.2 ns | 969.2 ns | 500.7 ns | 2.33 µs |
-| depth=2 width=8 nodes=24 | 6.61 µs | 1.15 µs | 6.57 µs | 2.81 µs | 151.5 ns | 1.58 µs | 698.3 ns | 3.56 µs |
-| depth=1 width=64 nodes=128 | 22.19 µs | 1.08 µs | 22.28 µs | 2.09 µs | 135.8 ns | 974.8 ns | 481.1 ns | 12.88 µs |
-| depth=2 width=32 nodes=96 | 21.34 µs | 1.08 µs | 21.01 µs | 2.71 µs | 146.1 ns | 1.66 µs | 676.9 ns | 11.84 µs |
-| depth=3 width=16 nodes=64 | 16.53 µs | 1.11 µs | 16.15 µs | 3.32 µs | 160.9 ns | 2.27 µs | 856.5 ns | 8.85 µs |
+- `eager convert` — full `QVariant -> Lua` of the same message (`DeepCached`);
+- `lazy notify` — the real notification with nobody reading it (view creation);
+- `lazy notify + read` — the notification plus walking `a.a…[1]` to the leaf;
+- `eager convert + read` — the same leaf read out of the fully converted table;
+- `read leaf (view)` — the leaf walk on an already captured view (no notify);
+- `tostring` — JSON serialization of the whole view;
+- `pairs` — iterate the root level;
+- `forward view` — hand the view to another worker (`toQVar` returns the tree);
+- `forward eager` — hand the same worker a converted Lua table instead;
+- `materialize` — `view:materialize()` on an already materialized view.
 
-One-shot "read one leaf" speedup of lazy over eager conversion:
+All numbers are PUC Lua 5.4, µs unless noted.
 
-| case | eager / lazy |
-|---|---:|
-| depth=1 width=1 nodes=2 | 0.7x |
-| depth=2 width=1 nodes=3 | 0.8x |
-| depth=3 width=1 nodes=4 | 0.9x |
-| depth=4 width=1 nodes=5 | 0.9x |
-| depth=6 width=1 nodes=7 | 1.0x |
-| depth=1 width=8 nodes=16 | 2.0x |
-| depth=2 width=8 nodes=24 | 2.3x |
-| depth=1 width=64 nodes=128 | 10.7x |
-| depth=2 width=32 nodes=96 | 7.8x |
-| depth=3 width=16 nodes=64 | 4.9x |
+| nodes | eager convert | lazy notify | lazy + read | eager + read | read leaf (view) | tostring | pairs | forward view | forward eager | materialize |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 1.42 | 4.05 | 5.51 | 1.46 | 1.14 | 1.72 | 1.05 | 386.9 ns | 1.23 | 323.5 ns |
+| 3 | 2.06 | 4.13 | 6.29 | 2.10 | 1.90 | 2.44 | 1.04 | 372.2 ns | 1.86 | 323.4 ns |
+| 4 | 2.60 | 4.03 | 6.96 | 2.69 | 2.68 | 3.09 | 1.08 | 377.6 ns | 2.53 | 325.5 ns |
+| 5 | 3.15 | 3.99 | 8.05 | 3.31 | 3.55 | 3.74 | 1.09 | 381.9 ns | 3.19 | 325.4 ns |
+| 7 | 4.31 | 4.01 | 9.47 | 4.51 | 5.06 | 5.02 | 1.05 | 373.3 ns | 4.46 | 321.9 ns |
+| 16 | 3.77 | 4.03 | 5.52 | 3.83 | 1.24 | 6.11 | 4.57 | 378.3 ns | 8.23 | 324.3 ns |
+| 24 | 6.33 | 4.01 | 6.34 | 6.38 | 2.14 | 9.49 | 4.48 | 374.7 ns | 14.40 | 326.8 ns |
+| 128 | 21.94 | 4.03 | 5.71 | 22.22 | 1.37 | 34.79 | 39.52 | 377.9 ns | 67.19 | 325.2 ns |
+| 96 | 20.13 | 3.98 | 6.50 | 20.91 | 2.22 | 31.47 | 18.65 | 375.4 ns | 61.41 | 325.1 ns |
+| 64 | 16.08 | 4.01 | 7.72 | 16.28 | 3.03 | 23.45 | 8.91 | 373.1 ns | 42.58 | 325.1 ns |
 
-Lazy overhead per level: ~0.5 µs uncached, ~0.2 µs with the child cache
-(PUC); direct table indexing is ~0.02 µs/level.
+What the table says:
+
+- **Notification is O(1).** `lazy notify` is 4.0 µs for every message shape; that
+  is the pipeline machinery (fiber entry, `call_all`, Lua handler), not the
+  message. Creating the view itself is below the measurement noise (< 100 ns).
+- **The eager path's notification would be flat + conversion.** `lazy + read`
+  includes the 4 µs floor that `eager + read` does not, so the comparison
+  understates the win: at 128 nodes an eager notification would cost
+  ~4 + 22 = 26 µs against 5.7 µs — **~4.5x**. At 2-7 nodes both are ~floor, i.e.
+  parity: small messages neither win nor lose.
+- **Walking a view is ~0.8 µs per level** (`read leaf (view)`: 1.14 µs for one
+  level, 5.06 µs for six); a converted table indexes in ~0.02 µs/level. A view
+  should be read a bounded number of times, or materialized once.
+- **Forwarding is the big win: ~375 ns flat**, versus 1.2 µs (2 nodes) to
+  67 µs (128 nodes) for a Lua table — up to **180x**, and independent of shape.
+  This is what the old eager pipeline paid at every hop.
+- **`tostring` serializes, it does not preview**: JSON of the whole message
+  (34.8 µs at 128 nodes, more than converting it — `QJsonDocument` build plus
+  the conversion). Used for logging, so it is exact.
+- **`pairs` over the root is O(width)**: 64 keys cost 39.5 µs because every
+  value becomes a child view. Iterating a wide root is the one pattern where a
+  view is expensive; `ipairs` over a list, `#`, and field reads are O(1).
+- **`materialize` is free after the first call** (325 ns: a cache lookup). The
+  first call pays the full conversion shown in the `eager convert` column; the
+  benchmark's iterations amortize it away.
+
+`build-jit` reproduces the same shape: notification 2.4 µs, forwarding
+**~168 ns** flat, `materialize` ~106 ns, `tostring` 33.5 µs and `pairs` 41.0 µs
+at 128 nodes.
+
+### Forwarding through real workers (`bench_conversion.lua`)
+
+Same message (depth 2, width 4, 12 nodes), the sender builds the Lua table once:
+
+| case | PUC | LuaJIT |
+|---|---:|---:|
+| `Echo` a Lua table: Lua -> QVariant + notify | 12.34 µs | 9.22 µs |
+| …its listener forwards the view to another worker | 12.80 µs | 9.32 µs |
+| …the listener materializes first, then forwards | 24.44 µs | 19.13 µs |
+| …two workers forward the view | 13.52 µs | 9.51 µs |
+
+A forwarded view costs **~0.4-0.7 µs per hop**; a materialized hop costs
+**+12 µs** (a full conversion down and back up). That difference is the entire
+eager-pipeline tax the lazy view removes.
 
 ## Takeaways
 
-1. **Message shape is the cost driver.** Deep/wide messages are cheap inside
-   Lua (reference passing) but linear per node at every C++ boundary.
-2. **Conversion is the pipeline tax.** ~0.58 µs/node Lua->QVariant and
-   ~0.18 µs/node QVariant->Lua; a 3-hop pipeline at depth 8 spends ~30 µs of
-   its 46 µs converting.
-3. **Indexing is cheap, conversion is not.** `get()`/`filter()` cost 0.3-3 µs
-   *after* the message was already converted; the same field accessed through
-   a lazy view avoids 5-11x the conversion work on realistic wide messages,
-   and the cached variant brings repeated access close to table speed.
-4. **Deep narrow chains do not benefit** from lazy views (parity at depth 6);
-   narrow messages also pay the fixed view/call overhead. Lazy indexing should
-   be opt-in or applied where messages are wide, deep, or forwarded.
-5. **Forwarding is the biggest opportunity**: every worker-to-worker hop pays
-   two full conversions. A retained `QVariant` in a lazy view makes forwarding
-   zero-copy; see `LAZY_INDEXING.md`.
+1. **Message shape is the cost driver for conversion, not for dispatch.** Deep
+   and wide messages are free inside Lua (reference passing) and linear per node
+   at every C++ boundary that converts them.
+2. **The lazy view removes the per-hop conversion tax.** Hops are now ~5.2 µs
+   flat regardless of depth (was 6.4-15.7 µs, growing with depth); forwarding a
+   view is ~375 ns instead of up to 67 µs.
+3. **Reading through a view costs ~0.8 µs/level**, so views pay off when a
+   handler reads a small part of a wide/deep message or forwards it, and break
+   even on tiny messages (both are dominated by the 4 µs notification floor).
+4. **`tostring` is exact (JSON) and costs like a conversion** — do not call it
+   per message in a hot path just to log a count.
+5. **Iterating a wide root with `pairs` is O(width) with child-view creation**;
+   prefer reading known fields, or `materialize()` once if the handler really
+   needs a table.

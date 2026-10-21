@@ -1,7 +1,8 @@
--- Path indexing cost in Lua, and the lazy message view prototype:
+-- Path indexing cost in Lua, and the engine's lazy message view:
 --   * direct table indexing vs get()/filter()/wrap() path helpers, by depth
---   * eager QVariant -> Lua conversion of a whole message vs creating a lazy
---     view and reading one leaf through it (the pattern lazy indexing targets)
+--   * a real worker notification (lazy view) against an eager QVariant -> Lua
+--     conversion of the same message, then reading, iterating, serializing and
+--     forwarding it
 --
 -- Timed bodies rotate over a small pool of inputs and write BENCH_SINK so the
 -- LuaJIT build cannot hoist or eliminate the measured work.
@@ -86,8 +87,9 @@ return function(env)
         return
     end
 
-    print("\n[lazy view: eager conversion vs lazy leaf read]")
+    print("\n[lazy view: engine lazy notifications]")
     local lazy_section = "lazy view"
+    local sink = Bench {name = "bench_index_sink"}
     local cases = {
         {depth = 1, width = 1},
         {depth = 2, width = 1},
@@ -106,54 +108,74 @@ return function(env)
         local nodes = B.tree_nodes(d, width)
         local label = string.format("depth=%d width=%d nodes=%d", d, width, nodes)
         bench:Prepare(d, width)
+        local eager = bench:DeepCached()
 
-        local eager = pool(function()
-            return bench:DeepCached()
+        local view
+        local cancel_capture = pipe(bench, function(m)
+            view = m
         end)
-        local lazy = pool(function()
-            return bench:LazyView()
-        end)
-        local lazy_cached = pool(function()
-            return bench:LazyViewCached()
-        end)
-        B.bench(lazy_section, "eager convert, no read       " .. label,
+        bench:EchoCached()
+        cancel_capture()
+
+        B.bench(lazy_section, "eager convert, no read      " .. label,
             function()
                 BENCH_SINK = bench:DeepCached()
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "lazy view, no read           " .. label,
+        local cancel_none = pipe(bench, function()
+        end)
+        B.bench(lazy_section, "lazy notify, no read        " .. label,
             function()
-                BENCH_SINK = bench:LazyView()
+                bench:EchoCached()
             end, {meta = {nodes = nodes}})
+        cancel_none()
 
-        B.bench(lazy_section, "eager convert + read leaf    " .. label,
-            function(i)
+        local cancel_read = pipe(bench, function(m)
+            BENCH_SINK = read_lazy(m, d)
+        end)
+        B.bench(lazy_section, "lazy notify + read leaf     " .. label,
+            function()
+                bench:EchoCached()
+            end, {meta = {nodes = nodes}})
+        cancel_read()
+
+        B.bench(lazy_section, "eager convert + read leaf   " .. label,
+            function()
                 BENCH_SINK = read_eager(bench:DeepCached(), d)
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "lazy view + read leaf        " .. label,
-            function(i)
-                BENCH_SINK = read_lazy(bench:LazyView(), d)
+        B.bench(lazy_section, "read leaf (view, no notify) " .. label,
+            function()
+                BENCH_SINK = read_lazy(view, d)
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "read leaf (prebuilt eager)   " .. label,
-            function(i)
-                BENCH_SINK = read_eager(pick(eager, i), d)
+        B.bench(lazy_section, "tostring (JSON, eager)      " .. label,
+            function()
+                BENCH_SINK = tostring(view)
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "read leaf (prebuilt lazy)    " .. label,
-            function(i)
-                BENCH_SINK = read_lazy(pick(lazy, i), d)
+        B.bench(lazy_section, "pairs over root             " .. label,
+            function()
+                local n = 0
+                for _, _ in pairs(view) do
+                    n = n + 1
+                end
+                BENCH_SINK = n
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "read leaf (prebuilt cached)  " .. label,
-            function(i)
-                BENCH_SINK = read_lazy(pick(lazy_cached, i), d)
+        B.bench(lazy_section, "forward view to worker      " .. label,
+            function()
+                sink(view)
             end, {meta = {nodes = nodes}})
 
-        B.bench(lazy_section, "materialize via proxy        " .. label,
-            function(i)
-                BENCH_SINK = pick(lazy, i):materialize()
+        B.bench(lazy_section, "forward eager table         " .. label,
+            function()
+                sink(eager)
+            end, {meta = {nodes = nodes}})
+
+        B.bench(lazy_section, "materialize (caches subtree)" .. label,
+            function()
+                BENCH_SINK = view:materialize()
             end, {meta = {nodes = nodes}})
     end
 end

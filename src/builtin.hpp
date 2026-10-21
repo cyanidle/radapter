@@ -175,6 +175,10 @@ bool isExitMarker(lua_State* L, int idx);
 void pushExitMarker(lua_State* L);
 void pushBytes(lua_State* L, QByteArray bytes);
 QByteArray* testBytes(lua_State* L, int idx);
+/// Human readable binary leaves for logs and JSON-ish output.
+QVariant reprBinaries(QVariant v);
+/// The `sep` argument of get()/set() (default ':'), validated.
+string_view Sep(lua_State* L, int idx, int argNum, const char* fname);
 }
 
 // Use this instead of glua::protect for every Lua-facing registration: a ForcedShutdown

@@ -11,6 +11,8 @@
 #include <QTemporaryFile>
 #include "QPointer"
 #include "builtin.hpp"
+#include "lazy.hpp"
+#include "radapter/lazy.hpp"
 #include "glua/glua.hpp"
 #include <QMetaObject>
 #include <QPluginLoader>
@@ -82,7 +84,7 @@ static string bytesRepr(QByteArray const& b) {
     return res;
 }
 
-static QVariant reprBinaries(QVariant v) {
+QVariant builtin::help::reprBinaries(QVariant v) {
     switch (v.metaType().id()) {
     case QMetaType::QByteArray:
         return QString::fromStdString(bytesRepr(v.toByteArray()));
@@ -311,7 +313,7 @@ int builtin::api::Format(lua_State* L) {
         case LUA_TTABLE: {
             lua_pushvalue(L, idx);
             auto var = builtin::help::toQVar(L);
-            auto j = QJsonDocument::fromVariant(reprBinaries(std::move(var)));
+            auto j = QJsonDocument::fromVariant(help::reprBinaries(std::move(var)));
             lua_pop(L, 1);
             args.push_back(j.toJson().toStdString());
             break;
@@ -352,16 +354,12 @@ static void pushPart(lua_State* L, string_view part) {
 
 // get(table, "deep:nested:key", sep = ':') -> nil/value
 int builtin::api::Get(lua_State* L) {
+    if (lazy::IsLazy(L, 1)) {
+        return lazy::GetPath(L);
+    }
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TSTRING);
-    string_view sep = ":";
-    if (lua_gettop(L) > 2 && lua_type(L, 3) != LUA_TNIL) {
-        luaL_checktype(L, 3, LUA_TSTRING);
-        sep = builtin::help::toSV(L, 3);
-        if (sep.empty()) {
-            luaL_error(L, "empty 'sep' parameter #3 passed to get()");
-        }
-    }
+    auto sep = builtin::help::Sep(L, 3, 3, "get");
 
     lua_pushvalue(L, 1);
     auto k = builtin::help::toSV(L, 2);
@@ -390,17 +388,13 @@ int builtin::api::Get(lua_State* L) {
 
 // get(table, "deep:nested:key", val, sep = ':') -> table
 int builtin::api::Set(lua_State* L) {
+    if (lazy::IsLazy(L, 1)) {
+        lazy::MaterializeInPlace(L, 1);
+    }
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TSTRING);
     luaL_checkany(L, 3);
-    string_view sep = ":";
-    if (lua_gettop(L) > 3 && lua_type(L, 4) != LUA_TNIL) {
-        luaL_checktype(L, 4, LUA_TSTRING);
-        sep = help::toSV(L, 4);
-        if (sep.empty()) {
-            luaL_error(L, "empty 'sep' parameter #4 passed to set()");
-        }
-    }
+    auto sep = help::Sep(L, 4, 4, "set");
 
     lua_pushvalue(L, 1);
     auto k = help::toSV(L, 2);
@@ -736,7 +730,9 @@ void glua::Push(lua_State* L, QVariant const& val) {
         break;
     }
     default:
-        if (auto f = val.value<LuaFunction>()) {
+        if (val.metaType().id() == qMetaTypeId<LazyNode>()) {
+            lazy::Push(L, val.value<LazyNode>().value);
+        } else if (auto f = val.value<LuaFunction>()) {
             f.Push(L);
         } else if (auto cf = val.value<ExtraFunctionPtr>()) {
             glua::Push(L, ExtraHelper{std::move(cf)});
@@ -750,6 +746,18 @@ void glua::Push(lua_State* L, QVariant const& val) {
         }
         break;
     }
+}
+
+string_view builtin::help::Sep(lua_State* L, int idx, int argNum, const char* fname) {
+    if (idx > lua_gettop(L) || lua_type(L, idx) == LUA_TNIL) {
+        return ":";
+    }
+    luaL_checktype(L, idx, LUA_TSTRING);
+    auto sep = toSV(L, idx);
+    if (sep.empty()) {
+        luaL_error(L, "empty 'sep' parameter #%d passed to %s()", argNum, fname);
+    }
+    return sep;
 }
 
 QVariant builtin::help::toStrOrBinary(lua_State* L, int idx) {
@@ -855,6 +863,10 @@ QVariant builtin::help::toQVar(lua_State* L, int idx) {
         return QVariant::fromValue(LuaFunction(L, idx));
     }
     case LUA_TUSERDATA: {
+        QVariant retained;
+        if (lazy::ToQVariant(L, idx, retained)) {
+            return retained;
+        }
         if (auto b = testBytes(L, idx)) {
             return *b;
         }

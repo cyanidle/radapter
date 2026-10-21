@@ -13,6 +13,7 @@
 #include "fmt/compile.h"
 #include "glua/glua.hpp"
 #include "instance_impl.hpp"
+#include "lazy.hpp"
 #include "pretty.hpp"
 
 static void init_qrc() {
@@ -147,6 +148,7 @@ Instance::Instance(QObject *parent) :
     });
 
     luaL_openlibs(L);
+    lazy::Init(L);
 
     lua_pushlightuserdata(L, instKey);
     lua_pushlightuserdata(L, this);
