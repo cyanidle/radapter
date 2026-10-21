@@ -263,6 +263,15 @@ if (NOT RADAPTER_SDK_ONLY)
     create_radapter_plugin(radapter_test_plugin
         FILES plugins/test.cpp
     )
+
+    create_radapter_plugin(radapter_bench_plugin
+        FILES bench/bench_plugin.cpp
+    )
+
+    add_custom_target(bench
+        COMMAND $<TARGET_FILE:radapter> ${CMAKE_CURRENT_SOURCE_DIR}/bench/run_all.lua
+        DEPENDS radapter radapter_bench_plugin
+        USES_TERMINAL)
 endif()
 
 if (RADAPTER_ROS2)

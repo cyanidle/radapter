@@ -1,0 +1,187 @@
+
+[pipeline: pure Lua dispatch]
+
+[conversion: C++ <-> Lua message trees]
+
+[pipeline across C++ workers]
+
+[indexing: Lua path access]
+
+[lazy view: eager conversion vs lazy leaf read]
+
+================================================================================================
+
+[pipeline (Lua)]
+  stamp chain depth=1 hops=1                                 0.9 ns
+  stamp chain depth=1 hops=3                               196.0 ns
+  stamp chain depth=1 hops=5                               568.2 ns
+  stamp chain depth=2 hops=1                               176.1 ns
+  stamp chain depth=2 hops=3                               371.5 ns
+  stamp chain depth=2 hops=5                               547.8 ns
+  stamp chain depth=4 hops=1                               174.1 ns
+  stamp chain depth=4 hops=3                               391.8 ns
+  stamp chain depth=4 hops=5                               580.7 ns
+  stamp chain depth=8 hops=1                               182.3 ns
+  stamp chain depth=8 hops=3                               380.9 ns
+  stamp chain depth=8 hops=5                               555.8 ns
+  unwrap/wrap hop depth=1                                  577.5 ns
+  wrap only depth=1                                        263.8 ns
+  unwrap only depth=1                                      197.2 ns
+  unwrap/wrap hop depth=4                                  630.6 ns
+  wrap only depth=4                                        263.6 ns
+  unwrap only depth=4                                      204.8 ns
+  filter() path depth=1                                    278.7 ns
+  filter() path depth=2                                    424.4 ns
+  filter() path depth=4                                    731.7 ns
+  filter() path depth=8                                     1.29 us
+
+[conversion (C++<->Lua)]
+  extra-method call floor (Noop)                           364.3 ns
+  Lua table -> QVariant   depth=1 width=1 nodes=2           1.44 us
+  QVariant -> Lua table   depth=1 width=1 nodes=2           1.04 us
+  roundtrip (both ways)   depth=1 width=1 nodes=2           2.08 us
+  Lua table -> QVariant   depth=2 width=1 nodes=3           2.01 us
+  QVariant -> Lua table   depth=2 width=1 nodes=3           1.48 us
+  roundtrip (both ways)   depth=2 width=1 nodes=3           3.09 us
+  Lua table -> QVariant   depth=3 width=1 nodes=4           2.61 us
+  QVariant -> Lua table   depth=3 width=1 nodes=4           1.91 us
+  roundtrip (both ways)   depth=3 width=1 nodes=4           4.24 us
+  Lua table -> QVariant   depth=4 width=1 nodes=5           3.15 us
+  QVariant -> Lua table   depth=4 width=1 nodes=5           2.46 us
+  roundtrip (both ways)   depth=4 width=1 nodes=5           5.26 us
+  Lua table -> QVariant   depth=6 width=1 nodes=7           4.07 us
+  QVariant -> Lua table   depth=6 width=1 nodes=7           3.37 us
+  roundtrip (both ways)   depth=6 width=1 nodes=7           7.37 us
+  Lua table -> QVariant   depth=1 width=8 nodes=16          7.38 us
+  QVariant -> Lua table   depth=1 width=8 nodes=16          3.09 us
+  roundtrip (both ways)   depth=1 width=8 nodes=16          9.84 us
+  Lua table -> QVariant   depth=2 width=8 nodes=24         12.32 us
+  QVariant -> Lua table   depth=2 width=8 nodes=24          5.16 us
+  roundtrip (both ways)   depth=2 width=8 nodes=24         17.31 us
+  Lua table -> QVariant   depth=1 width=64 nodes=128       62.27 us
+  QVariant -> Lua table   depth=1 width=64 nodes=128       18.44 us
+  roundtrip (both ways)   depth=1 width=64 nodes=128       81.07 us
+  Lua table -> QVariant   depth=2 width=32 nodes=96        54.50 us
+  QVariant -> Lua table   depth=2 width=32 nodes=96        17.64 us
+  roundtrip (both ways)   depth=2 width=32 nodes=96        74.56 us
+  Lua table -> QVariant   depth=3 width=16 nodes=64        37.97 us
+  QVariant -> Lua table   depth=3 width=16 nodes=64        13.56 us
+  roundtrip (both ways)   depth=3 width=16 nodes=64        51.00 us
+  worker echo (notify + convert) depth=2 width=4           11.22 us
+  forward 1 hop (convert both ways)                        17.76 us
+  forward 2 hops (convert both ways twice)                 23.29 us
+
+[pipeline (C++ hops)]
+  depth=1 hops=1                                            4.01 us
+  depth=1 hops=2                                            7.90 us
+  depth=1 hops=3                                           12.24 us
+  depth=2 hops=1                                            5.18 us
+  depth=2 hops=2                                           10.10 us
+  depth=2 hops=3                                           15.69 us
+  depth=4 hops=1                                            7.35 us
+  depth=4 hops=2                                           14.55 us
+  depth=4 hops=3                                           22.04 us
+  depth=8 hops=1                                           11.43 us
+  depth=8 hops=2                                           22.28 us
+  depth=8 hops=3                                           34.42 us
+
+[indexing (Lua)]
+  direct index depth=1                                      13.4 ns
+  get() path depth=1                                       157.3 ns
+  filter() path depth=1                                    273.1 ns
+  direct index depth=2                                      11.5 ns
+  get() path depth=2                                       206.0 ns
+  filter() path depth=2                                    412.7 ns
+  direct index depth=4                                      21.7 ns
+  get() path depth=4                                       279.6 ns
+  filter() path depth=4                                    727.3 ns
+  direct index depth=8                                      32.2 ns
+  get() path depth=8                                       425.0 ns
+  filter() path depth=8                                     1.29 us
+  wrap('payload') depth=4                                  261.0 ns
+  unwrap('payload') depth=4                                203.4 ns
+
+[lazy view]
+  eager convert, no read       depth=1 width=1 nodes=2      1.01 us
+  lazy view, no read           depth=1 width=1 nodes=2     606.2 ns
+  eager convert + read leaf    depth=1 width=1 nodes=2      1.03 us
+  lazy view + read leaf        depth=1 width=1 nodes=2      1.13 us
+  read leaf (prebuilt eager)   depth=1 width=1 nodes=2      19.7 ns
+  read leaf (prebuilt lazy)    depth=1 width=1 nodes=2     466.6 ns
+  read leaf (prebuilt cached)  depth=1 width=1 nodes=2     108.5 ns
+  materialize via proxy        depth=1 width=1 nodes=2     390.7 ns
+  eager convert, no read       depth=2 width=1 nodes=3      1.51 us
+  lazy view, no read           depth=2 width=1 nodes=3     592.9 ns
+  eager convert + read leaf    depth=2 width=1 nodes=3      1.48 us
+  lazy view + read leaf        depth=2 width=1 nodes=3      1.52 us
+  read leaf (prebuilt eager)   depth=2 width=1 nodes=3      22.0 ns
+  read leaf (prebuilt lazy)    depth=2 width=1 nodes=3     819.1 ns
+  read leaf (prebuilt cached)  depth=2 width=1 nodes=3     144.3 ns
+  materialize via proxy        depth=2 width=1 nodes=3     576.6 ns
+  eager convert, no read       depth=3 width=1 nodes=4      2.00 us
+  lazy view, no read           depth=3 width=1 nodes=4     591.9 ns
+  eager convert + read leaf    depth=3 width=1 nodes=4      1.99 us
+  lazy view + read leaf        depth=3 width=1 nodes=4      1.95 us
+  read leaf (prebuilt eager)   depth=3 width=1 nodes=4      27.9 ns
+  read leaf (prebuilt lazy)    depth=3 width=1 nodes=4      1.14 us
+  read leaf (prebuilt cached)  depth=3 width=1 nodes=4     183.7 ns
+  materialize via proxy        depth=3 width=1 nodes=4     788.9 ns
+  eager convert, no read       depth=4 width=1 nodes=5      2.45 us
+  lazy view, no read           depth=4 width=1 nodes=5     607.2 ns
+  eager convert + read leaf    depth=4 width=1 nodes=5      2.50 us
+  lazy view + read leaf        depth=4 width=1 nodes=5      2.24 us
+  read leaf (prebuilt eager)   depth=4 width=1 nodes=5      28.8 ns
+  read leaf (prebuilt lazy)    depth=4 width=1 nodes=5      1.53 us
+  read leaf (prebuilt cached)  depth=4 width=1 nodes=5     238.8 ns
+  materialize via proxy        depth=4 width=1 nodes=5      1.00 us
+  eager convert, no read       depth=6 width=1 nodes=7      3.34 us
+  lazy view, no read           depth=6 width=1 nodes=7     601.5 ns
+  eager convert + read leaf    depth=6 width=1 nodes=7      3.44 us
+  lazy view + read leaf        depth=6 width=1 nodes=7      2.99 us
+  read leaf (prebuilt eager)   depth=6 width=1 nodes=7      33.1 ns
+  read leaf (prebuilt lazy)    depth=6 width=1 nodes=7      2.16 us
+  read leaf (prebuilt cached)  depth=6 width=1 nodes=7     324.4 ns
+  materialize via proxy        depth=6 width=1 nodes=7      1.37 us
+  eager convert, no read       depth=1 width=8 nodes=16      3.10 us
+  lazy view, no read           depth=1 width=8 nodes=16     603.6 ns
+  eager convert + read leaf    depth=1 width=8 nodes=16      3.18 us
+  lazy view + read leaf        depth=1 width=8 nodes=16      1.29 us
+  read leaf (prebuilt eager)   depth=1 width=8 nodes=16      23.7 ns
+  read leaf (prebuilt lazy)    depth=1 width=8 nodes=16     548.6 ns
+  read leaf (prebuilt cached)  depth=1 width=8 nodes=16     104.6 ns
+  materialize via proxy        depth=1 width=8 nodes=16      1.38 us
+  eager convert, no read       depth=2 width=8 nodes=24      5.12 us
+  lazy view, no read           depth=2 width=8 nodes=24     614.5 ns
+  eager convert + read leaf    depth=2 width=8 nodes=24      5.30 us
+  lazy view + read leaf        depth=2 width=8 nodes=24      1.66 us
+  read leaf (prebuilt eager)   depth=2 width=8 nodes=24      24.2 ns
+  read leaf (prebuilt lazy)    depth=2 width=8 nodes=24     951.7 ns
+  read leaf (prebuilt cached)  depth=2 width=8 nodes=24     141.0 ns
+  materialize via proxy        depth=2 width=8 nodes=24      2.25 us
+  eager convert, no read       depth=1 width=64 nodes=128     18.02 us
+  lazy view, no read           depth=1 width=64 nodes=128     587.3 ns
+  eager convert + read leaf    depth=1 width=64 nodes=128     18.64 us
+  lazy view + read leaf        depth=1 width=64 nodes=128      1.30 us
+  read leaf (prebuilt eager)   depth=1 width=64 nodes=128      22.3 ns
+  read leaf (prebuilt lazy)    depth=1 width=64 nodes=128     602.4 ns
+  read leaf (prebuilt cached)  depth=1 width=64 nodes=128     100.6 ns
+  materialize via proxy        depth=1 width=64 nodes=128      9.23 us
+  eager convert, no read       depth=2 width=32 nodes=96     17.55 us
+  lazy view, no read           depth=2 width=32 nodes=96     616.0 ns
+  eager convert + read leaf    depth=2 width=32 nodes=96     18.00 us
+  lazy view + read leaf        depth=2 width=32 nodes=96      1.81 us
+  read leaf (prebuilt eager)   depth=2 width=32 nodes=96      24.0 ns
+  read leaf (prebuilt lazy)    depth=2 width=32 nodes=96      1.03 us
+  read leaf (prebuilt cached)  depth=2 width=32 nodes=96     142.6 ns
+  materialize via proxy        depth=2 width=32 nodes=96      8.44 us
+  eager convert, no read       depth=3 width=16 nodes=64     13.72 us
+  lazy view, no read           depth=3 width=16 nodes=64     599.5 ns
+  eager convert + read leaf    depth=3 width=16 nodes=64     13.63 us
+  lazy view + read leaf        depth=3 width=16 nodes=64      2.24 us
+  read leaf (prebuilt eager)   depth=3 width=16 nodes=64      27.9 ns
+  read leaf (prebuilt lazy)    depth=3 width=16 nodes=64      1.51 us
+  read leaf (prebuilt cached)  depth=3 width=16 nodes=64     196.3 ns
+  materialize via proxy        depth=3 width=16 nodes=64      6.24 us
+
+================================================================================================
+total CPU time: 113.15 s

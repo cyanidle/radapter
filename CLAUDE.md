@@ -98,6 +98,20 @@ do not add new flags to the pre-scan loop.
 The `--gui*` flags exist in every build (so scripts can pass them unconditionally); a
 headless build rejects them right after `parse_args` with an error instead of starting.
 
+### Benchmarks
+
+Performance benchmarks live under `bench/` (self-contained Lua scripts):
+
+```bash
+build/bin/radapter bench/run_all.lua          # PUC Lua build (reference numbers)
+cmake --build build --target bench            # same, via the bench target
+```
+
+`bench/README.md` documents the methodology and the `Bench` plugin worker
+(`bench/bench_plugin.cpp`, built next to the executable). Reference numbers and
+derived per-node costs are in `bench/RESULTS.md`; `bench/LAZY_INDEXING.md` is
+the lazy message-view proposal those numbers justify.
+
 ### Tests
 
 There is no unit-test framework. Self-checking scripts live under `tests/`; runnable

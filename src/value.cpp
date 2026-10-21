@@ -127,7 +127,7 @@ LuaUserData LuaUserData::initDone(lua_State* L, const char *tname, Dtor dtor)
         lua_pushcclosure(L, wrapDtor, 1);
         lua_setfield(L, -2, "__gc");
     }
-    lua_setmetatable(L, -1);
+    lua_setmetatable(L, -2);
     auto res = LuaUserData{L, -1};
     lua_pop(L, 1);
     return res;
