@@ -44,7 +44,8 @@ pipe(worker, function(msg)          -- msg is a LazyNode
     for k, v in pairs(msg) do end   -- O(1) per step, values are views/scalars
     tostring(msg)                   -- exact JSON of the whole message
     get(msg, "a:b")                 -- walks the QVariant, no materialization
-    msg:materialize()               -- plain Lua table, cached on the view
+    msg.a.b = 1                     -- write: the message becomes a table
+    msg:materialize()               -- plain Lua table of the message
     other_worker(msg)               -- forwarding: the retained tree, zero copy
 end)
 ```
@@ -60,22 +61,20 @@ end)
    keeps it, and a Lua table per node would cost memory in every message. Repeated
    access is cheap enough at ~0.6 µs/level (PUC); a handler that reads the same
    subtree repeatedly calls `materialize()` once.
-3. **Copy-on-write (`__newindex`).** A view is only the immutable source of
-   truth. The first write to a **message view** converts its whole subtree into
-   plain Lua tables (one deep conversion, exactly what `materialize()` returns),
-   stores them in the userdata (user value on 5.4, environment on LuaJIT/5.1) and
-   all metamethods prefer them afterwards — `msg.pong = 2` works
-   and every later read, `pairs`, `tostring` and forward sees it. A view produced
-   by *indexing* (`msg.nested`, a `get()` result, a `pairs` value) is a derived
-   temporary that cannot propagate an assignment to the message, so it is
-   **read-only**: `msg.nested.flag = 1` raises *"nested lazy views are read-only:
-   materialize() one and edit the returned table, or set() the field on the
-   message"*. That holds even after the derived view was materialized — the table
-   `x:materialize()` returns is an ordinary table and is what you edit. After
-   `msg:materialize()` (or a write to the message itself) the nested values *are*
-   plain tables, so nested assignment works normally.
+3. **Copy-on-write of the whole message (`__newindex`).** The views of one
+   message share an owner: the retained `QVariant` plus, once anything writes
+   through *any* of them, the plain Lua table the whole message became (one deep
+   conversion — exactly what the old eager delivery paid). A write materializes
+   that table and sets the key at the view's own place in it, so
+   `msg.nested.flag = 1` lands in the message, the way it did when a message
+   arrived as a plain table, and every other view of the message sees it. Once
+   the message is a table, reads through any view resolve into it, so
+   `msg.nested` is then a plain table and no child views are created any more.
+   A view's place is the chain of keys it was indexed with, kept in its user
+   values (1 = the view it came from, 2 = the key it was indexed with); LuaJIT
+   keeps the same two in the userdata environment.
 4. **`__len`** is the retained list's length (`0` for maps, as in Lua) — or the
-   length of the materialized table once the view was written to.
+   length of the message's table once it was written to.
 5. **`pairs` / `ipairs`** iterate the retained `QVariant` with an engine iterator
    (`next()`-style, O(1) per step), yielding scalars and child views. IPC maps are
    `QVariantMap`, i.e. key-sorted; `ipairs` over a map is empty, as usual. Lua 5.4
@@ -83,7 +82,9 @@ end)
    `__index`. Lua 5.1/LuaJIT honours neither metamethod, so there `Instance`
    wraps the `pairs`/`ipairs` globals: a view gets the engine iterator, every
    other value is delegated to the original function (the `#ifdef RADAPTER_JIT`
-   branch; 5.4 keeps the stock globals).
+   branch; 5.4 keeps the stock globals). Once the message is a table (after any
+   write, including one made inside the loop) iteration hands over to
+   `next`/`ipairs` on it.
 6. **`__tostring`** serializes the whole message as compact JSON (binary leaves
    as their `reprBinaries` form) — exact output, not a preview. It costs about
    as much as a conversion, so it belongs in logging, not in a hot loop.
@@ -91,19 +92,26 @@ end)
    after a write). Forwarding a received message to another worker is therefore
    zero-copy: no Lua table is built and none is walked.
 8. **`get(view, path)`** walks the `QVariant` directly, returning a child view or
-   a scalar (so `get(msg, "payload")` is still cheap). `set(view, path, value)`
-   materializes the view **in place** — the view's own copy becomes a plain
-   table, the assignment lands in it, and the returned table *is* that copy — so
-   `set(msg, "a:b", 1)` is visible to later `msg.a.b` reads and to a forwarded
-   `msg`, exactly like `set(table, …)` on a table you own. It obeys the write
-   rule of rule 3: `set` on a derived view raises instead of writing a temporary.
+   a scalar (so `get(msg, "payload")` is still cheap); `get(view, "")` is the view
+   itself, the way `get(table, "")` is the table. `set(view, path, value)` puts the
+   message's own table at the view's place and assigns into it, so
+   `set(msg, "a:b", 1)` and `set(msg.a, "b", 1)` are visible to later `msg.a.b`
+   reads and to a forwarded `msg`, exactly like `set(table, …)` on a table you
+   own — and the returned table *is* the message's. `x:materialize()` on any view
+   returns the message's own table at that path (writing into it writes the
+   message), or the whole message table for the message view.
 9. **`json_encode`** goes through `toQVar`, so it serializes the retained tree
    without building a Lua table. `fmt`/`log` interpolate a view through
    `__tostring`, i.e. as its JSON.
-10. Lifetime: the userdata owns one `QVariant` copy (implicitly shared with the
-    signal argument) and releases it in `__gc`. Child views share the same tree;
-    nothing is copied until `materialize`/a write, and nothing is materialized
-    merely by reading (a read of a pristine view allocates no Lua table).
+10. Lifetime: the message root's userdata owns the message (the retained tree,
+    embedded, and the materialized table in its third user value) and destroys
+    the tree in `__gc`; a derived view keeps the view it came from in its first
+    user value, so a live view holds its whole chain up to the root. Nothing is
+    copied until `materialize`/a write, and nothing is materialized merely by
+    reading (a read of a pristine view allocates no Lua table). The table is a
+    user value rather than a registry reference on purpose: a message that holds
+    a view of itself (`msg.self = msg`) is then one collectable cycle, not a
+    table pinned for the lifetime of the Lua state.
 11. **Tag events** reach their listeners the same way (`tags.changed` and
     `tags.changed["name"]`), so the same rules apply to `ev.name`, `ev.value`,
     `ev.quality` and `ev.ts`.
@@ -113,17 +121,17 @@ end)
 An earlier proposal (option A) suggested teaching `pipe(a, b)` to connect two
 workers without a Lua closure. It is not implemented and is **not needed**: the
 pipe stays pure Lua, and the zero-copy `toQVar` already makes a forwarded hop
-cost the Lua call plus a reference copy (~315 ns vs up to 71 µs, `RESULTS.md`
+cost the Lua call plus a reference copy (~305 ns vs up to 71 µs, `RESULTS.md`
 §5). Adding a second, parallel way to connect workers would duplicate the
 semantics `pipe`/`on`/`unpack` already provide.
 
 ## Portability
 
 - Lua 5.4: `lua_newuserdatauv` + `lua_getiuservalue`/`lua_setiuservalue`,
-  `lua_rawlen`; LuaJIT/5.1: `lua_newuserdata` + `lua_getfenv`/`lua_setfenv`,
+  `luaL_len`; LuaJIT/5.1: `lua_newuserdata` + `lua_getfenv`/`lua_setfenv`,
   `lua_objlen`. Both paths live behind `RADAPTER_JIT` in `src/lazy.cpp`.
-- A fresh LuaJIT userdata inherits the globals as its environment, so
-  `PushNode` installs an empty table there before the view can be written to.
+- A fresh LuaJIT userdata inherits the globals as its environment, so every view
+  gets its own environment table (holding the parent view and the key).
 - `compat::lua_absindex` covers the missing 5.1 `lua_absindex`.
 
 ## Compatibility and risks
@@ -135,22 +143,25 @@ semantics `pipe`/`on`/`unpack` already provide.
 - **Equality** is identity (no `__eq`): a view is never structurally equal to a
   table. Compare materialized values.
 - **Iterating a wide root with `pairs` is O(width)** and creates a view per
-  value (40.1 µs for 64 keys; `RESULTS.md` §5). Reading known fields is O(1).
+  value (43 µs for 64 keys; `RESULTS.md` §5). Reading known fields is O(1).
 - **`tostring` is a full serialization** — cheap to call once, expensive per
   message in a hot path.
-- **Writing to a message view materializes its whole subtree**, so a mutation loop over
-  a big message converts it; from then on the view *is* that plain table and the
-  retained tree is no longer shared. **Derived views are read-only** (rule 3),
-  even after their own `materialize()`: edit the message (`set(msg, "path", v)`)
-  or the table `x:materialize()` returns.
-- **`set(view, path, value)` mutates the view's copy**; the retained tree of the
-  sender is never modified, so a handler that edits and forwards sends a fresh
-  tree. On a derived (child) view it raises, like `__newindex`.
-- **`get(view, "")` returns a derived view**, where `get(table, "")` returns the
-  table itself — use the message view directly if you want to write to it.
-- **A child view captured before a write keeps the old data**: the retained tree
-  is immutable, so `local sub = msg.nested; msg.x = 1` leaves `sub` reading the
-  message as it arrived — re-read it from the message (`msg.nested`).
+- **The first write to any view converts the whole message** (one deep
+  conversion — the cost the eager delivery used to pay at every hop, now paid at
+  most once, and only by handlers that mutate). From then on every view resolves
+  into that table, so reads are plain-table speed.
+- **`set`/`materialize` hand out the message's own table**, never a detached copy;
+  the retained tree of the sender is still never modified, so a handler that edits
+  and forwards sends a fresh tree.
+- **A view whose path no longer holds a container raises** (`attempt to index a
+  nil value`): after `local sub = msg.a; msg.a = 5`, `sub.b` fails instead of
+  reading a detached old value. Re-read from the message.
+- **Storing a view inside a message stores a view**: `msg.copy = msg.a` keeps the
+  userdata, so converting the message serializes the view's content while the
+  entry stays a view (and `msg.self = msg` is the cycle below). Such a message
+  stays collectable — the table lives in the root's user value, not in the
+  registry (a 200-field message written with `msg.self = msg` 2000 times grows
+  RSS exactly like a scalar write).
 - **Table-only code needs `materialize()`.** A subtree taken off a message is a
   view, so anything that asserts `type(x) == "table"`, uses `table.*`, or walks
   the tree with its own helpers must be handed `x:materialize()`. `projects/scada`
@@ -170,14 +181,15 @@ semantics `pipe`/`on`/`unpack` already provide.
 - `tests/lazy.lua` (registered in ctest) exercises field access, nested views,
   list indexing, `#`, `pairs`/`ipairs` (on a pristine view **and** after
   `materialize()` and after a write), JSON `tostring`, `json_encode`, `get`
-  (including list path segments and misses), `materialize` (cached, same table),
-  a root write (visible to reads, `pairs`, `tostring`, `#` and the forwarded
-  copy), the nested-write error (also after the child view itself was materialized),
-  a self-referential view (`tostring`/`json_encode`/forwarding raise, the message
-  stays readable), `set` (in-place, visible to the view; rejected on a child view),
-  `wrap`/`unwrap`, forwarding a view to a worker that sends it back,
-  and a message whose **root is a list** (`#`, indices, `ipairs`, `pairs`, `get`,
-  `tostring`, forwarding).
+  (including list path segments, misses, and `get(view, "")`), `materialize`
+  (cached, same table, the message's own tables), writes through a nested view
+  and two levels down (visible to later reads, to views captured before the
+  write, to `pairs` including a write made inside the loop, to `tostring` and to
+  the forwarded copy), `set` on the message and on a nested view, a
+  self-referential view (`tostring`/`json_encode`/forwarding raise, the message
+  stays readable), `wrap`/`unwrap`, forwarding a view to a worker that sends it
+  back, and a message whose **root is a list** (`#`, indices, `ipairs`, `pairs`,
+  `get`, `tostring`, forwarding).
 - `tests/scada_runner.lua` spawns `projects/scada/scada.lua run-stdin` and
   asserts it builds the config it receives (the table-only-code path above).
 - Full `ctest` passes in both `build` (PUC 5.4) and `build-jit` (LuaJIT), 18/18,
@@ -198,8 +210,8 @@ From `RESULTS.md`, PUC Lua 5.4:
 | 1 worker hop, depth 8 | 15.0 µs | 11.2 µs | 1.3x |
 | marginal hop, depth 1 -> 8 | 6.4 -> 15.7 µs | 4.9 -> 4.7 µs | flat |
 | 3 hops, depth 8 | 46 µs | 20.5 µs | 2.2x |
-| forward one 128-node message | 71 µs | 0.31 µs | ~230x |
+| forward one 128-node message | 71 µs | 0.30 µs | ~230x |
 | notify + read one leaf, 128 nodes | ~28 µs | 5.5 µs | ~5x |
 | notify + read one leaf, 2 nodes | ~5.5 µs | 5.2 µs | parity |
 | `tostring` (JSON) of 128 nodes | — | 35.2 µs | exact, not free |
-| `pairs` over a 64-key root | — | 40.1 µs | O(width) |
+| `pairs` over a 64-key root | — | 43 µs | O(width) |

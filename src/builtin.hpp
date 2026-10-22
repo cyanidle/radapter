@@ -179,6 +179,9 @@ QByteArray* testBytes(lua_State* L, int idx);
 QVariant reprBinaries(QVariant v);
 /// The `sep` argument of get()/set() (default ':'), validated.
 string_view Sep(lua_State* L, int idx, int argNum, const char* fname);
+/// One `get()`/`set()` path segment as a Lua key: `[N]` is an integer, anything
+/// else a string. Plain tables and lazy views must agree on this.
+void PushPathPart(lua_State* L, string_view part);
 }
 
 // Use this instead of glua::protect for every Lua-facing registration: a ForcedShutdown

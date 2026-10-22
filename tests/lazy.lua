@@ -1,8 +1,8 @@
 -- Lazy message views: worker messages cross into Lua as a userdata view over the
 -- retained QVariant. Fields, pairs, ipairs, #, tostring (JSON), get, json_encode,
--- materialize, writes (copy-on-write), set and forwarding must all behave like
--- the plain table -- including after the view has been materialized, and for a
--- message whose root is a list.
+-- materialize, writes, set and forwarding must all behave like the plain Lua
+-- table a message used to be -- in particular a write through a nested view lands
+-- in the message -- and for a message whose root is a list.
 
 local os = require "os"
 
@@ -36,8 +36,8 @@ pipe(client, function(msg)
         assert(#msg.list == 2, "# on a lazy list")
 
         local keys = sorted_keys(msg)
-        assert(#keys == 3 and keys[1] == "list" and keys[2] == "n" and keys[3] == "nested",
-            "pairs keys: " .. table.concat(keys, ","))
+        assert(#keys == 4 and keys[1] == "deep" and keys[2] == "list" and keys[3] == "n"
+            and keys[4] == "nested", "pairs keys: " .. table.concat(keys, ","))
         for k, v in pairs(msg) do
             if k == "nested" then
                 assert(v.flag == true, "pairs value should be a lazy child view")
@@ -61,48 +61,82 @@ pipe(client, function(msg)
         assert(get(msg, "list:[2]") == "b", "get path with a list index")
         assert(get(msg, "nested").flag == true, "get returns a lazy child")
         assert(get(msg, "missing") == nil, "get missing path")
+        assert(rawequal(get(msg, ""), msg), "get(view, '') is the view itself")
 
-        -- A derived child view cannot propagate an assignment to the message, so
-        -- the write must fail loudly instead of vanishing -- for set() as well,
-        -- and it stays read-only after being materialized on its own.
-        local ok, err = pcall(function()
-            msg.nested.flag = false
-        end)
-        assert(not ok, "writing a nested view must raise")
-        assert(tostring(err):find("nested lazy views are read-only", 1, true),
-            "nested write error: " .. tostring(err))
-        assert(msg.nested.flag == true, "a rejected nested write changes nothing")
-        ok, err = pcall(set, msg.nested, "flag", false)
-        assert(not ok, "set on a nested view must raise")
-        assert(msg.nested.flag == true, "a rejected set changes nothing")
-
+        -- Views captured before the first write must follow the message once it
+        -- is written to: a message used to be a single plain table, so there was
+        -- never a detached copy of a subtree.
         local sub = msg.nested
-        assert(sub:materialize().flag == true, "a child view can be materialized")
-        ok, err = pcall(function()
-            sub.flag = false
-        end)
-        assert(not ok, "materializing a child view must not make it writable")
-        assert(sub.flag == true and msg.nested.flag == true, "a rejected child write changes nothing")
+        local list = msg.list
+        local via_get = get(msg, "nested")
+        local deep = msg.deep.mid
+
+        local deep_get = get(msg, "deep:mid")
+        deep_get.leaf = 3
+        assert(msg.deep.mid.leaf == 3, "write through a multi-segment get() view")
+        assert(deep.leaf == 3, "a deep view captured before the write follows it")
+        assert(type(msg.deep.mid) == "table", "a written message is plain tables")
+
+        msg.deep.mid.leaf = 2
+        assert(msg.deep.mid.leaf == 2, "write two levels down")
+
+        msg.nested.flag = false
+        assert(msg.nested.flag == false, "nested write")
+        assert(sub.flag == false, "a view captured before the write follows it")
+        assert(via_get.flag == false, "a get() view follows the write")
+        assert(get(sub, "flag") == false, "get on a view whose message was written to")
+        assert(json_decode(tostring(msg)).nested.flag == false, "nested write is serialized")
+
+        msg.list[3] = "c"
+        assert(#msg.list == 3 and msg.list[3] == "c", "write into a nested list")
+        assert(#list == 3 and list[3] == "c", "a captured list view follows the write")
+
+        -- set() on a nested view edits the message, and materialize() hands out
+        -- the message's own table instead of a copy of the subtree.
+        set(msg.nested, "flag", true)
+        assert(msg.nested.flag == true, "set on a nested view")
+        local nested_table = msg.nested
+        assert(rawequal(sub:materialize(), nested_table),
+            "materialize of a nested view returns the message's own table")
 
         local plain = msg:materialize()
         assert(type(plain) == "table" and plain.nested.flag == true and plain.list[2] == "b",
             "materialize")
         assert(rawequal(plain, msg:materialize()), "materialize is cached on the view")
-        assert(#sorted_keys(msg) == 3, "pairs after materialize")
+        assert(rawequal(plain.nested, nested_table), "materialize holds the message's own tables")
+        assert(#sorted_keys(msg) == 4, "pairs after materialize")
         assert(get(msg, "nested:flag") == true, "get after materialize")
         values = {}
         for i, v in ipairs(msg.list) do
             values[i] = v
         end
-        assert(values[2] == "b", "ipairs after materialize")
+        assert(values[2] == "b" and values[3] == "c", "ipairs after materialize")
 
-        -- A write to the message root materializes the message; it is visible to
-        -- every later read and to a forwarded copy.
+        -- Iteration switches to the message's table once a write happens inside
+        -- the loop.
+        local wrote = false
+        for k, v in pairs(msg) do
+            if not wrote then
+                msg.iter_write = true
+                wrote = true
+            end
+        end
+        assert(msg.iter_write == true, "a write during pairs")
+        assert(#sorted_keys(msg) == 5, "pairs after a write during pairs")
+
+        for k, v in pairs(msg.deep) do
+            msg.deep[k] = v
+        end
+        msg.deep.looked_at = true
+        assert(msg.deep.looked_at == true, "a write during pairs over a nested view")
+
+        -- A write to the message root itself is visible to every later read too.
         msg.added = true
         assert(msg.added == true, "root write")
-        assert(#sorted_keys(msg) == 4, "pairs after a root write")
+        assert(#sorted_keys(msg) == 6, "pairs after a root write")
         assert(#msg == 0, "# on a map message after a write")
         assert(json_decode(tostring(msg)).added == true, "root write is serialized")
+        assert(plain.added == true, "a write lands in the table materialize() returned")
 
         local changed = set(msg, "extra", 7)
         assert(type(changed) == "table" and changed.extra == 7, "set returns the view's table")
@@ -118,6 +152,9 @@ pipe(client, function(msg)
     elseif stage == 2 then
         assert(type(msg) == "userdata" and msg.nested.flag == true, "forwarded message")
         assert(msg.extra == 7 and msg.added == true, "forwarded message carries the writes")
+        assert(msg.list[3] == "c", "forwarded message carries a nested list write")
+        assert(msg.deep.mid.leaf == 2 and msg.deep.looked_at == true,
+            "forwarded message carries the deep writes")
         -- a view that refers to itself must fail the conversion, not take the process down
         msg.self = msg
         local ok, err = pcall(tostring, msg)
@@ -162,4 +199,4 @@ end)
 match_msg(client.events, function(ev)
     return ev.state == "ConnectedState"
 end):await()
-client {n = 42, nested = {flag = true}, list = {"a", "b"}}
+client {n = 42, nested = {flag = true}, list = {"a", "b"}, deep = {mid = {leaf = 1}}}

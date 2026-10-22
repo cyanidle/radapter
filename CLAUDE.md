@@ -386,11 +386,13 @@ representation used by binary protocols.
 `QVariant`, so `type(msg) == "userdata"`. Indexing converts only the addressed subtree,
 `pairs`/`ipairs`/`#` walk it, `tostring` is exact JSON, forwarding it to another worker
 returns the retained tree (zero-copy). Tag events (`tags.changed`) arrive the same way.
-Writing a message view is copy-on-write; a *derived* view (`msg.a.b = 1`, a `get()`
-result) is read-only and raises. Code that needs a real table (passing a subtree to
-`table.*` or to a function asserting `type(x) == "table"`) must call `x:materialize()`;
-`get`/`set` accept views. Semantics, costs and `set`/write rules are in
-`bench/LAZY_INDEXING.md`.
+The views of one message share its owner, so a write at any depth (`msg.a.b = 1`, a
+`get()` result) lands in the message exactly as it did when a message was a plain table:
+the first write converts the whole message into the plain Lua table every view then
+resolves into (copy-on-write, once). Code that needs a real table (passing a subtree to
+`table.*` or to a function asserting `type(x) == "table"`) must call `x:materialize()`,
+which is the message's own table at that view's place; `get`/`set` accept views.
+Semantics, costs and `set`/write rules are in `bench/LAZY_INDEXING.md`.
 
 **Pipelines are pure Lua** (`src/scripts/builtins.lua`):
 - `pipe(a, b, c)` subscribes each target to the previous one's listener list and returns

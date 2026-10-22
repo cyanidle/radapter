@@ -362,13 +362,13 @@ log = {
 
 ---A message delivered to a Lua listener is a lazy view over the QVariant tree:
 ---indexing a field converts only that subtree, `pairs`/`ipairs`/`#` iterate it
----and `tostring` serializes it as JSON. Writing a field materializes the view
----(copy-on-write); a nested view (`msg.a.b = x`) cannot take writes -- materialize
----the message first or use set(). Forwarding a view to a worker passes the
----retained tree unchanged.
+---and `tostring` serializes it as JSON. Writing a field -- `msg.a.b = x` at any
+---depth, like the plain table a message used to be -- materializes the whole
+---message once (copy-on-write) and every view of it then reads and writes that
+---table. Forwarding a view to a worker passes the retained tree unchanged.
 ---@class LazyNode<T>
 ---@overload fun(key: string|integer): any
----@field materialize fun(self: LazyNode<T>): T -- plain Lua table with the whole message
+---@field materialize fun(self: LazyNode<T>): T -- the message's own table at this view's place
 
 ---@generic T
 ---@class Events<T>

@@ -183,16 +183,16 @@ All numbers are PUC Lua 5.4, µs unless noted.
 
 | nodes | eager convert | lazy notify | lazy + read | eager + read | read leaf (view) | tostring | pairs | forward view | forward eager | materialize |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 1.45 | 4.04 | 5.18 | 1.52 | 970 ns | 1.73 | 1.07 | 314 ns | 1.29 | 332 ns |
-| 3 | 2.09 | 4.18 | 5.98 | 2.17 | 1.55 | 2.40 | 1.06 | 317 ns | 2.03 | 332 ns |
-| 4 | 2.74 | 4.07 | 6.63 | 2.85 | 2.19 | 3.03 | 1.07 | 315 ns | 2.66 | 330 ns |
-| 5 | 3.32 | 4.05 | 7.04 | 3.44 | 2.76 | 3.65 | 1.06 | 318 ns | 3.31 | 337 ns |
-| 7 | 4.86 | 4.25 | 8.53 | 4.78 | 3.98 | 5.10 | 1.11 | 316 ns | 4.79 | 331 ns |
-| 16 | 4.26 | 4.09 | 5.31 | 4.21 | 1.09 | 6.20 | 4.71 | 321 ns | 8.68 | 334 ns |
-| 24 | 6.97 | 4.02 | 6.12 | 7.10 | 1.77 | 9.57 | 4.66 | 313 ns | 15.36 | 336 ns |
-| 128 | 23.82 | 4.04 | 5.51 | 23.55 | 1.13 | 35.22 | 40.06 | 312 ns | 71.03 | 331 ns |
-| 96 | 22.50 | 4.06 | 6.07 | 22.17 | 1.84 | 31.58 | 18.63 | 311 ns | 65.23 | 333 ns |
-| 64 | 17.05 | 3.99 | 6.86 | 17.74 | 2.61 | 24.26 | 9.07 | 314 ns | 45.86 | 331 ns |
+| 2 | 1.45 | 4.09 | 5.16 | 1.55 | 916 ns | 1.70 | 1.11 | 306 ns | 1.30 | 299 ns |
+| 3 | 2.06 | 4.06 | 5.72 | 2.17 | 1.51 | 2.40 | 1.11 | 306 ns | 2.01 | 296 ns |
+| 4 | 2.68 | 4.08 | 6.36 | 2.75 | 2.12 | 3.05 | 1.11 | 305 ns | 2.69 | 299 ns |
+| 5 | 3.29 | 4.05 | 6.88 | 3.39 | 2.60 | 3.73 | 1.12 | 304 ns | 3.34 | 295 ns |
+| 7 | 4.46 | 4.01 | 8.10 | 4.58 | 3.81 | 5.12 | 1.12 | 306 ns | 4.77 | 300 ns |
+| 16 | 3.91 | 3.97 | 5.24 | 4.00 | 985 ns | 6.01 | 4.88 | 302 ns | 8.71 | 297 ns |
+| 24 | 6.51 | 4.02 | 5.97 | 6.58 | 1.65 | 9.42 | 4.83 | 305 ns | 15.36 | 295 ns |
+| 128 | 22.39 | 3.97 | 5.25 | 22.47 | 1.06 | 34.84 | 42.91 | 304 ns | 71.19 | 296 ns |
+| 96 | 21.11 | 3.98 | 5.99 | 21.46 | 1.82 | 31.90 | 20.68 | 307 ns | 65.70 | 297 ns |
+| 64 | 16.18 | 4.02 | 6.71 | 17.16 | 2.55 | 24.15 | 9.93 | 305 ns | 44.97 | 295 ns |
 
 What the table says:
 
@@ -207,21 +207,23 @@ What the table says:
 - **Walking a view is ~0.6 µs per level** (`read leaf (view)`: 0.97 µs for one
   level, 3.98 µs for six); a converted table indexes in ~0.02 µs/level. A view
   should be read a bounded number of times, or materialized once.
-- **Forwarding is the big win: ~315 ns flat**, versus 1.3 µs (2 nodes) to
+- **Forwarding is the big win: ~305 ns flat**, versus 1.3 µs (2 nodes) to
   71 µs (128 nodes) for a Lua table — up to **~230x**, and independent of shape.
   This is what the old eager pipeline paid at every hop.
 - **`tostring` serializes, it does not preview**: JSON of the whole message
   (35.2 µs at 128 nodes, more than converting it — `QJsonDocument` build plus
   the conversion). Used for logging, so it is exact.
-- **`pairs` over the root is O(width)**: 64 keys cost 40.1 µs because every
+- **`pairs` over the root is O(width)**: 64 keys cost 43 µs because every
   value becomes a child view. Iterating a wide root is the one pattern where a
   view is expensive; `ipairs` over a list, `#`, and field reads are O(1).
-- **`materialize` is free after the first call** (~330 ns: a cache lookup). The
-  first call pays the full conversion shown in the `eager convert` column; the
-  benchmark's iterations amortize it away.
+- **`materialize` is free after the first call** (~300 ns: the message's table is
+  already built). The first call pays the full conversion shown in the `eager
+  convert` column; the benchmark's iterations amortize it away. A write through
+  *any* view materializes the whole message that way once, so a mutation loop
+  pays it once and then edits plain tables.
 
 `build-jit` reproduces the same shape: notification 2.5 µs, forwarding
-**~175 ns** flat, `materialize` ~108 ns, `tostring` 35.5 µs and `pairs` 43.2 µs
+**~140 ns** flat, `materialize` ~90 ns, `tostring` ~35 µs and `pairs` ~44 µs
 at 128 nodes.
 
 ### Forwarding through real workers (`bench_conversion.lua`)
@@ -246,7 +248,7 @@ eager-pipeline tax the lazy view removes.
    at every C++ boundary that converts them.
 2. **The lazy view removes the per-hop conversion tax.** Hops are now ~4.9 µs
    flat regardless of depth (was 6.4-15.7 µs, growing with depth); forwarding a
-   view is ~315 ns instead of up to 71 µs.
+   view is ~305 ns instead of up to 71 µs.
 3. **Reading through a view costs ~0.6 µs/level**, so views pay off when a
    handler reads a small part of a wide/deep message or forwards it, and break
    even on tiny messages (both are dominated by the 4 µs notification floor).

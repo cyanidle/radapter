@@ -343,7 +343,7 @@ int builtin::api::Format(lua_State* L) {
     return 1;
 }
 
-static void pushPart(lua_State* L, string_view part) {
+void builtin::help::PushPathPart(lua_State* L, string_view part) {
     auto n = tryInt(part);
     if (n < 0) {
         lua_pushlstring(L, part.data(), part.size());
@@ -372,7 +372,7 @@ int builtin::api::Get(lua_State* L) {
         auto ptr = k.find(sep, pos);
         if (ptr) {
             string_view part = k.substr(pos, ptr - pos);
-            pushPart(L, part);
+            builtin::help::PushPathPart(L, part);
             lua_rawget(L, -2);
             if (lua_isnil(L, -1)) {
                 return 1;
@@ -407,7 +407,7 @@ int builtin::api::Set(lua_State* L) {
         auto ptr = k.find(sep, pos);
         if (ptr) {
             string_view part = k.substr(pos, ptr - pos);
-            pushPart(L, part);
+            builtin::help::PushPathPart(L, part);
             if (ptr == string_view::npos) {
                 lua_pushvalue(L, 3);
                 lua_rawset(L, -3);
@@ -419,7 +419,7 @@ int builtin::api::Set(lua_State* L) {
                 if (t != LUA_TTABLE) {
                     lua_pop(L, 1);
                     lua_newtable(L);
-                    pushPart(L, part);
+                    builtin::help::PushPathPart(L, part);
                     lua_pushvalue(L, -2);
                     lua_rawset(L, -4);
                 }
