@@ -18,19 +18,23 @@ RAD_DESCRIBE(BinaryCrc) {
 enum class BinaryProtocol
 {
 	msgpack,
+	text,
 };
 
 RAD_DESCRIBE(BinaryProtocol) {
     MEMBER("msgpack", _::msgpack);
+    MEMBER("text", _::text);
 }
 
 enum class BinaryFraming
 {
 	slip,
+	line,
 };
 
 RAD_DESCRIBE(BinaryFraming) {
     MEMBER("slip", _::slip);
+    MEMBER("line", _::line);
 }
 
 struct BinaryConfig : WorkerConfig {

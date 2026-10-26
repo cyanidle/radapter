@@ -48,6 +48,36 @@ static QVariant parseMsgpackProto(Arena& alloc, string_view frame) {
 	return res.result.Get<QVariant>();
 }
 
+// Text payloads: one frame is one UTF-8 line, delivered to Lua as a string.
+static QVariant parseTextProto(Arena&, string_view frame) {
+	return QString::fromUtf8(frame.data(), int(frame.size()));
+}
+
+static constexpr int MAX_LINE_BYTES = 4096;
+
+static QVariantList parseLineFrames(Worker* w, QByteArray& buffer, ProtoParser fromProto) {
+	QVariantList result;
+	DefaultArena alloc;
+	while (true) {
+		auto end = buffer.indexOf('\n');
+		if (end < 0) {
+			if (buffer.size() > MAX_LINE_BYTES) {
+				// No terminator in sight: the sender is misconfigured or the
+				// stream is out of sync, and a growing buffer cannot recover.
+				w->Error("Dropping {} bytes without a line terminator", buffer.size());
+				buffer.clear();
+			}
+			return result;
+		}
+		auto line = buffer.left(int(end));
+		buffer = buffer.mid(int(end) + 1);
+		if (line.endsWith('\r')) {
+			line.chop(1);
+		}
+		result.append(fromProto(alloc, string_view(line.constData(), size_t(line.size()))));
+	}
+}
+
 static QByteArray dumpMsgpackProto(QVariant const& msg) {
 
 	jv::DefaultArena alloc;
@@ -55,6 +85,13 @@ static QByteArray dumpMsgpackProto(QVariant const& msg) {
     membuff::StringOut<QByteArray> buff;
     DumpMsgPackInto(buff, json);
     return buff.Consume();
+}
+
+static QByteArray dumpTextProto(QVariant const& msg) {
+	if (msg.metaType().id() != QMetaType::QString) {
+		Raise("protocol \"text\" sends strings only, got {}", msg.metaType().name());
+	}
+	return msg.toString().toUtf8();
 }
 
 static uint16_t CRC16_Modbus (const char *nData, size_t wLength)
@@ -108,7 +145,6 @@ static uint16_t CRC16_Modbus (const char *nData, size_t wLength)
 }
 
 static QByteArray dumpSlipFrames(QVariant const& msg, ProtoDumper intoProto, BinaryConfig const& config) {
-
     QByteArray buffer;
     auto wrapped = intoProto(msg);
     if (auto crc = config.crc) {
@@ -125,6 +161,16 @@ static QByteArray dumpSlipFrames(QVariant const& msg, ProtoDumper intoProto, Bin
 	});
 	buffer += slipa::END;
 	return buffer;
+}
+
+static QByteArray dumpLineFrames(QVariant const& msg, ProtoDumper intoProto, BinaryConfig const&) {
+	auto wrapped = intoProto(msg);
+	if (wrapped.contains('\n')) {
+		// A line frame cannot carry a newline: the receiver would split it.
+		Raise("line framing cannot send a payload with a newline in it");
+	}
+	wrapped += '\n';
+	return wrapped;
 }
 
 struct radapter::BinaryWorker::Impl {
@@ -149,12 +195,22 @@ radapter::BinaryWorker::BinaryWorker(BinaryConfig const& config, Instance* paren
 		d->framesParser = parseSlipFrames;
 		break;
 	}
+    case BinaryFraming::line: {
+		d->framesDumper = dumpLineFrames;
+		d->framesParser = parseLineFrames;
+		break;
+	}
 	}
 	switch (config.protocol)
 	{
     case BinaryProtocol::msgpack: {
 		d->protoDumper = dumpMsgpackProto;
 		d->protoParser = parseMsgpackProto;
+		break;
+	}
+    case BinaryProtocol::text: {
+		d->protoDumper = dumpTextProto;
+		d->protoParser = parseTextProto;
 		break;
 	}
 	}

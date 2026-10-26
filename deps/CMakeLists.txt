@@ -22,8 +22,8 @@ endif()
 
 CPMAddPackage(NAME Boost
     VERSION 1.92.0
-    URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
-    URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
+    URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.7z
+    URL_HASH SHA256=158852d45a7ce23de167a3dc2e57b04490829b233f06e835d5c81a65547ef68b
 )
 
 CPMAddPackage(NAME rpcxx

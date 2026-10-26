@@ -495,7 +495,9 @@ nested described structs all compose recursively.
   new dir under `src/workers/`, declare its `builtin::workers::<name>(Instance*)` init in
   `src/builtin.hpp`, and add it to `_all[]` in `src/builtin.cpp`.
 - `src/workers/binary_worker.{hpp,cpp}` is a shared base for framed binary protocols (SLIP
-  framing, msgpack, optional CRC) — reuse it for new serial/socket binary workers.
+  framing, msgpack, optional CRC) and for line protocols (`framing = "line"` splits on
+  `\n`, `protocol = "text"` hands each line to Lua as a string, a sent string is
+  terminated with `\n`) — reuse it for new serial/socket binary workers.
 
 ## Git workflow
 
