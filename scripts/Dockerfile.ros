@@ -115,12 +115,16 @@ FROM dev AS cross-builder
 ARG TARGET_ARCH=aarch64
 ARG RADAPTER_JIT
 ARG BUILD_JOBS=4
+ARG BOOST_CACHE_BUST=
 USER root
 COPY . /src
 WORKDIR /src
 ENV CPM_SOURCE_CACHE=/cpm
+# Any non-empty BOOST_CACHE_BUST drops the cached Boost sources first so CPM
+# re-fetches them; CPM keys the cache dir by the lowercased package name.
 RUN --mount=type=cache,target=/cpm \
-    bash -c "source /opt/ros/jazzy/setup.bash && cmake \
+    bash -c "if [ -n '${BOOST_CACHE_BUST}' ]; then rm -rf /cpm/boost; fi && \
+        source /opt/ros/jazzy/setup.bash && cmake \
         -D CMAKE_BUILD_TYPE=Release \
         -D RADAPTER_GUI=OFF \
         -D RADAPTER_ROS2=ON \
@@ -160,12 +164,16 @@ COPY --from=cross-builder /build/bin/libradapter_ros.so /libradapter_ros_${TARGE
 FROM dev AS native-builder
 ARG RADAPTER_JIT
 ARG BUILD_JOBS=4
+ARG BOOST_CACHE_BUST=
 USER root
 COPY . /src
 WORKDIR /src
 ENV CPM_SOURCE_CACHE=/cpm
+# Any non-empty BOOST_CACHE_BUST drops the cached Boost sources first so CPM
+# re-fetches them; CPM keys the cache dir by the lowercased package name.
 RUN --mount=type=cache,target=/cpm \
-    bash -c "source /opt/ros/jazzy/setup.bash && cmake \
+    bash -c "if [ -n '${BOOST_CACHE_BUST}' ]; then rm -rf /cpm/boost; fi && \
+        source /opt/ros/jazzy/setup.bash && cmake \
         -D CMAKE_BUILD_TYPE=Release \
         -D CMAKE_PREFIX_PATH=/opt/ros/jazzy \
         -D RADAPTER_GUI=OFF \
