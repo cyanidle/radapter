@@ -2,6 +2,7 @@
 #include "radapter/async_helpers.hpp"
 #include <QVariant>
 #include <QCoreApplication>
+#include <clocale>
 #include <QMap>
 #include <QTimer>
 #include <qdatetime.h>
@@ -140,6 +141,13 @@ Instance::Instance(QObject *parent) :
     d(new Impl)
 {
     d->self = this;
+    // Lua converts numbers through the C library (snprintf/strtod), and Qt's
+    // QCoreApplication constructor runs setlocale(LC_ALL, "") from the env —
+    // under a comma LC_NUMERIC tostring(0.5) becomes "0,5" and leaks into
+    // every protocol string a script builds. Lua's reference semantics are
+    // the C locale; pin LC_NUMERIC back to it (Qt's own formatting reads the
+    // env directly and is not affected).
+    setlocale(LC_NUMERIC, "C");
     auto L = d->L = luaL_newstate();
     init_qrc();
     lua_gc(L, LUA_GCSTOP, 0);
