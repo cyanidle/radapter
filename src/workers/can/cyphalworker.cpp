@@ -452,6 +452,14 @@ private:
         if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, reinterpret_cast<CanardRxSubscription**>(&sub))) {
             return;
         }
+        // On success libcanard hands the payload over to the application, and
+        // canard.h requires it back; one guard covers every branch below,
+        // including the early return and any branch added later.
+        defer free_payload([this, &transfer]{
+            if (transfer.payload) {
+                canard.memory_free(&canard, transfer.payload);
+            }
+        });
         // Only a *request* on the fixed GetInfo port is ours to answer: a
         // response travels on the same port number and belongs to the
         // request/response correlation below, whose subscription has no
@@ -473,14 +481,10 @@ private:
                 // handler to pull, and in_flight.end() must not be dereferenced
                 Error("Could not find response handler for server:{} port:{} transfer_id:{}",
                       meta.remote_node_id, meta.port_id, meta.transfer_id);
-                canard.memory_free(&canard, transfer.payload);
                 return;
             }
             auto& handler = curr->second;
             auto res = req_port->resp_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
-            // libcanard hands the payload over to us once canardRxAccept accepted
-            // the transfer
-            canard.memory_free(&canard, transfer.payload);
             handler.promise(std::move(res));
             req_port->in_flight.erase(curr);
             if (req_port->in_flight.empty())
@@ -489,7 +493,6 @@ private:
             auto* service = static_cast<Service*>(sub);
             auto meta = transfer.metadata;
             QVariant req = service->req_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
-            canard.memory_free(&canard, transfer.payload);
             service->handler(req).AtLastSync([ref = QPointer(this), service, meta](fut::Result<QVariant> res){
                 auto self = ref.data();
                 if (!self)
@@ -499,7 +502,6 @@ private:
         } else {
             auto* rx_sub = static_cast<RxSub*>(sub);
             QVariant msg = rx_sub->dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
-            canard.memory_free(&canard, transfer.payload);
             emit SendMsgField(rx_sub->name, msg);
         }
     } catch (std::exception& e) {
