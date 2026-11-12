@@ -55,5 +55,17 @@ local res2, err2 = server:Request({ type = "uavcan.node.GetInfo.1.0", server = 6
 assert(res2 ~= nil and err2 == nil, "GetInfo the other way was not answered: " .. tostring(err2))
 assert(res2.name == "cyphal-test-client", "GetInfo lost the client's name: " .. tostring(res2.name))
 
+-- A request sent after the port has gone idle must not reuse a transfer id the
+-- server still remembers: it would treat the request as a duplicate and stay
+-- silent, so this answers only while the port keeps its transfer-id counter.
+for _, gap in ipairs({ 1200, 1200, 700 }) do
+    sleep(gap)
+    local res3, err3 = client:Request({ type = "uavcan.node.GetInfo.1.0", server = 60, port = 430 },
+        { timeout = 2000 }):await()
+    assert(res3 ~= nil and err3 == nil,
+        ("a GetInfo after a %d ms idle gap timed out: %s"):format(gap, tostring(err3)))
+    assert(res3.name == "cyphal-test-server", "the spaced GetInfo lost the node name")
+end
+
 print("can_cyphal: ok")
 os.exit(0)

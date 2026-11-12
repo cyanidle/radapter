@@ -269,9 +269,8 @@ public:
     }
 
     void checkReqTimeouts() {
-        for (auto port = reqs.begin(); port != reqs.end();)
-        {
-            auto& in_flight = port->second.in_flight;
+        for (auto& [port_id, port] : reqs) {
+            auto& in_flight = port.in_flight;
             for (auto req = in_flight.begin(); req != in_flight.end();) {
                 if (req->second.timeout < 500ms) {
                     req = in_flight.erase(req);
@@ -280,11 +279,11 @@ public:
                     ++req;
                 }
             }
-            if (port->second.in_flight.empty()) {
-                canardRxUnsubscribe(&canard, CanardTransferKindResponse, port->second.port_id);
-                port = reqs.erase(port);
-            } else {
-                ++port;
+            if (in_flight.empty()) {
+                // Unsubscribe, but keep the port: its transfer-id counter has to
+                // keep counting across idle gaps, or the next request reuses an
+                // id the server still remembers and gets deduplicated
+                canardRxUnsubscribe(&canard, CanardTransferKindResponse, port_id);
             }
         }
     }
@@ -334,7 +333,9 @@ public:
             // the extent bounds the payload libcanard will accept, so it must be
             // the *response* type's: GetInfo's request extent is zero, and a
             // zero extent truncates the answer to nothing
-            canardRxSubscribe(&canard, CanardTransferKindResponse, params.port, resp->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, &port);
+            if (!canardRxSubscribe(&canard, CanardTransferKindResponse, params.port, resp->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, &port)) {
+                Raise("Could not subscribe to the responses on port:{}", params.port);
+            }
         }
 
         fut::Future<QVariant> future = state.promise.GetFuture();
@@ -472,10 +473,14 @@ private:
                 // handler to pull, and in_flight.end() must not be dereferenced
                 Error("Could not find response handler for server:{} port:{} transfer_id:{}",
                       meta.remote_node_id, meta.port_id, meta.transfer_id);
+                canard.memory_free(&canard, transfer.payload);
                 return;
             }
             auto& handler = curr->second;
             auto res = req_port->resp_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
+            // libcanard hands the payload over to us once canardRxAccept accepted
+            // the transfer
+            canard.memory_free(&canard, transfer.payload);
             handler.promise(std::move(res));
             req_port->in_flight.erase(curr);
             if (req_port->in_flight.empty())
