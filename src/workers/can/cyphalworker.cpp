@@ -331,7 +331,10 @@ public:
         meta.transfer_kind = CanardTransferKindRequest;
 
         if (port.in_flight.size() == 1) {
-            canardRxSubscribe(&canard, CanardTransferKindResponse, params.port, req->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, &port);
+            // the extent bounds the payload libcanard will accept, so it must be
+            // the *response* type's: GetInfo's request extent is zero, and a
+            // zero extent truncates the answer to nothing
+            canardRxSubscribe(&canard, CanardTransferKindResponse, params.port, resp->extent, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, &port);
         }
 
         fut::Future<QVariant> future = state.promise.GetFuture();
@@ -465,8 +468,11 @@ private:
             RequestsPort* req_port = static_cast<RequestsPort*>(sub);
             auto curr = req_port->in_flight.find(meta.transfer_id);
             if (curr == req_port->in_flight.end()) {
+                // a late answer to a request that already timed out: there is no
+                // handler to pull, and in_flight.end() must not be dereferenced
                 Error("Could not find response handler for server:{} port:{} transfer_id:{}",
                       meta.remote_node_id, meta.port_id, meta.transfer_id);
+                return;
             }
             auto& handler = curr->second;
             auto res = req_port->resp_dyn->deserialize(reinterpret_cast<const uint8_t*>(transfer.payload), transfer.payload_size);
