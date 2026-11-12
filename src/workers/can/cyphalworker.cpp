@@ -253,8 +253,12 @@ public:
             Dump(config.node_info, node_info_resp);
             auto* info_sub = &subs_storage.emplace_back();
             info_sub->user_reference = (void*)lookup_canard_type(u"uavcan.node.GetInfo.Response.1.0");
-            assert(info_sub->user_reference);
-            canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub);
+            if (!info_sub->user_reference) {
+                Raise("GetInfo response type is not registered");
+            }
+            if (!canardRxSubscribe(&canard, CanardTransferKindRequest, uavcan_node_GetInfo_1_0_FIXED_PORT_ID_, uavcan_node_GetInfo_Request_1_0_EXTENT_BYTES_, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC, info_sub)) {
+                Raise("Could not subscribe to the GetInfo request port");
+            }
         }
         add_filter(canardMakeFilterForServices(config.node_id));
         can->get_device()->setConfigurationParameter(QCanBusDevice::RawFilterKey, QVariant::fromValue(filterList));
@@ -444,7 +448,13 @@ private:
         if (!canardRxAccept(&canard, micros(), &rxf, 0, &transfer, reinterpret_cast<CanardRxSubscription**>(&sub))) {
             return;
         }
-        if (transfer.metadata.port_id == uavcan_node_GetInfo_1_0_FIXED_PORT_ID_) {
+        // Only a *request* on the fixed GetInfo port is ours to answer: a
+        // response travels on the same port number and belongs to the
+        // request/response correlation below, whose subscription has no
+        // GetInfo type attached.
+        const bool get_info = transfer.metadata.transfer_kind == CanardTransferKindRequest
+            && transfer.metadata.port_id == uavcan_node_GetInfo_1_0_FIXED_PORT_ID_;
+        if (get_info) {
             auto* resp_dyn = static_cast<const CanardMessageDynamic*>(sub->user_reference);
             auto meta = transfer.metadata;
             meta.transfer_kind = CanardTransferKindResponse;
